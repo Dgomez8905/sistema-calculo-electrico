@@ -134,18 +134,19 @@ export default function LandingAndAuthView({
   // ===========================================================================
   if (mode === "landing") {
     return (
-      <div className="relative min-h-screen bg-[#f8fafc] text-slate-900 flex flex-col isolate">
-        {/* Marca de agua de fondo en blanco y negro tenue (Esquema eléctrico CAD y sistema B.T.) */}
+      <div className="relative min-h-screen bg-[#f4f7fb] text-slate-900 flex flex-col isolate">
+        {/* Marca de agua de fondo en blanco y negro resaltada (Esquema eléctrico CAD y sistema B.T.) */}
         <div
           aria-hidden="true"
-          className="pointer-events-none fixed inset-0 -z-10 bg-cover bg-center bg-no-repeat opacity-[0.42] grayscale contrast-125 mix-blend-multiply"
+          className="pointer-events-none fixed inset-0 -z-10 bg-cover bg-center bg-no-repeat opacity-95 mix-blend-multiply"
           style={{
             backgroundImage: "url('/bg-electrical-cad.jpg')",
+            filter: "grayscale(100%) contrast(280%) brightness(88%)",
           }}
         />
         <div
           aria-hidden="true"
-          className="pointer-events-none fixed inset-0 -z-10 bg-gradient-to-b from-white/55 via-white/35 to-[#f8fafc]/65"
+          className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(#94a3b8_1px,transparent_1px)] [background-size:28px_28px] opacity-25"
         />
 
         {/* Navegación Superior Responsive */}
@@ -196,7 +197,7 @@ export default function LandingAndAuthView({
 
         {/* Hero Principal */}
         <main className="flex-1">
-          <section className="relative overflow-hidden border-b border-slate-200/80 bg-gradient-to-b from-white/50 via-blue-50/20 to-transparent py-12 sm:py-20">
+          <section className="relative overflow-hidden border-b border-slate-200/80 bg-white/25 py-12 sm:py-20">
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
               <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-12">
                 <div className="space-y-6 lg:col-span-7">
@@ -456,17 +457,18 @@ export default function LandingAndAuthView({
   // VISTA 2 Y 3: LOGIN Y RESTABLECIMIENTO DE CONTRASEÑA
   // ===========================================================================
   return (
-    <div className="relative min-h-screen bg-[#f8fafc] flex flex-col justify-between p-4 sm:p-6 isolate">
+    <div className="relative min-h-screen bg-[#f4f7fb] flex flex-col justify-between p-4 sm:p-6 isolate">
       <div
         aria-hidden="true"
-        className="pointer-events-none fixed inset-0 -z-10 bg-cover bg-center bg-no-repeat opacity-[0.42] grayscale contrast-125 mix-blend-multiply"
+        className="pointer-events-none fixed inset-0 -z-10 bg-cover bg-center bg-no-repeat opacity-95 mix-blend-multiply"
         style={{
           backgroundImage: "url('/bg-electrical-cad.jpg')",
+          filter: "grayscale(100%) contrast(280%) brightness(88%)",
         }}
       />
       <div
         aria-hidden="true"
-        className="pointer-events-none fixed inset-0 -z-10 bg-gradient-to-b from-white/55 via-white/35 to-[#f8fafc]/65"
+        className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(#94a3b8_1px,transparent_1px)] [background-size:28px_28px] opacity-25"
       />
       <div className="mx-auto w-full max-w-6xl pt-2">
         <button
