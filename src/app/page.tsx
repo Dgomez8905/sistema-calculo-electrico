@@ -921,148 +921,68 @@ export default function SistemaCalculoRebtPage() {
   const navItems: {
     id: ActiveSection;
     label: string;
-    subtitle: string;
     icon: React.ReactNode;
-    badge?: string;
   }[] = [
     {
       id: "dashboard_tecnico",
-      label: "Dashboard del Técnico",
-      subtitle: "KPIs de cálculo y monitor REBT",
+      label: "Dashboard",
       icon: <LayoutDashboard className="h-4 w-4" />,
     },
     {
       id: "expedientes",
       label: "Mis Expedientes",
-      subtitle: "Reportes aislados por usuario",
       icon: <FolderOpen className="h-4 w-4" />,
-      badge: String(isolatedProjects.length),
     },
     {
       id: "titular_ubicacion",
-      label: "1. Titular y Ubicación",
-      subtitle: "Datos administrativos e instalador",
+      label: "Titular y Ubicación",
       icon: <MapPin className="h-4 w-4" />,
     },
     {
       id: "circuitos",
-      label: "2. Cuadro de Circuitos",
-      subtitle: "ITC-BT-15 / 19 / 25 (mm² y PIA)",
+      label: "Cuadro de Circuitos",
       icon: <Activity className="h-4 w-4" />,
-      badge: `${calculatedCircuits.length} cir.`,
     },
     {
       id: "edificio_itc10",
-      label: "3. Previsión Edificio y LGA",
-      subtitle: "ITC-BT-10 / 14 / 52 (Recarga VE)",
+      label: "Previsión de Edificio",
       icon: <Building2 className="h-4 w-4" />,
     },
     {
       id: "tierras_legalizacion",
-      label: "4. Tierra y Legalización",
-      subtitle: "ITC-BT-04 / 05 / 18 / 24",
+      label: "Tierra y Legalización",
       icon: <FileCheck2 className="h-4 w-4" />,
     },
     {
       id: "ficha_mtd",
-      label: "5. Ficha Oficial M.T.D.",
-      subtitle: "Vista previa y descarga opcional",
+      label: "Ficha Técnica M.T.D.",
       icon: <FileSpreadsheet className="h-4 w-4" />,
-      badge: "Opcional",
     },
     {
       id: "administracion",
-      label: "6. Dashboard Admin y Usuarios",
-      subtitle: "KPIs Multitenant y Permisología",
+      label: "Administración",
       icon: <ShieldCheck className="h-4 w-4" />,
-      badge: `${users.length} usu.`,
     },
   ];
 
   return (
     <div className="flex min-h-screen bg-[#f8fafc] text-slate-900">
       {/* =====================================================================
-          MENÚ LATERAL IZQUIERDO (ESTILO GOOGLE WORKSPACE / MICROSOFT FLUENT)
+          MENÚ LATERAL IZQUIERDO SIMPLIFICADO (SOLO ICONO + TEXTO DEL APARTADO)
          ===================================================================== */}
-      <aside className="no-print sticky top-0 flex h-screen w-72 shrink-0 flex-col border-r border-slate-200 bg-white">
+      <aside className="no-print sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r border-slate-200 bg-white">
         {/* Marca / Cabecera Lateral */}
         <div className="flex items-center gap-3 border-b border-slate-200 px-5 py-4">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#0f6cbd] text-white shadow-xs">
-            <Zap className="h-5 w-5" />
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#0f6cbd] text-white shadow-xs">
+            <Zap className="h-4 w-4" />
           </div>
-          <div>
-            <h1 className="text-sm font-bold tracking-tight text-slate-900">
-              REBT Cloud Suite
-            </h1>
-            <p className="text-[11px] font-medium text-slate-500">
-              Cálculo B.T. y Gestión M.T.D.
-            </p>
-          </div>
+          <span className="text-sm font-bold tracking-tight text-slate-900">
+            REBT Cloud Suite
+          </span>
         </div>
 
-        {/* Tarjeta de Usuario y Tenant Activo */}
-        <div className="border-b border-slate-200 bg-slate-50/70 p-4">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-[#0f6cbd] ring-1 ring-[#0f6cbd]/20">
-                <Building className="h-3 w-3" />
-                {currentTenant?.name}
-              </span>
-              <p className="mt-1.5 truncate text-xs font-bold text-slate-900">
-                {currentUser?.full_name}
-              </p>
-              <p className="truncate text-[11px] text-slate-500">
-                {currentUser?.email}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                setLoginEmail(currentUser?.email || "");
-                setLoginPin("1234");
-                setShowLoginModal(true);
-              }}
-              className="shrink-0 rounded-lg border border-slate-300 bg-white p-1.5 text-slate-600 shadow-2xs transition hover:bg-slate-100 hover:text-slate-900"
-              title="Cambiar de Usuario / Iniciar Sesión"
-            >
-              <LogOut className="h-3.5 w-3.5" />
-            </button>
-          </div>
-
-          {/* Selector Rápido de Usuario para probar el aislamiento de reportes */}
-          <div className="mt-3">
-            <label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-              Cambio rápido de cuenta (Multitenant):
-            </label>
-            <select
-              value={currentUser?.id || 1}
-              onChange={(e) => {
-                const target = users.find(
-                  (u) => u.id === Number(e.target.value)
-                );
-                if (target) switchActiveUser(target);
-              }}
-              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 shadow-2xs focus:border-[#0f6cbd] focus:outline-none"
-            >
-              {users
-                .filter((u) => u.is_active)
-                .map((u) => {
-                  const t = tenants.find((ten) => ten.id === u.tenant_id);
-                  return (
-                    <option key={u.id} value={u.id}>
-                      {u.full_name} — [{t?.name}]
-                    </option>
-                  );
-                })}
-            </select>
-          </div>
-        </div>
-
-        {/* Navegación por Apartados */}
+        {/* Navegación Limpia y Minimalista */}
         <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
-          <div className="px-2 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-            Módulos del Sistema
-          </div>
           {navItems.map((item) => {
             const isActive = activeSection === item.id;
             return (
@@ -1070,59 +990,32 @@ export default function SistemaCalculoRebtPage() {
                 key={item.id}
                 type="button"
                 onClick={() => setActiveSection(item.id)}
-                className={`group flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left transition ${
+                className={`flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-left text-xs transition ${
                   isActive
-                    ? "bg-[#e8f0fe] text-[#0f6cbd] font-semibold shadow-2xs"
-                    : "text-slate-700 hover:bg-slate-100"
+                    ? "bg-[#e8f0fe] text-[#0f6cbd] font-semibold"
+                    : "font-medium text-slate-700 hover:bg-slate-100"
                 }`}
               >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div
-                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition ${
-                      isActive
-                        ? "bg-[#0f6cbd] text-white"
-                        : "bg-slate-100 text-slate-600 group-hover:bg-white"
-                    }`}
-                  >
-                    {item.icon}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="truncate text-xs font-semibold">
-                      {item.label}
-                    </div>
-                    <div className="truncate text-[10px] text-slate-500">
-                      {item.subtitle}
-                    </div>
-                  </div>
-                </div>
-                {item.badge && (
-                  <span
-                    className={`ml-2 shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                      isActive
-                        ? "bg-[#0f6cbd] text-white"
-                        : "bg-slate-200/80 text-slate-600"
-                    }`}
-                  >
-                    {item.badge}
-                  </span>
-                )}
+                <span
+                  className={
+                    isActive ? "text-[#0f6cbd]" : "text-slate-500"
+                  }
+                >
+                  {item.icon}
+                </span>
+                <span className="truncate">{item.label}</span>
               </button>
             );
           })}
         </nav>
 
-        {/* Pie del Menú Lateral */}
-        <div className="border-t border-slate-200 p-4 text-[11px] text-slate-500">
-          <div className="flex items-center justify-between">
-            <span>Estado Base de Datos:</span>
-            <span className="inline-flex items-center gap-1 font-semibold text-emerald-700">
-              <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
-              {isSupabaseConfigured ? "Supabase Online" : "Local"}
-            </span>
-          </div>
-          <p className="mt-1 text-[10px] text-slate-400">
-            REBT RD 842/2002 · ITC-BT-01 a BT-52
-          </p>
+        {/* Estado compacto al pie */}
+        <div className="border-t border-slate-200 px-4 py-3 text-[11px] text-slate-500 flex items-center justify-between">
+          <span>REBT RD 842/2002</span>
+          <span className="inline-flex items-center gap-1 font-semibold text-emerald-700">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+            {isSupabaseConfigured ? "Online" : "Local"}
+          </span>
         </div>
       </aside>
 
@@ -1130,72 +1023,104 @@ export default function SistemaCalculoRebtPage() {
           ÁREA DE CONTENIDO PRINCIPAL
          ===================================================================== */}
       <div className="flex flex-1 flex-col min-w-0">
-        {/* Barra Superior Limpia estilo Google / Microsoft */}
-        <header className="no-print sticky top-0 z-10 flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 bg-white/95 px-6 py-3.5 backdrop-blur">
-          <div className="flex items-center gap-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-[#0f6cbd]">
-                  {mtdMeta.expedienteNum}
-                </span>
-                <ChevronRight className="h-3.5 w-3.5 text-slate-400" />
-                <span className="text-sm font-bold text-slate-900">
-                  {mtdMeta.titularNombre || "Nuevo Expediente REBT (Sin Titular)"}
-                </span>
-                {activeProjectId && (
-                  <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 ring-1 ring-emerald-600/20">
-                    ID #{activeProjectId}
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-slate-500">
-                Propietario del reporte:{" "}
-                <strong className="text-slate-700">
-                  {currentUser?.full_name}
-                </strong>{" "}
-                · Empresa:{" "}
-                <strong className="text-slate-700">
-                  {currentTenant?.name}
-                </strong>{" "}
-                · Potencia prevista:{" "}
-                <strong className="text-[#0f6cbd]">
-                  {cgmpSummary.contractDesignWatts.toLocaleString()} W (IGA{" "}
-                  {cgmpSummary.igaAmps} A)
-                </strong>
-              </p>
-            </div>
+        {/* Barra Superior con Acciones y Perfil de Sesión Organizado Arriba a la Derecha */}
+        <header className="no-print sticky top-0 z-10 flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 bg-white/95 px-6 py-3 backdrop-blur">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="rounded-md bg-blue-50 px-2 py-1 text-xs font-bold text-[#0f6cbd]">
+              {mtdMeta.expedienteNum}
+            </span>
+            <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+            <span className="truncate text-sm font-bold text-slate-900">
+              {mtdMeta.titularNombre || "Nuevo Expediente REBT"}
+            </span>
+            {activeProjectId && (
+              <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 ring-1 ring-emerald-600/20">
+                #{activeProjectId}
+              </span>
+            )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5">
-            <button
-              type="button"
-              onClick={() =>
-                startNewBlankProjectForUser(currentUser, currentTenant)
-              }
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50"
-            >
-              <FilePlus2 className="h-4 w-4 text-slate-500" />
-              Nuevo Reporte Limpio
-            </button>
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Botones de Acción del Expediente */}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  startNewBlankProjectForUser(currentUser, currentTenant)
+                }
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50"
+              >
+                <FilePlus2 className="h-3.5 w-3.5 text-slate-500" />
+                Nuevo
+              </button>
 
-            <button
-              type="button"
-              onClick={() => setActiveSection("ficha_mtd")}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50/70 px-3 py-2 text-xs font-semibold text-[#0f6cbd] transition hover:bg-blue-100/70"
-            >
-              <Printer className="h-4 w-4" />
-              Ficha M.T.D. (Opcional)
-            </button>
+              <button
+                type="button"
+                onClick={() => setActiveSection("ficha_mtd")}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50/70 px-3 py-1.5 text-xs font-semibold text-[#0f6cbd] transition hover:bg-blue-100/70"
+              >
+                <Printer className="h-3.5 w-3.5" />
+                Ficha M.T.D.
+              </button>
 
-            <button
-              type="button"
-              onClick={handleSaveToSupabase}
-              disabled={isSaving || !currentUser?.can_create_projects}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-[#0f6cbd] px-4 py-2 text-xs font-semibold text-white shadow-xs transition hover:bg-[#115ea3] disabled:opacity-50"
-            >
-              <Save className="h-4 w-4" />
-              {isSaving ? "Guardando..." : "Guardar Reporte del Usuario"}
-            </button>
+              <button
+                type="button"
+                onClick={handleSaveToSupabase}
+                disabled={isSaving || !currentUser?.can_create_projects}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[#0f6cbd] px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:bg-[#115ea3] disabled:opacity-50"
+              >
+                <Save className="h-3.5 w-3.5" />
+                {isSaving ? "Guardando..." : "Guardar"}
+              </button>
+            </div>
+
+            <div className="h-6 w-px bg-slate-200" />
+
+            {/* Perfil de Sesión Organizado en la Esquina Superior Derecha */}
+            <div className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-slate-50/90 px-3 py-1.5 shadow-2xs">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#0f6cbd] text-xs font-bold text-white">
+                {currentUser?.full_name.charAt(0).toUpperCase()}
+              </div>
+              <div className="min-w-0">
+                <select
+                  value={currentUser?.id || 1}
+                  onChange={(e) => {
+                    const target = users.find(
+                      (u) => u.id === Number(e.target.value)
+                    );
+                    if (target) switchActiveUser(target);
+                  }}
+                  className="block max-w-[210px] truncate bg-transparent text-xs font-bold text-slate-900 focus:outline-none cursor-pointer"
+                  title="Cambiar cuenta activa (Multitenant)"
+                >
+                  {users
+                    .filter((u) => u.is_active)
+                    .map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.full_name}
+                      </option>
+                    ))}
+                </select>
+                <div className="flex items-center gap-1 text-[10px] text-slate-500">
+                  <Building className="h-2.5 w-2.5 text-[#0f6cbd]" />
+                  <span className="truncate max-w-[180px]">
+                    {currentTenant?.name}
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setLoginEmail(currentUser?.email || "");
+                  setLoginPin("1234");
+                  setShowLoginModal(true);
+                }}
+                className="ml-1 rounded-lg border border-slate-200 bg-white p-1.5 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
+                title="Iniciar sesión con otra cuenta / PIN"
+              >
+                <LogOut className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
         </header>
 
