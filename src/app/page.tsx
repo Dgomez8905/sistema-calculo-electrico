@@ -24,6 +24,7 @@ import {
   Lock,
   Building,
   ChevronRight,
+  LayoutDashboard,
 } from "lucide-react";
 import {
   RebtCircuitInput,
@@ -42,9 +43,14 @@ import {
   calculateEarthingItc18,
 } from "@/lib/electrical-calculations";
 import MtdCanariasOfficialForm from "@/components/MtdCanariasOfficialForm";
+import {
+  TechnicianDashboard,
+  AdminDashboardSummary,
+} from "@/components/DashboardsView";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 
 type ActiveSection =
+  | "dashboard_tecnico"
   | "expedientes"
   | "titular_ubicacion"
   | "circuitos"
@@ -172,7 +178,7 @@ const FALLBACK_USERS: AppUser[] = [
 
 export default function SistemaCalculoRebtPage() {
   const [activeSection, setActiveSection] =
-    useState<ActiveSection>("expedientes");
+    useState<ActiveSection>("dashboard_tecnico");
 
   // Estado Multi-Tenant y Usuarios (RBAC)
   const [tenants, setTenants] = useState<AppTenant[]>(FALLBACK_TENANTS);
@@ -920,6 +926,12 @@ export default function SistemaCalculoRebtPage() {
     badge?: string;
   }[] = [
     {
+      id: "dashboard_tecnico",
+      label: "Dashboard del Técnico",
+      subtitle: "KPIs de cálculo y monitor REBT",
+      icon: <LayoutDashboard className="h-4 w-4" />,
+    },
+    {
       id: "expedientes",
       label: "Mis Expedientes",
       subtitle: "Reportes aislados por usuario",
@@ -960,8 +972,8 @@ export default function SistemaCalculoRebtPage() {
     },
     {
       id: "administracion",
-      label: "6. Administración y Usuarios",
-      subtitle: "Multitenencia y Permisología",
+      label: "6. Dashboard Admin y Usuarios",
+      subtitle: "KPIs Multitenant y Permisología",
       icon: <ShieldCheck className="h-4 w-4" />,
       badge: `${users.length} usu.`,
     },
@@ -1208,6 +1220,29 @@ export default function SistemaCalculoRebtPage() {
                 Cerrar
               </button>
             </div>
+          )}
+
+          {/* =================================================================
+              DASHBOARD OPERATIVO DEL TÉCNICO (KPIs Y MONITOR REBT)
+             ================================================================= */}
+          {activeSection === "dashboard_tecnico" && (
+            <TechnicianDashboard
+              currentUser={currentUser}
+              currentTenant={currentTenant}
+              isolatedProjects={isolatedProjects}
+              activeProjectId={activeProjectId}
+              mtdMeta={mtdMeta}
+              calculatedCircuits={calculatedCircuits}
+              cgmpSummary={cgmpSummary}
+              buildingForecast={buildingForecast}
+              earthingResult={earthingResult}
+              itc04Evaluation={itc04Evaluation}
+              onNavigate={(sec) => setActiveSection(sec)}
+              onLoadProject={(id) => handleLoadProject(id)}
+              onNewProject={() =>
+                startNewBlankProjectForUser(currentUser, currentTenant)
+              }
+            />
           )}
 
           {/* =================================================================
@@ -2670,22 +2705,31 @@ export default function SistemaCalculoRebtPage() {
           )}
 
           {/* =================================================================
-              APARTADO 6: ADMINISTRACIÓN, CREACIÓN DE USUARIOS Y PERMISOLOGÍA
+              APARTADO 6: DASHBOARD ADMINISTRATIVO, CREACIÓN DE USUARIOS Y PERMISOLOGÍA
              ================================================================= */}
           {activeSection === "administracion" && (
             <div className="space-y-6">
               <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs">
                 <span className="inline-flex items-center gap-1.5 rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-[#0f6cbd]">
                   <ShieldCheck className="h-3.5 w-3.5" />
-                  Centro de Administración Multi-Tenant y RBAC
+                  Dashboard Administrativo Multi-Tenant y RBAC
                 </span>
                 <h2 className="mt-2 text-lg font-bold text-slate-900">
-                  Gestión de Empresas (Tenants), Creación de Usuarios y Matriz de Permisología
+                  Métricas Globales, Empresas (Tenants), Creación de Usuarios y Matriz de Permisología
                 </h2>
                 <p className="mt-0.5 text-xs text-slate-500">
-                  Crea nuevas empresas instaladoras y usuarios independientes. Cada usuario creado dispone de su propio espacio de trabajo aislado para que sus reportes nunca se mezclen con los de otros usuarios.
+                  Supervisa las métricas de actividad por empresa, la cobertura de permisos RBAC y registra nuevas organizaciones y técnicos con espacios de trabajo aislados.
                 </p>
               </div>
+
+              {/* Dashboard Ejecutivo de Administración */}
+              <AdminDashboardSummary
+                tenants={tenants}
+                users={users}
+                allProjects={allProjects}
+                currentUser={currentUser}
+                onSwitchUser={(u) => switchActiveUser(u)}
+              />
 
               <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                 {/* Formulario 1: Crear Nuevo Usuario */}

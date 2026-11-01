@@ -138,3 +138,4 @@ set
   tenant_id = (select id from public.app_tenants order by id asc limit 1),
   owner_user_id = (select id from public.app_users order by id asc limit 1)
 where tenant_id is null;
+
