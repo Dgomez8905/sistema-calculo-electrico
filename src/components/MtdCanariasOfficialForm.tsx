@@ -384,224 +384,185 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
       : 0;
 
   return (
-    <div className="space-y-5">
-      {/* Barra de Herramientas Opcional de la Ficha Oficial M.T.D. (No se imprime) */}
-      <div className="no-print flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="max-w-2xl">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-600/20">
-              <Sparkles className="h-3.5 w-3.5" />
-              Descarga Opcional
+    <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+      {/* =====================================================================
+          COLUMNA IZQUIERDA (FIJA): SELECCIÓN DE APARTADO Y DESCARGA OPCIONAL
+         ===================================================================== */}
+      <div className="no-print w-full shrink-0 space-y-4 lg:sticky lg:top-20 lg:w-80 xl:w-96">
+        {/* Tarjeta 1: Selección de Apartado (Dropdown Minimalista) */}
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-[#0f6cbd]">
+              <Sparkles className="h-3 w-3" />
+              Navegador de Secciones
             </span>
-            <h2 className="text-base font-bold text-slate-900">
-              Ficha Técnica Oficial M.T.D. B.T. (Gobierno de Canarias · 11 Páginas)
-            </h2>
+            <span className="text-[11px] font-semibold text-slate-400">
+              {selectedPage === "all" ? "11 Hojas" : `Sección ${selectedPage}/11`}
+            </span>
           </div>
-          <p className="mt-1 text-xs text-slate-600">
-            Todos los datos registrados y los cálculos eléctricos del REBT se han volcado automáticamente en este documento. La descarga en PDF es totalmente opcional: puedes revisar o editar cualquier casilla en pantalla y exportar todas las 11 páginas o solo la hoja que necesites.
-          </p>
-        </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
-          <button
-            type="button"
-            onClick={() => setShowPreview((prev) => !prev)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-xs transition hover:bg-slate-50"
-          >
-            <Eye className="h-4 w-4 text-slate-500" />
-            {showPreview ? "Ocultar Vista Previa" : "Mostrar Vista Previa"}
-          </button>
+          <div className="relative">
+            <label className="block text-[11px] font-bold uppercase tracking-wide text-slate-500">
+              Seleccionar Apartado según su Contenido
+            </label>
 
-          {canExportMtd ? (
+            <button
+              type="button"
+              onClick={() => setIsSheetDropdownOpen((prev) => !prev)}
+              className="mt-1.5 flex w-full items-center justify-between gap-2.5 rounded-lg border border-slate-300 bg-slate-50/70 px-3 py-2 text-left text-xs font-semibold text-slate-900 shadow-2xs transition hover:bg-white focus:border-[#0f6cbd] focus:outline-none"
+            >
+              <span className="flex items-center gap-2 truncate">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[#e8f0fe] text-[#0f6cbd]">
+                  {selectedPage === "all" ? (
+                    <Layers className="h-3.5 w-3.5" />
+                  ) : (
+                    MTD_SHEETS_CATALOG.find((s) => s.page === selectedPage)
+                      ?.icon
+                  )}
+                </span>
+                <span className="truncate">
+                  {selectedPage === "all"
+                    ? "Vista Completa — Expediente M.T.D. B.T."
+                    : MTD_SHEETS_CATALOG.find((s) => s.page === selectedPage)
+                        ?.title}
+                </span>
+              </span>
+              <ChevronDown
+                className={`h-4 w-4 shrink-0 text-slate-500 transition-transform ${
+                  isSheetDropdownOpen ? "rotate-180" : ""
+                }`}
+              />
+            </button>
+
+            {isSheetDropdownOpen && (
+              <div className="absolute left-0 z-30 mt-1.5 max-h-96 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedPage("all");
+                    setIsSheetDropdownOpen(false);
+                  }}
+                  className={`flex w-full items-center justify-between gap-2.5 rounded-lg px-2.5 py-2 text-left text-xs transition ${
+                    selectedPage === "all"
+                      ? "bg-[#e8f0fe] font-bold text-[#0f6cbd]"
+                      : "font-medium text-slate-700 hover:bg-slate-100"
+                  }`}
+                >
+                  <span className="flex items-center gap-2 truncate">
+                    <Layers
+                      className={`h-4 w-4 shrink-0 ${
+                        selectedPage === "all"
+                          ? "text-[#0f6cbd]"
+                          : "text-slate-500"
+                      }`}
+                    />
+                    <span className="truncate">
+                      Vista Completa — Expediente M.T.D. B.T.
+                    </span>
+                  </span>
+                  {selectedPage === "all" && (
+                    <Check className="h-3.5 w-3.5 shrink-0 text-[#0f6cbd]" />
+                  )}
+                </button>
+
+                <div className="my-1 border-t border-slate-100" />
+
+                {MTD_SHEETS_CATALOG.map((sheet) => {
+                  const isActive = selectedPage === sheet.page;
+                  return (
+                    <button
+                      key={sheet.page}
+                      type="button"
+                      onClick={() => {
+                        setSelectedPage(sheet.page);
+                        setIsSheetDropdownOpen(false);
+                      }}
+                      className={`flex w-full items-center justify-between gap-2.5 rounded-lg px-2.5 py-2 text-left text-xs transition ${
+                        isActive
+                          ? "bg-[#e8f0fe] font-bold text-[#0f6cbd]"
+                          : "font-medium text-slate-700 hover:bg-slate-100"
+                      }`}
+                    >
+                      <span className="flex items-center gap-2 truncate">
+                        <span
+                          className={`shrink-0 ${
+                            isActive ? "text-[#0f6cbd]" : "text-slate-500"
+                          }`}
+                        >
+                          {sheet.icon}
+                        </span>
+                        <span className="truncate">{sheet.title}</span>
+                      </span>
+                      {isActive && (
+                        <Check className="h-3.5 w-3.5 shrink-0 text-[#0f6cbd]" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Botones de navegación rápida entre secciones */}
+          <div className="grid grid-cols-2 gap-2 pt-1">
             <button
               type="button"
               onClick={() => {
-                setShowPreview(true);
-                setTimeout(() => window.print(), 100);
+                if (selectedPage === "all") {
+                  setSelectedPage(1);
+                } else if (selectedPage > 1) {
+                  setSelectedPage(selectedPage - 1);
+                }
               }}
-              className="inline-flex items-center gap-2 rounded-lg bg-[#0f6cbd] px-4 py-2 text-xs font-semibold text-white shadow-xs transition hover:bg-[#115ea3]"
+              disabled={selectedPage === 1}
+              className="inline-flex items-center justify-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-40"
             >
-              <Printer className="h-4 w-4" />
-              {selectedPage === "all"
-                ? "Descargar / Imprimir Ficha M.T.D. (11 Páginas)"
-                : `Descargar / Imprimir solo Página ${selectedPage}/11`}
+              <ChevronLeft className="h-3.5 w-3.5" />
+              Anterior
             </button>
-          ) : (
-            <span className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
-              Tu perfil no tiene permiso para exportar PDF (solicítalo en Administración)
-            </span>
-          )}
-        </div>
-      </div>
 
-      {/* Selector Desplegable (Dropdown) de Hojas con Iconos Minimalistas y Sin Emojis */}
-      {showPreview && (
-        <div className="no-print rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            {/* Dropdown Minimalista con Iconos SVG */}
-            <div className="relative flex-1 min-w-[280px] max-w-2xl">
-              <label className="block text-[11px] font-bold uppercase tracking-wide text-slate-500">
-                Seleccionar Apartado de la Ficha M.T.D. según su Contenido
-              </label>
-
-              <button
-                type="button"
-                onClick={() => setIsSheetDropdownOpen((prev) => !prev)}
-                className="mt-1.5 flex w-full items-center justify-between gap-3 rounded-lg border border-slate-300 bg-slate-50/70 px-3.5 py-2 text-left text-xs font-semibold text-slate-900 shadow-2xs transition hover:bg-white focus:border-[#0f6cbd] focus:outline-none"
-              >
-                <span className="flex items-center gap-2.5 truncate">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[#e8f0fe] text-[#0f6cbd]">
-                    {selectedPage === "all" ? (
-                      <Layers className="h-3.5 w-3.5" />
-                    ) : (
-                      MTD_SHEETS_CATALOG.find((s) => s.page === selectedPage)
-                        ?.icon
-                    )}
-                  </span>
-                  <span className="truncate">
-                    {selectedPage === "all"
-                      ? "Vista Completa — Expediente M.T.D. B.T. Completo"
-                      : MTD_SHEETS_CATALOG.find((s) => s.page === selectedPage)
-                          ?.title}
-                  </span>
-                </span>
-                <ChevronDown
-                  className={`h-4 w-4 shrink-0 text-slate-500 transition-transform ${
-                    isSheetDropdownOpen ? "rotate-180" : ""
-                  }`}
-                />
-              </button>
-
-              {isSheetDropdownOpen && (
-                <div className="absolute left-0 z-30 mt-1.5 max-h-96 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedPage("all");
-                      setIsSheetDropdownOpen(false);
-                    }}
-                    className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-xs transition ${
-                      selectedPage === "all"
-                        ? "bg-[#e8f0fe] font-bold text-[#0f6cbd]"
-                        : "font-medium text-slate-700 hover:bg-slate-100"
-                    }`}
-                  >
-                    <span className="flex items-center gap-2.5 truncate">
-                      <Layers
-                        className={`h-4 w-4 shrink-0 ${
-                          selectedPage === "all"
-                            ? "text-[#0f6cbd]"
-                            : "text-slate-500"
-                        }`}
-                      />
-                      <span className="truncate">
-                        Vista Completa — Expediente M.T.D. B.T. Completo
-                      </span>
-                    </span>
-                    {selectedPage === "all" && (
-                      <Check className="h-3.5 w-3.5 shrink-0 text-[#0f6cbd]" />
-                    )}
-                  </button>
-
-                  <div className="my-1 border-t border-slate-100" />
-
-                  {MTD_SHEETS_CATALOG.map((sheet) => {
-                    const isActive = selectedPage === sheet.page;
-                    return (
-                      <button
-                        key={sheet.page}
-                        type="button"
-                        onClick={() => {
-                          setSelectedPage(sheet.page);
-                          setIsSheetDropdownOpen(false);
-                        }}
-                        className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-xs transition ${
-                          isActive
-                            ? "bg-[#e8f0fe] font-bold text-[#0f6cbd]"
-                            : "font-medium text-slate-700 hover:bg-slate-100"
-                        }`}
-                      >
-                        <span className="flex items-center gap-2.5 truncate">
-                          <span
-                            className={`shrink-0 ${
-                              isActive ? "text-[#0f6cbd]" : "text-slate-500"
-                            }`}
-                          >
-                            {sheet.icon}
-                          </span>
-                          <span className="truncate">{sheet.title}</span>
-                        </span>
-                        {isActive && (
-                          <Check className="h-3.5 w-3.5 shrink-0 text-[#0f6cbd]" />
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Controles rápidos de Navegación entre Hojas */}
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  if (selectedPage === "all") {
-                    setSelectedPage(1);
-                  } else if (selectedPage > 1) {
-                    setSelectedPage(selectedPage - 1);
-                  }
-                }}
-                disabled={selectedPage === 1}
-                className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-40"
-              >
-                <ChevronLeft className="h-3.5 w-3.5" />
-                Anterior
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  if (selectedPage === "all") {
-                    setSelectedPage(1);
-                  } else if (selectedPage < 11) {
-                    setSelectedPage(selectedPage + 1);
-                  }
-                }}
-                disabled={selectedPage === 11}
-                className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-40"
-              >
-                Siguiente
-                <ChevronRight className="h-3.5 w-3.5" />
-              </button>
-
-              {selectedPage !== "all" && (
-                <button
-                  type="button"
-                  onClick={() => setSelectedPage("all")}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#e8f0fe] px-3 py-2 text-xs font-semibold text-[#0f6cbd] transition hover:bg-blue-100"
-                >
-                  <Layers className="h-3.5 w-3.5" />
-                  Vista Completa
-                </button>
-              )}
-            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (selectedPage === "all") {
+                  setSelectedPage(1);
+                } else if (selectedPage < 11) {
+                  setSelectedPage(selectedPage + 1);
+                }
+              }}
+              disabled={selectedPage === 11}
+              className="inline-flex items-center justify-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-40"
+            >
+              Siguiente
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
           </div>
 
-          {/* Resumen de la información que recolecta la hoja seleccionada */}
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-blue-100 bg-blue-50/50 px-3.5 py-2 text-xs text-slate-700">
+          {selectedPage !== "all" && (
+            <button
+              type="button"
+              onClick={() => setSelectedPage("all")}
+              className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-[#e8f0fe] px-3 py-1.5 text-xs font-semibold text-[#0f6cbd] transition hover:bg-blue-100"
+            >
+              <Layers className="h-3.5 w-3.5" />
+              Mostrar Vista Completa (11 Hojas)
+            </button>
+          )}
+
+          {/* Descripción de la información recolectada */}
+          <div className="rounded-lg border border-blue-100 bg-blue-50/50 p-3 text-xs leading-relaxed text-slate-700">
             {selectedPage === "all" ? (
               <span>
-                <strong className="text-[#0f6cbd]">
-                  Mostrando el documento oficial completo:
-                </strong>{" "}
-                Datos del Titular y Características, Previsión de Cargas, Cuadro de Receptores, Memoria Descriptiva, Cálculos de Circuitos, Esquema Unifilar, Croquis, Plano en Planta y Declaración del Autor.
+                <strong className="block text-[#0f6cbd]">
+                  Documento Oficial Completo:
+                </strong>
+                Visualizando las 11 secciones autocompletadas del expediente M.T.D. B.T.
               </span>
             ) : (
               <span>
-                <strong className="text-[#0f6cbd]">
-                  Información recolectada en esta sección:
-                </strong>{" "}
+                <strong className="block text-[#0f6cbd]">
+                  Información recolectada:
+                </strong>
                 {
                   MTD_SHEETS_CATALOG.find((s) => s.page === selectedPage)
                     ?.collectedInfo
@@ -610,7 +571,55 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
             )}
           </div>
         </div>
-      )}
+
+        {/* Tarjeta 2: Descarga / Impresión Opcional y Control de Vista */}
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs space-y-3">
+          <div>
+            <h2 className="text-sm font-bold text-slate-900">
+              Ficha Técnica Oficial M.T.D. B.T.
+            </h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Todos los cálculos del REBT están volcados en la ficha de la derecha. Puedes editar cualquier casilla directamente sobre el documento.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            {canExportMtd ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPreview(true);
+                  setTimeout(() => window.print(), 100);
+                }}
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#0f6cbd] px-4 py-2.5 text-xs font-semibold text-white shadow-xs transition hover:bg-[#115ea3]"
+              >
+                <Printer className="h-4 w-4" />
+                {selectedPage === "all"
+                  ? "Descargar / Imprimir Ficha M.T.D."
+                  : "Descargar / Imprimir esta Sección"}
+              </button>
+            ) : (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs font-medium text-amber-800">
+                Tu perfil no tiene permiso para exportar PDF.
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setShowPreview((prev) => !prev)}
+              className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+            >
+              <Eye className="h-4 w-4 text-slate-500" />
+              {showPreview ? "Ocultar Vista Previa" : "Mostrar Vista Previa"}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* =====================================================================
+          COLUMNA DERECHA: DOCUMENTO OFICIAL M.T.D. B.T. (SIN SCROLL EXTRA)
+         ===================================================================== */}
+      <div className="min-w-0 flex-1 space-y-6">
 
       {/* =====================================================================
           PÁGINA 1/11: DATOS TITULAR, UBICACIÓN Y CARACTERÍSTICAS ELÉCTRICAS
@@ -3217,6 +3226,7 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
           <div className="mt-16 text-right text-sm font-bold">11/11</div>
         </div>
       )}
+      </div>
     </div>
   );
 }
