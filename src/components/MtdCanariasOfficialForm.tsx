@@ -1,7 +1,111 @@
 "use client";
 
 import React, { useState } from "react";
-import { Printer, Sparkles, Eye, Layers } from "lucide-react";
+import {
+  Printer,
+  Sparkles,
+  Eye,
+  Layers,
+  ChevronLeft,
+  ChevronRight,
+  FileText,
+} from "lucide-react";
+
+const MTD_SHEETS_CATALOG: {
+  page: number;
+  shortTitle: string;
+  fullLabel: string;
+  collectedInfo: string;
+}[] = [
+  {
+    page: 1,
+    shortTitle: "Datos del Titular, Ubicación y Características Eléctricas",
+    fullLabel:
+      "Hoja 1/11 — Datos del Titular, Ubicación, Canalizaciones, Protecciones y Tierra",
+    collectedInfo:
+      "Recolecta NIF/CIF del titular, dirección, uso, potencias, acometida, LGA, D.I., IGA, diferenciales y puesta a tierra.",
+  },
+  {
+    page: 2,
+    shortTitle: "Previsión de Potencia: Viviendas y Servicios Generales",
+    fullLabel:
+      "Hoja 2/11 — Previsión de Potencia de Viviendas y Servicios Generales (ITC-BT-10)",
+    collectedInfo:
+      "Recolecta nº de viviendas (básica/elevada), coeficiente de simultaneidad, ascensores, grupo de presión y alumbrado común.",
+  },
+  {
+    page: 3,
+    shortTitle: "Previsión de Potencia: Oficinas, Locales, Garajes e Industrias",
+    fullLabel:
+      "Hoja 3/11 — Previsión de Potencia en Oficinas, Locales, Garajes e Industrias",
+    collectedInfo:
+      "Recolecta superficies y potencias previstas de locales comerciales, oficinas, garajes (ventilación natural/forzada) y naves.",
+  },
+  {
+    page: 4,
+    shortTitle: "Relación de Receptores de Alumbrado y Fuerza Motriz",
+    fullLabel:
+      "Hoja 4/11 — Cuadro de Receptores de Alumbrado, Fuerza y Presupuesto",
+    collectedInfo:
+      "Recolecta el desglose de lámparas/luminarias, motores, tomas de fuerza, factor de potencia y presupuesto total de la obra.",
+  },
+  {
+    page: 5,
+    shortTitle: "Memoria Descriptiva de la Instalación de Baja Tensión",
+    fullLabel:
+      "Hoja 5/11 — Memoria Descriptiva Reglamentaria (REBT e ITC-BT)",
+    collectedInfo:
+      "Recolecta la descripción técnica del objeto, suministro, instalaciones de enlace, cuadro de mando y puesta a tierra.",
+  },
+  {
+    page: 6,
+    shortTitle: "Cálculos Justificativos de Líneas y Circuitos (Parte I)",
+    fullLabel:
+      "Hoja 6/11 — Tabla de Cálculos Eléctricos: LGA, D.I. y Circuitos C1 a C5",
+    collectedInfo:
+      "Recolecta potencia de cálculo, tensión, intensidad Ib, sección (mm²), PIA, caída de tensión ΔU% y diámetro de tubo.",
+  },
+  {
+    page: 7,
+    shortTitle: "Cálculos Justificativos de Líneas y Circuitos (Parte II)",
+    fullLabel:
+      "Hoja 7/11 — Tabla de Cálculos Eléctricos: Circuitos Adicionales y Recarga VE",
+    collectedInfo:
+      "Recolecta el cálculo de circuitos de electrificación elevada (C6 a C12), recarga de vehículo eléctrico (C13) y subcuadros.",
+  },
+  {
+    page: 8,
+    shortTitle: "Esquema Unifilar del Cuadro General de Mando y Protección",
+    fullLabel:
+      "Hoja 8/11 — Esquema Unifilar de Protecciones (CGMP, IGA, Diferenciales y PIAs)",
+    collectedInfo:
+      "Recolecta el diagrama unifilar reglamentario desde acometida/contador hasta cada circuito interior y sus calibres.",
+  },
+  {
+    page: 9,
+    shortTitle: "Croquis de Situación y Emplazamiento de la Instalación",
+    fullLabel:
+      "Hoja 9/11 — Croquis de Situación, Emplazamiento y Punto de Suministro",
+    collectedInfo:
+      "Recolecta el plano de localización geográfica del inmueble, callejero, coordenadas UTM y punto de conexión a la red.",
+  },
+  {
+    page: 10,
+    shortTitle: "Plano en Planta y Trazado de la Instalación Eléctrica",
+    fullLabel:
+      "Hoja 10/11 — Croquis de Trazado en Planta, Ubicación de CGP, CGMP y Tomas",
+    collectedInfo:
+      "Recolecta la distribución en planta de puntos de luz, interruptores, tomas de corriente, cuadro general y canalizaciones.",
+  },
+  {
+    page: 11,
+    shortTitle: "Autoría, Firma del Profesional Habilitado / Técnico y Notas",
+    fullLabel:
+      "Hoja 11/11 — Declaración del Autor (Instalador PH / Técnico) y Notas Oficiales",
+    collectedInfo:
+      "Recolecta los datos del Profesional Habilitado o Técnico Competente firmante, empresa instaladora, fecha/lugar y notas.",
+  },
+];
 import {
   MtdFormMetadata,
   RebtCalculatedCircuit,
@@ -327,35 +431,107 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
         </div>
       </div>
 
-      {/* Selector de Página rápida (No se imprime) */}
+      {/* Selector Desplegable (Dropdown) de Hojas según la Información que Recolecta */}
       {showPreview && (
-        <div className="no-print flex flex-wrap items-center gap-1.5 rounded-xl border border-slate-200 bg-white p-3 shadow-xs">
-          <button
-            type="button"
-            onClick={() => setSelectedPage("all")}
-            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-              selectedPage === "all"
-                ? "bg-[#0f6cbd] text-white shadow-xs"
-                : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-            }`}
-          >
-            <Layers className="h-3.5 w-3.5" />
-            Todas las páginas (1 a 11)
-          </button>
-          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((p) => (
-            <button
-              key={p}
-              type="button"
-              onClick={() => setSelectedPage(p)}
-              className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition ${
-                selectedPage === p
-                  ? "bg-blue-50 text-[#0f6cbd] font-bold ring-1 ring-[#0f6cbd]/30"
-                  : "bg-slate-50 text-slate-600 hover:bg-slate-100"
-              }`}
-            >
-              Pág. {p}/11
-            </button>
-          ))}
+        <div className="no-print rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            {/* Dropdown principal de Hojas */}
+            <div className="flex flex-1 flex-wrap items-center gap-3 min-w-[280px]">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#e8f0fe] text-[#0f6cbd]">
+                <FileText className="h-4 w-4" />
+              </div>
+              <div className="flex-1 min-w-[240px] max-w-2xl">
+                <label className="block text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                  Seleccionar Hoja de la Ficha M.T.D. según su Contenido
+                </label>
+                <select
+                  value={selectedPage === "all" ? "all" : String(selectedPage)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSelectedPage(val === "all" ? "all" : Number(val));
+                  }}
+                  className="mt-1 w-full rounded-lg border border-slate-300 bg-slate-50/70 px-3 py-2 text-xs font-bold text-slate-900 shadow-2xs transition focus:border-[#0f6cbd] focus:bg-white focus:outline-none cursor-pointer"
+                >
+                  <option value="all">
+                    📑 Vista Completa (Hojas 1 a 11) — Expediente M.T.D. B.T. Completo
+                  </option>
+                  {MTD_SHEETS_CATALOG.map((sheet) => (
+                    <option key={sheet.page} value={sheet.page}>
+                      {sheet.fullLabel}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Controles rápidos de Navegación entre Hojas */}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (selectedPage === "all") {
+                    setSelectedPage(1);
+                  } else if (selectedPage > 1) {
+                    setSelectedPage(selectedPage - 1);
+                  }
+                }}
+                disabled={selectedPage === 1}
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-40"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+                Hoja Anterior
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (selectedPage === "all") {
+                    setSelectedPage(1);
+                  } else if (selectedPage < 11) {
+                    setSelectedPage(selectedPage + 1);
+                  }
+                }}
+                disabled={selectedPage === 11}
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-40"
+              >
+                Hoja Siguiente
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+
+              {selectedPage !== "all" && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedPage("all")}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#e8f0fe] px-3 py-2 text-xs font-semibold text-[#0f6cbd] transition hover:bg-blue-100"
+                >
+                  <Layers className="h-3.5 w-3.5" />
+                  Ver las 11 Hojas
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Resumen de la información que recolecta la hoja seleccionada */}
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-blue-100 bg-blue-50/50 px-3.5 py-2 text-xs text-slate-700">
+            {selectedPage === "all" ? (
+              <span>
+                <strong className="text-[#0f6cbd]">
+                  Mostrando las 11 hojas oficiales:
+                </strong>{" "}
+                Titular y Características (1), Previsión Viviendas/Edificio (2-3), Receptores (4), Memoria Descriptiva (5), Cálculos de Circuitos (6-7), Esquema Unifilar (8), Croquis y Plano (9-10) y Firma del Autor (11).
+              </span>
+            ) : (
+              <span>
+                <strong className="text-[#0f6cbd]">
+                  Información que recolecta la Hoja {selectedPage}/11:
+                </strong>{" "}
+                {
+                  MTD_SHEETS_CATALOG.find((s) => s.page === selectedPage)
+                    ?.collectedInfo
+                }
+              </span>
+            )}
+          </div>
         </div>
       )}
 
