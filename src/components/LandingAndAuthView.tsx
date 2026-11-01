@@ -197,7 +197,7 @@ export default function LandingAndAuthView({
 
         {/* Hero Principal */}
         <main className="flex-1">
-          <section className="relative overflow-hidden border-b border-slate-200/80 bg-white/25 py-12 sm:py-20">
+          <section className="relative overflow-hidden py-12 sm:py-20">
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
               <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-12">
                 <div className="space-y-6 lg:col-span-7">
