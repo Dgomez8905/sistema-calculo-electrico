@@ -58,19 +58,18 @@ export default function LandingAndAuthView({
   mode,
   setMode,
   users,
-  tenants,
   onLoginSuccess,
   onResetPassword,
 }: LandingAndAuthViewProps) {
-  const [email, setEmail] = useState("daniel@ingenieriagomez.es");
-  const [pin, setPin] = useState("1234");
+  const [email, setEmail] = useState("");
+  const [pin, setPin] = useState("");
   const [showPin, setShowPin] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [authSuccess, setAuthSuccess] = useState<string | null>(null);
 
   // Estado para Restablecimiento de Contraseña
-  const [resetEmail, setResetEmail] = useState("daniel@ingenieriagomez.es");
-  const [resetDoi, setResetDoi] = useState("43.829.104-Z");
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetDoi, setResetDoi] = useState("");
   const [newPin, setNewPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");
   const [isResetting, setIsResetting] = useState(false);
@@ -211,8 +210,8 @@ export default function LandingAndAuthView({
                     <button
                       type="button"
                       onClick={() => {
-                        setEmail("daniel@ingenieriagomez.es");
-                        setPin("1234");
+                        setAuthError(null);
+                        setAuthSuccess(null);
                         setMode("login");
                       }}
                       className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0f6cbd] px-6 py-3.5 text-sm font-bold text-white shadow-md transition hover:bg-[#115ea3]"
@@ -224,13 +223,14 @@ export default function LandingAndAuthView({
                     <button
                       type="button"
                       onClick={() => {
-                        const admin = users.find((u) => u.id === 1) || users[0];
-                        if (admin) onLoginSuccess(admin);
+                        setAuthError(null);
+                        setAuthSuccess(null);
+                        setMode("reset_password");
                       }}
                       className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-3.5 text-sm font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50"
                     >
-                      <UserCheck className="h-4 w-4 text-[#0f6cbd]" />
-                      Acceso Directo Demo (Admin Global)
+                      <KeyRound className="h-4 w-4 text-[#0f6cbd]" />
+                      Recuperar Contraseña
                     </button>
                   </div>
 
@@ -250,7 +250,7 @@ export default function LandingAndAuthView({
                   </div>
                 </div>
 
-                {/* Tarjeta Visual Derecha con Vista Previa e Información de Credenciales */}
+                {/* Tarjeta Visual Derecha con Resumen Técnico REBT */}
                 <div className="lg:col-span-5">
                   <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-xl space-y-5">
                     <div className="flex items-center justify-between border-b border-slate-100 pb-4">
@@ -267,26 +267,26 @@ export default function LandingAndAuthView({
 
                     <div className="space-y-3">
                       <h3 className="text-sm font-bold text-slate-900">
-                        Credenciales del Administrador Global (Super Admin)
+                        Verificación Reglamentaria Automatizada
                       </h3>
-                      <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-4 text-xs space-y-2">
+                      <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4 text-xs space-y-2.5 text-slate-700">
                         <div className="flex items-center justify-between">
-                          <span className="text-slate-600">Usuario / Correo:</span>
-                          <code className="rounded bg-white px-2 py-0.5 font-mono font-bold text-[#0f6cbd] border border-blue-100">
-                            daniel@ingenieriagomez.es
-                          </code>
+                          <span>Normativa Vigente:</span>
+                          <strong className="font-semibold text-[#0f6cbd]">
+                            REBT RD 842/2002
+                          </strong>
                         </div>
                         <div className="flex items-center justify-between">
-                          <span className="text-slate-600">Contraseña / PIN:</span>
-                          <code className="rounded bg-white px-2 py-0.5 font-mono font-bold text-slate-900 border border-blue-100">
-                            1234
-                          </code>
+                          <span>Instrucciones Técnicas:</span>
+                          <strong className="font-semibold text-slate-900">
+                            ITC-BT-01 a ITC-BT-52
+                          </strong>
                         </div>
                         <div className="flex items-center justify-between">
-                          <span className="text-slate-600">NIF Verificación:</span>
-                          <code className="font-mono font-semibold text-slate-700">
-                            43.829.104-Z
-                          </code>
+                          <span>Formato Oficial:</span>
+                          <strong className="font-semibold text-slate-900">
+                            M.T.D. B.T. (11 Páginas A4)
+                          </strong>
                         </div>
                       </div>
                     </div>
@@ -535,7 +535,7 @@ export default function LandingAndAuthView({
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="daniel@ingenieriagomez.es"
+                  placeholder="correo@empresa.es"
                   className="w-full rounded-xl border border-slate-300 bg-white pl-9 pr-3 py-2 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
                 />
               </div>
@@ -590,42 +590,6 @@ export default function LandingAndAuthView({
               Entrar al Sistema REBT
               <ArrowRight className="h-4 w-4" />
             </button>
-
-            {/* Selector Rápido de Cuentas Demo */}
-            <div className="pt-3 border-t border-slate-100">
-              <p className="text-[11px] font-semibold text-slate-500 mb-2">
-                Cuentas configuradas (clic para autocompletar):
-              </p>
-              <div className="space-y-1.5">
-                {users.map((u) => {
-                  const t = tenants.find((ten) => ten.id === u.tenant_id);
-                  return (
-                    <button
-                      key={u.id}
-                      type="button"
-                      onClick={() => {
-                        setEmail(u.email);
-                        setPin(u.access_pin);
-                        setAuthError(null);
-                      }}
-                      className="flex w-full items-center justify-between rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2 text-left text-[11px] transition hover:border-blue-200 hover:bg-blue-50/50"
-                    >
-                      <div className="truncate pr-2">
-                        <div className="font-bold text-slate-800 truncate">
-                          {u.full_name}
-                        </div>
-                        <div className="text-slate-500 truncate">
-                          {u.email} · {t?.isla}
-                        </div>
-                      </div>
-                      <span className="shrink-0 rounded bg-white px-1.5 py-0.5 font-mono text-[10px] font-bold text-[#0f6cbd] border border-slate-200">
-                        Clave: {u.access_pin}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
           </form>
         ) : (
           <form onSubmit={handlePasswordReset} className="mt-5 space-y-3.5">
@@ -638,25 +602,25 @@ export default function LandingAndAuthView({
                 required
                 value={resetEmail}
                 onChange={(e) => setResetEmail(e.target.value)}
-                placeholder="daniel@ingenieriagomez.es"
+                placeholder="correo@empresa.es"
                 className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
               />
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-slate-700">
-                D.O.I. / N.I.F. del Titular o Código de Recuperación
+                D.O.I. / N.I.F. del Titular o Nº Colegiado / CCI
               </label>
               <input
                 type="text"
                 required
                 value={resetDoi}
                 onChange={(e) => setResetDoi(e.target.value)}
-                placeholder="Ej. 43.829.104-Z o REBT-ADMIN"
+                placeholder="Introduce tu NIF o Nº de Colegiado / CCI"
                 className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
               />
               <p className="mt-1 text-[10px] text-slate-500">
-                Para el Admin Global usa <code>43.829.104-Z</code> o el código maestro <code>REBT-2026</code>.
+                Introduce el documento de identidad o número de colegiado registrado en tu perfil profesional.
               </p>
             </div>
 
@@ -710,3 +674,4 @@ export default function LandingAndAuthView({
     </div>
   );
 }
+
