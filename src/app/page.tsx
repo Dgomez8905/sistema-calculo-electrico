@@ -1520,386 +1520,409 @@ export default function SistemaCalculoRebtPage() {
               APARTADO 1: DATOS DEL TITULAR, UBICACIÓN E INSTALADOR
              ================================================================= */}
           {activeSection === "titular_ubicacion" && (
-            <div className="space-y-6">
-              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-xs">
-                <h2 className="text-base font-bold text-slate-900">
-                  1. Datos del Titular y Ubicación de la Instalación (Página 1/11 M.T.D.)
-                </h2>
-                <p className="mt-1 text-xs text-slate-500">
-                  Introduce los datos administrativos del expediente. Se sincronizan automáticamente con la cabecera, la Página 1, la Memoria Descriptiva (Pág. 5) y el Croquis de Situación (Pág. 9).
-                </p>
+            <div className="space-y-5">
+              <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                {/* Columna 1: Datos del Titular y Ubicación */}
+                <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs">
+                  <h2 className="text-sm font-bold text-slate-900">
+                    1. Datos del Titular y Ubicación de la Instalación (Página 1/11 M.T.D.)
+                  </h2>
+                  <p className="mt-0.5 text-[11px] text-slate-500">
+                    Datos administrativos del expediente sincronizados con la Ficha Técnica M.T.D.
+                  </p>
 
-                <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700">
-                      Nº de Instalación
-                    </label>
-                    <input
-                      type="text"
-                      value={mtdMeta.instalacionNum}
-                      onChange={(e) =>
-                        setMtdMeta((p) => ({
-                          ...p,
-                          instalacionNum: e.target.value,
-                        }))
-                      }
-                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700">
-                      Nº de Expediente
-                    </label>
-                    <input
-                      type="text"
-                      value={mtdMeta.expedienteNum}
-                      onChange={(e) =>
-                        setMtdMeta((p) => ({
-                          ...p,
-                          expedienteNum: e.target.value,
-                        }))
-                      }
-                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
-                    />
-                  </div>
-
-                  <div className="sm:col-span-2">
-                    <label className="block text-xs font-semibold text-slate-700">
-                      Nombre / Razón Social del Titular
-                    </label>
-                    <input
-                      type="text"
-                      value={mtdMeta.titularNombre}
-                      onChange={(e) =>
-                        setMtdMeta((p) => ({
-                          ...p,
-                          titularNombre: e.target.value,
-                        }))
-                      }
-                      placeholder="Ej. Comunidad de Propietarios Edificio Atlántico"
-                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700">
-                      D.O.I. / C.I.F. del Titular
-                    </label>
-                    <input
-                      type="text"
-                      value={mtdMeta.titularNif}
-                      onChange={(e) =>
-                        setMtdMeta((p) => ({ ...p, titularNif: e.target.value }))
-                      }
-                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
-                    />
-                  </div>
-
-                  <div className="sm:col-span-2">
-                    <label className="block text-xs font-semibold text-slate-700">
-                      Dirección (Calle / Avenida)
-                    </label>
-                    <input
-                      type="text"
-                      value={mtdMeta.direccionCalle}
-                      onChange={(e) =>
-                        setMtdMeta((p) => ({
-                          ...p,
-                          direccionCalle: e.target.value,
-                        }))
-                      }
-                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-700">
-                        Número
+                      <label className="block text-[11px] font-semibold text-slate-700">
+                        Nº de Instalación
                       </label>
                       <input
                         type="text"
-                        value={mtdMeta.direccionNum}
+                        value={mtdMeta.instalacionNum}
                         onChange={(e) =>
                           setMtdMeta((p) => ({
                             ...p,
-                            direccionNum: e.target.value,
+                            instalacionNum: e.target.value,
                           }))
                         }
-                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
+                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
                       />
                     </div>
+
                     <div>
-                      <label className="block text-xs font-semibold text-slate-700">
-                        Portal / Planta
+                      <label className="block text-[11px] font-semibold text-slate-700">
+                        Nº de Expediente
                       </label>
                       <input
                         type="text"
-                        value={mtdMeta.portalPlanta}
+                        value={mtdMeta.expedienteNum}
                         onChange={(e) =>
                           setMtdMeta((p) => ({
                             ...p,
-                            portalPlanta: e.target.value,
+                            expedienteNum: e.target.value,
                           }))
                         }
-                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
+                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
                       />
                     </div>
-                  </div>
 
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700">
-                      Término Municipal (T.M.)
-                    </label>
-                    <input
-                      type="text"
-                      value={mtdMeta.terminoMunicipal}
-                      onChange={(e) =>
-                        setMtdMeta((p) => ({
-                          ...p,
-                          terminoMunicipal: e.target.value,
-                        }))
-                      }
-                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
-                    />
-                  </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700">
+                        D.O.I. / C.I.F. del Titular
+                      </label>
+                      <input
+                        type="text"
+                        value={mtdMeta.titularNif}
+                        onChange={(e) =>
+                          setMtdMeta((p) => ({ ...p, titularNif: e.target.value }))
+                        }
+                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
+                      />
+                    </div>
 
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700">
-                      Isla
-                    </label>
-                    <select
-                      value={mtdMeta.isla}
-                      onChange={(e) =>
-                        setMtdMeta((p) => ({ ...p, isla: e.target.value }))
-                      }
-                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
-                    >
-                      <option value="Tenerife">Tenerife</option>
-                      <option value="Gran Canaria">Gran Canaria</option>
-                      <option value="Lanzarote">Lanzarote</option>
-                      <option value="Fuerteventura">Fuerteventura</option>
-                      <option value="La Palma">La Palma</option>
-                      <option value="La Gomera">La Gomera</option>
-                      <option value="El Hierro">El Hierro</option>
-                    </select>
-                  </div>
+                    <div className="sm:col-span-2">
+                      <label className="block text-[11px] font-semibold text-slate-700">
+                        Nombre / Razón Social del Titular
+                      </label>
+                      <input
+                        type="text"
+                        value={mtdMeta.titularNombre}
+                        onChange={(e) =>
+                          setMtdMeta((p) => ({
+                            ...p,
+                            titularNombre: e.target.value,
+                          }))
+                        }
+                        placeholder="Ej. Comunidad de Propietarios Edificio Atlántico"
+                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
+                      />
+                    </div>
 
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700">
-                      Teléfono(s)
-                    </label>
-                    <input
-                      type="text"
-                      value={mtdMeta.telefono}
-                      onChange={(e) =>
-                        setMtdMeta((p) => ({ ...p, telefono: e.target.value }))
-                      }
-                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
-                    />
-                  </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700">
+                        Teléfono(s)
+                      </label>
+                      <input
+                        type="text"
+                        value={mtdMeta.telefono}
+                        onChange={(e) =>
+                          setMtdMeta((p) => ({ ...p, telefono: e.target.value }))
+                        }
+                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
+                      />
+                    </div>
 
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700">
-                      Código Postal (C.P.)
-                    </label>
-                    <input
-                      type="text"
-                      value={mtdMeta.codigoPostal}
-                      onChange={(e) =>
-                        setMtdMeta((p) => ({
-                          ...p,
-                          codigoPostal: e.target.value,
-                        }))
-                      }
-                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
-                    />
-                  </div>
+                    <div className="sm:col-span-2">
+                      <label className="block text-[11px] font-semibold text-slate-700">
+                        Dirección (Calle / Avenida)
+                      </label>
+                      <input
+                        type="text"
+                        value={mtdMeta.direccionCalle}
+                        onChange={(e) =>
+                          setMtdMeta((p) => ({
+                            ...p,
+                            direccionCalle: e.target.value,
+                          }))
+                        }
+                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
+                      />
+                    </div>
 
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700">
-                      Superficie Útil (m²)
-                    </label>
-                    <input
-                      type="number"
-                      value={mtdMeta.superficieUtilM2}
-                      onChange={(e) =>
-                        setMtdMeta((p) => ({
-                          ...p,
-                          superficieUtilM2: Number(e.target.value) || 0,
-                        }))
-                      }
-                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
-                    />
-                  </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-700">
+                          Número
+                        </label>
+                        <input
+                          type="text"
+                          value={mtdMeta.direccionNum}
+                          onChange={(e) =>
+                            setMtdMeta((p) => ({
+                              ...p,
+                              direccionNum: e.target.value,
+                            }))
+                          }
+                          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-700">
+                          Portal / Planta
+                        </label>
+                        <input
+                          type="text"
+                          value={mtdMeta.portalPlanta}
+                          onChange={(e) =>
+                            setMtdMeta((p) => ({
+                              ...p,
+                              portalPlanta: e.target.value,
+                            }))
+                          }
+                          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
+                        />
+                      </div>
+                    </div>
 
-                  <div className="sm:col-span-2">
-                    <label className="block text-xs font-semibold text-slate-700">
-                      Uso a que se destina
-                    </label>
-                    <input
-                      type="text"
-                      value={mtdMeta.usoDestino}
-                      onChange={(e) =>
-                        setMtdMeta((p) => ({ ...p, usoDestino: e.target.value }))
-                      }
-                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
-                    />
-                  </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700">
+                        Término Municipal (T.M.)
+                      </label>
+                      <input
+                        type="text"
+                        value={mtdMeta.terminoMunicipal}
+                        onChange={(e) =>
+                          setMtdMeta((p) => ({
+                            ...p,
+                            terminoMunicipal: e.target.value,
+                          }))
+                        }
+                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
+                      />
+                    </div>
 
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700">
-                      Presupuesto Total (Euros)
-                    </label>
-                    <input
-                      type="number"
-                      value={mtdMeta.presupuestoTotalEuros}
-                      onChange={(e) =>
-                        setMtdMeta((p) => ({
-                          ...p,
-                          presupuestoTotalEuros: Number(e.target.value) || 0,
-                        }))
-                      }
-                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
-                    />
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700">
+                        Isla
+                      </label>
+                      <select
+                        value={mtdMeta.isla}
+                        onChange={(e) =>
+                          setMtdMeta((p) => ({ ...p, isla: e.target.value }))
+                        }
+                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
+                      >
+                        <option value="Tenerife">Tenerife</option>
+                        <option value="Gran Canaria">Gran Canaria</option>
+                        <option value="Lanzarote">Lanzarote</option>
+                        <option value="Fuerteventura">Fuerteventura</option>
+                        <option value="La Palma">La Palma</option>
+                        <option value="La Gomera">La Gomera</option>
+                        <option value="El Hierro">El Hierro</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700">
+                        Código Postal (C.P.)
+                      </label>
+                      <input
+                        type="text"
+                        value={mtdMeta.codigoPostal}
+                        onChange={(e) =>
+                          setMtdMeta((p) => ({
+                            ...p,
+                            codigoPostal: e.target.value,
+                          }))
+                        }
+                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700">
+                        Superficie Útil (m²)
+                      </label>
+                      <input
+                        type="number"
+                        value={mtdMeta.superficieUtilM2}
+                        onChange={(e) =>
+                          setMtdMeta((p) => ({
+                            ...p,
+                            superficieUtilM2: Number(e.target.value) || 0,
+                          }))
+                        }
+                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700">
+                        Uso a que se destina
+                      </label>
+                      <input
+                        type="text"
+                        value={mtdMeta.usoDestino}
+                        onChange={(e) =>
+                          setMtdMeta((p) => ({ ...p, usoDestino: e.target.value }))
+                        }
+                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700">
+                        Presupuesto Total (Euros)
+                      </label>
+                      <input
+                        type="number"
+                        value={mtdMeta.presupuestoTotalEuros}
+                        onChange={(e) =>
+                          setMtdMeta((p) => ({
+                            ...p,
+                            presupuestoTotalEuros: Number(e.target.value) || 0,
+                          }))
+                        }
+                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Autor Firmante de la M.T.D. (Página 11/11) */}
-              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-xs">
-                <h3 className="text-base font-bold text-slate-900">
-                  Datos del Profesional Habilitado (PH) / Técnico Competente (Página 11/11 M.T.D.)
-                </h3>
-                <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {/* Columna 2: Datos del Profesional Habilitado (PH) / Técnico Competente (Página 11/11) */}
+                <div className="flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-5 shadow-xs">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700">
-                      Modalidad de Firma
-                    </label>
-                    <select
-                      value={mtdMeta.autorTipo}
-                      onChange={(e) =>
-                        setMtdMeta((p) => ({
-                          ...p,
-                          autorTipo: e.target.value as
-                            | "instalador_ph"
-                            | "tecnico_competente",
-                        }))
-                      }
-                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
-                    >
-                      <option value="instalador_ph">
-                        Instalador Autorizado (Profesional Habilitado PH)
-                      </option>
-                      <option value="tecnico_competente">
-                        Técnico Competente Colegiado
-                      </option>
-                    </select>
+                    <h3 className="text-sm font-bold text-slate-900">
+                      Datos del Profesional Habilitado (PH) / Técnico Competente (Página 11/11 M.T.D.)
+                    </h3>
+                    <p className="mt-0.5 text-[11px] text-slate-500">
+                      Identificación del instalador o ingeniero firmante y empresa instaladora habilitada.
+                    </p>
+
+                    <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div className="sm:col-span-2">
+                        <label className="block text-[11px] font-semibold text-slate-700">
+                          Modalidad de Firma
+                        </label>
+                        <select
+                          value={mtdMeta.autorTipo}
+                          onChange={(e) =>
+                            setMtdMeta((p) => ({
+                              ...p,
+                              autorTipo: e.target.value as
+                                | "instalador_ph"
+                                | "tecnico_competente",
+                            }))
+                          }
+                          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900"
+                        >
+                          <option value="instalador_ph">
+                            Instalador Autorizado (Profesional Habilitado PH)
+                          </option>
+                          <option value="tecnico_competente">
+                            Técnico Competente Colegiado
+                          </option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-700">
+                          Nombre del Instalador PH / Técnico
+                        </label>
+                        <input
+                          type="text"
+                          value={mtdMeta.instaladorNombrePh}
+                          onChange={(e) =>
+                            setMtdMeta((p) => ({
+                              ...p,
+                              instaladorNombrePh: e.target.value,
+                              tecnicoNombre: e.target.value,
+                            }))
+                          }
+                          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-700">
+                          D.O.I. / N.I.F. Firmante
+                        </label>
+                        <input
+                          type="text"
+                          value={mtdMeta.instaladorDoi}
+                          onChange={(e) =>
+                            setMtdMeta((p) => ({
+                              ...p,
+                              instaladorDoi: e.target.value,
+                            }))
+                          }
+                          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-700">
+                          Nº C.C.I. / Nº Colegiado
+                        </label>
+                        <input
+                          type="text"
+                          value={mtdMeta.instaladorCciNum}
+                          onChange={(e) =>
+                            setMtdMeta((p) => ({
+                              ...p,
+                              instaladorCciNum: e.target.value,
+                              tecnicoColegiadoNum: e.target.value,
+                            }))
+                          }
+                          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-700">
+                          Nº Empresa Instaladora
+                        </label>
+                        <input
+                          type="text"
+                          value={mtdMeta.empresaInstaladoraNum}
+                          onChange={(e) =>
+                            setMtdMeta((p) => ({
+                              ...p,
+                              empresaInstaladoraNum: e.target.value,
+                            }))
+                          }
+                          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-700">
+                          Empresa Instaladora
+                        </label>
+                        <input
+                          type="text"
+                          value={mtdMeta.empresaInstaladoraNombre}
+                          onChange={(e) =>
+                            setMtdMeta((p) => ({
+                              ...p,
+                              empresaInstaladoraNombre: e.target.value,
+                            }))
+                          }
+                          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-700">
+                          Lugar de Firma
+                        </label>
+                        <input
+                          type="text"
+                          value={mtdMeta.ciudadFirma}
+                          onChange={(e) =>
+                            setMtdMeta((p) => ({
+                              ...p,
+                              ciudadFirma: e.target.value,
+                            }))
+                          }
+                          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900"
+                        />
+                      </div>
+                    </div>
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700">
-                      Nombre del Instalador PH / Técnico
-                    </label>
-                    <input
-                      type="text"
-                      value={mtdMeta.instaladorNombrePh}
-                      onChange={(e) =>
-                        setMtdMeta((p) => ({
-                          ...p,
-                          instaladorNombrePh: e.target.value,
-                          tecnicoNombre: e.target.value,
-                        }))
-                      }
-                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700">
-                      D.O.I. / N.I.F. Firmante
-                    </label>
-                    <input
-                      type="text"
-                      value={mtdMeta.instaladorDoi}
-                      onChange={(e) =>
-                        setMtdMeta((p) => ({
-                          ...p,
-                          instaladorDoi: e.target.value,
-                        }))
-                      }
-                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700">
-                      Nº C.C.I. / Nº Colegiado
-                    </label>
-                    <input
-                      type="text"
-                      value={mtdMeta.instaladorCciNum}
-                      onChange={(e) =>
-                        setMtdMeta((p) => ({
-                          ...p,
-                          instaladorCciNum: e.target.value,
-                          tecnicoColegiadoNum: e.target.value,
-                        }))
-                      }
-                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
-                    />
-                  </div>
-
-                  <div className="sm:col-span-2">
-                    <label className="block text-xs font-semibold text-slate-700">
-                      Empresa Instaladora
-                    </label>
-                    <input
-                      type="text"
-                      value={mtdMeta.empresaInstaladoraNombre}
-                      onChange={(e) =>
-                        setMtdMeta((p) => ({
-                          ...p,
-                          empresaInstaladoraNombre: e.target.value,
-                        }))
-                      }
-                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700">
-                      Nº Empresa Instaladora
-                    </label>
-                    <input
-                      type="text"
-                      value={mtdMeta.empresaInstaladoraNum}
-                      onChange={(e) =>
-                        setMtdMeta((p) => ({
-                          ...p,
-                          empresaInstaladoraNum: e.target.value,
-                        }))
-                      }
-                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700">
-                      Lugar de Firma
-                    </label>
-                    <input
-                      type="text"
-                      value={mtdMeta.ciudadFirma}
-                      onChange={(e) =>
-                        setMtdMeta((p) => ({
-                          ...p,
-                          ciudadFirma: e.target.value,
-                        }))
-                      }
-                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
-                    />
+                  {/* Resumen rápido al pie de la tarjeta de firmante */}
+                  <div className="mt-4 flex items-center justify-between rounded-lg border border-blue-100 bg-blue-50/50 px-3.5 py-2.5 text-xs text-slate-700">
+                    <span>
+                      Expediente:{" "}
+                      <strong className="text-[#0f6cbd]">
+                        {mtdMeta.expedienteNum}
+                      </strong>{" "}
+                      · {mtdMeta.isla}
+                    </span>
+                    <span className="font-mono font-bold text-slate-900">
+                      {Number(mtdMeta.presupuestoTotalEuros || 0).toLocaleString()} €
+                    </span>
                   </div>
                 </div>
               </div>
