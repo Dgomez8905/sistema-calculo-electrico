@@ -135,3 +135,4 @@ create policy "electrical_circuits_access_policy"
         and (p.user_id is null or p.user_id = (select auth.uid()))
     )
   );
+
