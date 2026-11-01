@@ -262,6 +262,100 @@ export default function LandingAndAuthView({
                       <span>Aislamiento Multi-Tenant</span>
                     </div>
                   </div>
+
+                  {/* Sellos y Normas Europeas / ISO / UNE-HD (Unión Europea y España) */}
+                  <div className="rounded-2xl border border-slate-200/90 bg-white/90 p-3.5 shadow-xs backdrop-blur-xs">
+                    <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                        Estándares y Normativa Técnica en la Unión Europea
+                      </span>
+                      <span className="inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-[#0f6cbd]">
+                        Directiva UE 2014/35/UE (LVD)
+                      </span>
+                    </div>
+
+                    <div className="mt-2.5 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                      {/* Sello 1: ISO 9001 */}
+                      <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/70 px-2.5 py-2">
+                        <div className="flex h-8 w-8 shrink-0 flex-col items-center justify-center rounded-lg border border-blue-200 bg-[#0f6cbd] text-white shadow-2xs">
+                          <span className="text-[8px] font-extrabold leading-none tracking-tighter">
+                            ISO
+                          </span>
+                          <span className="text-[8px] font-bold leading-none mt-0.5">
+                            9001
+                          </span>
+                        </div>
+                        <div className="min-w-0">
+                          <div className="truncate text-[11px] font-bold text-slate-900">
+                            ISO 9001
+                          </div>
+                          <div className="truncate text-[9.5px] text-slate-500">
+                            Calidad M.T.D.
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Sello 2: UNE-HD 60364 (IEC 60364 / CENELEC UE) */}
+                      <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/70 px-2.5 py-2">
+                        <div className="flex h-8 w-8 shrink-0 flex-col items-center justify-center rounded-lg border border-blue-900 bg-[#003399] text-white shadow-2xs">
+                          <span className="text-[7.5px] font-extrabold leading-none text-amber-300">
+                            ★ UE ★
+                          </span>
+                          <span className="text-[7.5px] font-bold leading-none mt-0.5">
+                            60364
+                          </span>
+                        </div>
+                        <div className="min-w-0">
+                          <div className="truncate text-[11px] font-bold text-slate-900">
+                            UNE-HD 60364
+                          </div>
+                          <div className="truncate text-[9.5px] text-slate-500">
+                            Cálculo B.T. CENELEC
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Sello 3: EN / IEC 61082 & 60617 (Esquemas y Documentación Técnica) */}
+                      <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/70 px-2.5 py-2">
+                        <div className="flex h-8 w-8 shrink-0 flex-col items-center justify-center rounded-lg border border-slate-300 bg-slate-800 text-white shadow-2xs">
+                          <span className="text-[8px] font-extrabold leading-none">
+                            EN/IEC
+                          </span>
+                          <span className="text-[7.5px] font-bold leading-none mt-0.5 text-blue-200">
+                            61082
+                          </span>
+                        </div>
+                        <div className="min-w-0">
+                          <div className="truncate text-[11px] font-bold text-slate-900">
+                            EN 61082 / 60617
+                          </div>
+                          <div className="truncate text-[9.5px] text-slate-500">
+                            Unifilar y Ficha
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Sello 4: ISO/IEC 27001 (Seguridad Cloud Multi-Tenant) */}
+                      <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/70 px-2.5 py-2">
+                        <div className="flex h-8 w-8 shrink-0 flex-col items-center justify-center rounded-lg border border-emerald-300 bg-emerald-700 text-white shadow-2xs">
+                          <span className="text-[8px] font-extrabold leading-none">
+                            ISO
+                          </span>
+                          <span className="text-[7.5px] font-bold leading-none mt-0.5">
+                            27001
+                          </span>
+                        </div>
+                        <div className="min-w-0">
+                          <div className="truncate text-[11px] font-bold text-slate-900">
+                            ISO/IEC 27001
+                          </div>
+                          <div className="truncate text-[9.5px] text-slate-500">
+                            Datos Aislados
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Tarjeta Visual Derecha con Imagen Profesional e Información Técnica REBT */}
