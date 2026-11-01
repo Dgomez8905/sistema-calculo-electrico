@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Sistema de Cálculo Eléctrico REBT (RD 842/2002 - ITC-BT-01 a BT-52)",
+  title: "Sistema de Cálculo Eléctrico REBT y Gestión Multi-Tenant M.T.D.",
   description:
-    "Plataforma de ingeniería eléctrica según el Reglamento Electrotécnico para Baja Tensión (REBT): Cuadro de circuitos en mm², Previsión de Cargas ITC-BT-10/52, LGA/DI ITC-BT-14/15, Puesta a Tierra ITC-BT-18/24 y Legalización ITC-BT-04/05.",
+    "Plataforma corporativa multi-tenant para cálculo eléctrico según el REBT (RD 842/2002 - ITC-BT-01 a BT-52), control de usuarios y permisos (RBAC) y generación opcional de la Memoria Técnica de Diseño (M.T.D. B.T.).",
 };
 
 export default function RootLayout({
@@ -14,7 +14,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es">
-      <body className="min-h-screen bg-slate-950 text-slate-100 antialiased">
+      <body className="min-h-screen bg-[#f8fafc] text-slate-900 antialiased">
         {children}
       </body>
     </html>

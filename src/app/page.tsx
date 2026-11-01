@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import {
   Zap,
   Plus,
@@ -8,15 +8,22 @@ import {
   Save,
   CheckCircle2,
   AlertTriangle,
-  Database,
   Activity,
   Building2,
   FileCheck2,
   Sparkles,
-  BookOpen,
   FileSpreadsheet,
   Printer,
   FolderOpen,
+  Users,
+  ShieldCheck,
+  UserCheck,
+  LogOut,
+  FilePlus2,
+  MapPin,
+  Lock,
+  Building,
+  ChevronRight,
 } from "lucide-react";
 import {
   RebtCircuitInput,
@@ -37,41 +44,199 @@ import {
 import MtdCanariasOfficialForm from "@/components/MtdCanariasOfficialForm";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 
-type ActiveTab =
-  | "ficha_mtd"
+type ActiveSection =
+  | "expedientes"
+  | "titular_ubicacion"
   | "circuitos"
   | "edificio_itc10"
-  | "tierras_legalizacion";
+  | "tierras_legalizacion"
+  | "ficha_mtd"
+  | "administracion";
+
+export type UserRole =
+  | "super_admin"
+  | "admin_empresa"
+  | "ingeniero_instalador"
+  | "visor_auditor";
+
+export interface AppTenant {
+  id: number;
+  name: string;
+  cif: string;
+  empresa_instaladora_num: string;
+  isla: string;
+  is_active: boolean;
+}
+
+export interface AppUser {
+  id: number;
+  tenant_id: number;
+  full_name: string;
+  email: string;
+  access_pin: string;
+  doi_nif: string;
+  role: UserRole;
+  cci_or_colegiado: string;
+  can_create_projects: boolean;
+  can_edit_calculations: boolean;
+  can_export_mtd: boolean;
+  can_delete_projects: boolean;
+  can_manage_users: boolean;
+  is_active: boolean;
+}
 
 interface SavedProjectRow {
   id: number;
+  tenant_id: number | null;
+  owner_user_id: number | null;
   name: string;
   client_name: string;
   location: string;
   system_type: SystemSupplyType;
   electrification_grade: "basica" | "elevada";
+  total_demand_va: number;
+  iga_amps: number;
   mtd_metadata_json?: MtdFormMetadata;
   created_at: string;
 }
 
-export default function SistemaCalculoRebtPage() {
-  const [activeTab, setActiveTab] = useState<ActiveTab>("ficha_mtd");
+const FALLBACK_TENANTS: AppTenant[] = [
+  {
+    id: 1,
+    name: "Ingeniería e Instalaciones Gómez S.L.",
+    cif: "B-38901245",
+    empresa_instaladora_num: "EI-38-02941",
+    isla: "Tenerife",
+    is_active: true,
+  },
+  {
+    id: 2,
+    name: "ElectroCanarias Proyectos B.T. S.L.",
+    cif: "B-35419820",
+    empresa_instaladora_num: "EI-35-01184",
+    isla: "Gran Canaria",
+    is_active: true,
+  },
+];
 
-  // Metadatos completos de la Ficha Técnica Oficial M.T.D. B.T. (Gobierno de Canarias - 11 páginas)
+const FALLBACK_USERS: AppUser[] = [
+  {
+    id: 1,
+    tenant_id: 1,
+    full_name: "Daniel Gómez Rojas (Admin General)",
+    email: "daniel@ingenieriagomez.es",
+    access_pin: "1234",
+    doi_nif: "43.829.104-Z",
+    role: "super_admin",
+    cci_or_colegiado: "COIITF-3109 / CCI-TF-4821",
+    can_create_projects: true,
+    can_edit_calculations: true,
+    can_export_mtd: true,
+    can_delete_projects: true,
+    can_manage_users: true,
+    is_active: true,
+  },
+  {
+    id: 2,
+    tenant_id: 1,
+    full_name: "Carlos Morales (Instalador PH - Tenerife)",
+    email: "carlos@ingenieriagomez.es",
+    access_pin: "1234",
+    doi_nif: "78.412.509-M",
+    role: "ingeniero_instalador",
+    cci_or_colegiado: "CCI-TF-5510",
+    can_create_projects: true,
+    can_edit_calculations: true,
+    can_export_mtd: true,
+    can_delete_projects: false,
+    can_manage_users: false,
+    is_active: true,
+  },
+  {
+    id: 3,
+    tenant_id: 2,
+    full_name: "Elena Betancor (Ingeniera - Gran Canaria)",
+    email: "elena@electrocanarias.es",
+    access_pin: "1234",
+    doi_nif: "42.918.301-P",
+    role: "admin_empresa",
+    cci_or_colegiado: "COIIGC-2045",
+    can_create_projects: true,
+    can_edit_calculations: true,
+    can_export_mtd: true,
+    can_delete_projects: true,
+    can_manage_users: true,
+    is_active: true,
+  },
+];
+
+export default function SistemaCalculoRebtPage() {
+  const [activeSection, setActiveSection] =
+    useState<ActiveSection>("expedientes");
+
+  // Estado Multi-Tenant y Usuarios (RBAC)
+  const [tenants, setTenants] = useState<AppTenant[]>(FALLBACK_TENANTS);
+  const [users, setUsers] = useState<AppUser[]>(FALLBACK_USERS);
+  const [currentUserId, setCurrentUserId] = useState<number>(1);
+  const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
+  const [loginEmail, setLoginEmail] = useState<string>("");
+  const [loginPin, setLoginPin] = useState<string>("");
+  const [loginError, setLoginError] = useState<string | null>(null);
+
+  // Modo de aislamiento: 'strict_user' = cada usuario ve únicamente sus propios reportes
+  const [isolationScope, setIsolationScope] = useState<
+    "strict_user" | "tenant_shared"
+  >("strict_user");
+
+  const currentUser = useMemo(
+    () => users.find((u) => u.id === currentUserId) || users[0],
+    [users, currentUserId]
+  );
+
+  const currentTenant = useMemo(
+    () =>
+      tenants.find((t) => t.id === currentUser?.tenant_id) ||
+      tenants[0],
+    [tenants, currentUser]
+  );
+
+  //Formularios de Creación en el Apartado Administrativo
+  const [newTenantName, setNewTenantName] = useState("");
+  const [newTenantCif, setNewTenantCif] = useState("");
+  const [newTenantNum, setNewTenantNum] = useState("");
+  const [newTenantIsla, setNewTenantIsla] = useState("Tenerife");
+
+  const [newUserName, setNewUserName] = useState("");
+  const [newUserEmail, setNewUserEmail] = useState("");
+  const [newUserPin, setNewUserPin] = useState("1234");
+  const [newUserDoi, setNewUserDoi] = useState("");
+  const [newUserTenantId, setNewUserTenantId] = useState<number>(1);
+  const [newUserRole, setNewUserRole] = useState<UserRole>(
+    "ingeniero_instalador"
+  );
+  const [newUserCci, setNewUserCci] = useState("");
+
+  // Expediente activo
+  const [activeProjectId, setActiveProjectId] = useState<number | null>(null);
   const [mtdMeta, setMtdMeta] = useState<MtdFormMetadata>(DEFAULT_MTD_METADATA);
 
   // Configuración Eléctrica REBT
-  const [supplyType, setSupplyType] = useState<SystemSupplyType>("monofasico_230v");
-  const [electrificationGrade, setElectrificationGrade] = useState<"basica" | "elevada">("basica");
+  const [supplyType, setSupplyType] =
+    useState<SystemSupplyType>("monofasico_230v");
+  const [electrificationGrade, setElectrificationGrade] = useState<
+    "basica" | "elevada"
+  >("basica");
   const [diLengthMeters, setDiLengthMeters] = useState<number>(18);
-  const [diType, setDiType] = useState<"di_concentrada" | "di_unico">("di_concentrada");
+  const [diType, setDiType] = useState<"di_concentrada" | "di_unico">(
+    "di_concentrada"
+  );
 
-  // Circuitos interiores (inicializados con los 5 circuitos básicos C1-C5 de ITC-BT-25)
+  // Circuitos interiores
   const [circuits, setCircuits] = useState<RebtCircuitInput[]>(() =>
     ITC_BT_25_TEMPLATES.slice(0, 5)
   );
 
-  // Estado para Previsión de Cargas de Edificios (ITC-BT-10 + ITC-BT-52 + ITC-BT-14)
+  // Previsión de Cargas de Edificios (ITC-BT-10 + ITC-BT-52 + ITC-BT-14)
   const [basicDwellings, setBasicDwellings] = useState(12);
   const [elevatedDwellings, setElevatedDwellings] = useState(4);
   const [commonLightingW, setCommonLightingW] = useState(1800);
@@ -85,23 +250,31 @@ export default function SistemaCalculoRebtPage() {
   const [hasSpl, setHasSpl] = useState(false);
   const [lgaLengthMeters, setLgaLengthMeters] = useState(25);
 
-  // Estado para Clasificador ITC-BT-04 / ITC-BT-05 (Proyecto vs MTD + OCA)
-  const [itc04Group, setItc04Group] = useState<Itc04GroupCode>("e_edificio_viviendas");
+  // Clasificador ITC-BT-04 / ITC-BT-05 (Proyecto vs MTD + OCA)
+  const [itc04Group, setItc04Group] = useState<Itc04GroupCode>(
+    "e_edificio_viviendas"
+  );
   const [itc04CustomPowerKw, setItc04CustomPowerKw] = useState<number>(115);
   const [itc04ParkingSpaces, setItc04ParkingSpaces] = useState<number>(20);
 
-  // Estado para Puesta a Tierra (ITC-BT-18 + ITC-BT-24)
+  // Puesta a Tierra (ITC-BT-18 + ITC-BT-24)
   const [soilResistivity, setSoilResistivity] = useState<number>(150);
   const [rodLengthMeters, setRodLengthMeters] = useState<number>(2);
   const [numRods, setNumRods] = useState<number>(4);
-  const [buriedConductorMeters, setBuriedConductorMeters] = useState<number>(15);
+  const [buriedConductorMeters, setBuriedConductorMeters] =
+    useState<number>(15);
   const [maxContactVoltageV, setMaxContactVoltageV] = useState<50 | 24>(50);
-  const [rcdSensitivityMa, setRcdSensitivityMa] = useState<30 | 100 | 300 | 500>(30);
+  const [rcdSensitivityMa, setRcdSensitivityMa] = useState<
+    30 | 100 | 300 | 500
+  >(30);
 
   // Estado de guardado y carga en Supabase
   const [isSaving, setIsSaving] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<string | null>(null);
-  const [savedProjects, setSavedProjects] = useState<SavedProjectRow[]>([]);
+  const [statusBanner, setStatusBanner] = useState<{
+    type: "success" | "warning" | "error";
+    text: string;
+  } | null>(null);
+  const [allProjects, setAllProjects] = useState<SavedProjectRow[]>([]);
 
   const generalServicesW = commonLightingW + hydroW + otherServicesW;
 
@@ -111,7 +284,7 @@ export default function SistemaCalculoRebtPage() {
     [circuits]
   );
 
-  // Resumen del Cuadro General de Mando y Protección (CGMP - ITC-BT-17 / 25) y Derivación Individual (ITC-BT-15)
+  // Resumen del Cuadro General de Mando y Protección (CGMP) y Derivación Individual
   const cgmpSummary = useMemo(() => {
     const totalInstalledWatts = calculatedCircuits.reduce(
       (acc, c) => acc + c.powerWatts,
@@ -176,9 +349,15 @@ export default function SistemaCalculoRebtPage() {
       diCalculation,
       nonCompliantCircuits,
     };
-  }, [calculatedCircuits, electrificationGrade, supplyType, diLengthMeters, diType]);
+  }, [
+    calculatedCircuits,
+    electrificationGrade,
+    supplyType,
+    diLengthMeters,
+    diType,
+  ]);
 
-  // Cálculo de Previsión de Cargas del Edificio (ITC-BT-10 + ITC-BT-52 + ITC-BT-14)
+  // Previsión de Cargas del Edificio (ITC-BT-10 + ITC-BT-52 + ITC-BT-14)
   const buildingForecast = useMemo(
     () =>
       calculateBuildingLoadForecastItc10({
@@ -245,39 +424,138 @@ export default function SistemaCalculoRebtPage() {
     ]
   );
 
-  // Consultar expedientes guardados en Supabase al iniciar
-  const fetchSavedProjects = async () => {
+  // Cargar Tenants, Usuarios y Expedientes desde Supabase
+  const fetchDirectoryAndProjects = useCallback(async () => {
     if (!supabase) return;
-    const { data } = await supabase
-      .from("electrical_projects")
-      .select(
-        "id, name, client_name, location, system_type, electrification_grade, mtd_metadata_json, created_at"
-      )
-      .order("created_at", { ascending: false })
-      .limit(10);
 
-    if (data) {
-      setSavedProjects(data as SavedProjectRow[]);
+    const [tenantsRes, usersRes, projectsRes] = await Promise.all([
+      supabase.from("app_tenants").select("*").order("id", { ascending: true }),
+      supabase.from("app_users").select("*").order("id", { ascending: true }),
+      supabase
+        .from("electrical_projects")
+        .select(
+          "id, tenant_id, owner_user_id, name, client_name, location, system_type, electrification_grade, total_demand_va, iga_amps, mtd_metadata_json, created_at"
+        )
+        .order("created_at", { ascending: false }),
+    ]);
+
+    if (tenantsRes.data && tenantsRes.data.length > 0) {
+      setTenants(tenantsRes.data as AppTenant[]);
     }
-  };
+    if (usersRes.data && usersRes.data.length > 0) {
+      setUsers(usersRes.data as AppUser[]);
+    }
+    if (projectsRes.data) {
+      setAllProjects(projectsRes.data as SavedProjectRow[]);
+    }
+  }, []);
 
   useEffect(() => {
-    fetchSavedProjects();
-  }, []);
+    fetchDirectoryAndProjects();
+  }, [fetchDirectoryAndProjects]);
+
+  // Expedientes filtrados estrictamente para el usuario activo / tenant activo (Aislamiento Multi-Tenant)
+  const isolatedProjects = useMemo(() => {
+    if (!currentUser) return [];
+    return allProjects.filter((p) => {
+      if (isolationScope === "strict_user") {
+        // Estricto por usuario: los reportes de un usuario nunca se ligan con los de otro
+        return p.owner_user_id === currentUser.id;
+      }
+      // Aislado por empresa/tenant
+      return p.tenant_id === currentUser.tenant_id;
+    });
+  }, [allProjects, currentUser, isolationScope]);
+
+  // Preparar un expediente nuevo limpio con los datos profesionales del usuario activo
+  const startNewBlankProjectForUser = useCallback(
+    (user: AppUser, tenant: AppTenant | undefined) => {
+      const randNum = Math.floor(100 + Math.random() * 900);
+      setActiveProjectId(null);
+      setMtdMeta({
+        ...DEFAULT_MTD_METADATA,
+        instalacionNum: `BT-2026-U${user.id}-${randNum}`,
+        expedienteNum: `EXP-${tenant?.isla.slice(0, 2).toUpperCase() || "TF"}-2026-${randNum}`,
+        titularNombre: "",
+        titularNif: "",
+        direccionCalle: "",
+        direccionNum: "",
+        portalPlanta: "",
+        terminoMunicipal: tenant?.isla === "Gran Canaria" ? "Las Palmas de G.C." : "Santa Cruz de Tenerife",
+        isla: tenant?.isla || "Tenerife",
+        instaladorNombrePh: user.full_name.replace(/\s*\(.*?\)\s*/g, ""),
+        tecnicoNombre: user.full_name.replace(/\s*\(.*?\)\s*/g, ""),
+        instaladorDoi: user.doi_nif,
+        instaladorCciNum: user.cci_or_colegiado,
+        tecnicoColegiadoNum: user.cci_or_colegiado,
+        empresaInstaladoraNombre: tenant?.name || "",
+        empresaInstaladoraNum: tenant?.empresa_instaladora_num || "",
+      });
+      setCircuits(ITC_BT_25_TEMPLATES.slice(0, 5));
+    },
+    []
+  );
+
+  // Cambiar de Usuario Activo (limpiando el formulario activo para que nunca se mezclen reportes entre usuarios)
+  const switchActiveUser = (targetUser: AppUser) => {
+    const targetTenant = tenants.find((t) => t.id === targetUser.tenant_id);
+    setCurrentUserId(targetUser.id);
+    startNewBlankProjectForUser(targetUser, targetTenant);
+    setShowLoginModal(false);
+    setLoginError(null);
+    setStatusBanner({
+      type: "success",
+      text: `Sesión iniciada como ${targetUser.full_name} (${targetTenant?.name}). Sus reportes están aislados de otros usuarios.`,
+    });
+  };
+
+  const handleLoginSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const found = users.find(
+      (u) =>
+        u.email.toLowerCase().trim() === loginEmail.toLowerCase().trim() &&
+        u.access_pin === loginPin.trim()
+    );
+    if (!found) {
+      setLoginError("Credenciales inválidas. Verifica el correo y el PIN (por defecto 1234).");
+      return;
+    }
+    if (!found.is_active) {
+      setLoginError("Esta cuenta de usuario se encuentra desactivada por el administrador.");
+      return;
+    }
+    switchActiveUser(found);
+  };
 
   const handleLoadProject = async (projectId: number) => {
     if (!supabase) return;
-    const proj = savedProjects.find((p) => p.id === projectId);
-    if (proj) {
-      if (proj.mtd_metadata_json && Object.keys(proj.mtd_metadata_json).length > 0) {
-        setMtdMeta({ ...DEFAULT_MTD_METADATA, ...proj.mtd_metadata_json });
-      }
-      if (proj.system_type === "monofasico_230v" || proj.system_type === "trifasico_400v") {
-        setSupplyType(proj.system_type);
-      }
-      if (proj.electrification_grade === "basica" || proj.electrification_grade === "elevada") {
-        setElectrificationGrade(proj.electrification_grade);
-      }
+    const proj = isolatedProjects.find((p) => p.id === projectId);
+    if (!proj) {
+      setStatusBanner({
+        type: "error",
+        text: "Acceso denegado: este reporte pertenece a otro usuario/tenant.",
+      });
+      return;
+    }
+
+    setActiveProjectId(proj.id);
+    if (
+      proj.mtd_metadata_json &&
+      Object.keys(proj.mtd_metadata_json).length > 0
+    ) {
+      setMtdMeta({ ...DEFAULT_MTD_METADATA, ...proj.mtd_metadata_json });
+    }
+    if (
+      proj.system_type === "monofasico_230v" ||
+      proj.system_type === "trifasico_400v"
+    ) {
+      setSupplyType(proj.system_type);
+    }
+    if (
+      proj.electrification_grade === "basica" ||
+      proj.electrification_grade === "elevada"
+    ) {
+      setElectrificationGrade(proj.electrification_grade);
     }
 
     const { data: dbCircuits } = await supabase
@@ -291,7 +569,8 @@ export default function SistemaCalculoRebtPage() {
         dbCircuits.map((row) => ({
           code: row.circuit_code || `C${row.circuit_number}`,
           description: row.description,
-          usageType: (row.usage_type as CircuitUsageType) || "vivienda_interior",
+          usageType:
+            (row.usage_type as CircuitUsageType) || "vivienda_interior",
           phaseSystem: row.phases === 3 ? "trifasico" : "monofasico",
           phaseAssigned: row.phases === 3 ? "L1-L2-L3" : "L1",
           voltage: row.phases === 3 ? 400 : 230,
@@ -300,89 +579,74 @@ export default function SistemaCalculoRebtPage() {
           simultaneityFactor: Number(row.simultaneity_factor) || 1.0,
           utilizationFactor: Number(row.utilization_factor) || 1.0,
           lengthMeters: Number(row.length_meters) || 15,
-          installationMethod: (row.installation_method as InstallationMethod) || "B1",
+          installationMethod:
+            (row.installation_method as InstallationMethod) || "B1",
           insulationType: (row.insulation_type as InsulationType) || "PVC_70",
           material: row.conductor_material === "Al" ? "Al" : "Cu",
           fixedPiaAmps: Number(row.breaker_amps) || undefined,
         }))
       );
-      setSaveStatus(`Expediente #${projectId} cargado desde Supabase.`);
+      setStatusBanner({
+        type: "success",
+        text: `Expediente #${projectId} (${proj.name}) cargado correctamente en el espacio de trabajo de ${currentUser.full_name}.`,
+      });
     }
   };
 
-  const loadPresetDwellings = (preset: "basica" | "elevada_ve") => {
-    if (preset === "basica") {
-      setElectrificationGrade("basica");
-      setCircuits(ITC_BT_25_TEMPLATES.slice(0, 5));
-    } else {
-      setElectrificationGrade("elevada");
-      setCircuits(ITC_BT_25_TEMPLATES);
+  const handleDeleteProject = async (projectId: number) => {
+    if (!currentUser.can_delete_projects) {
+      setStatusBanner({
+        type: "warning",
+        text: "No tienes permiso para eliminar expedientes. Solicita el permiso 'Eliminar Reportes' en Administración.",
+      });
+      return;
     }
-  };
+    if (!supabase) return;
+    const { error } = await supabase
+      .from("electrical_projects")
+      .delete()
+      .eq("id", projectId);
 
-  const addCircuit = () => {
-    const nextIdx = circuits.length + 1;
-    setCircuits((prev) => [
-      ...prev,
-      {
-        code: `C${nextIdx}`,
-        description: `Circuito interior ${nextIdx}`,
-        usageType: "fuerza_otros",
-        phaseSystem: supplyType === "trifasico_400v" ? "trifasico" : "monofasico",
-        phaseAssigned: supplyType === "trifasico_400v" ? "L1-L2-L3" : "L1",
-        voltage: supplyType === "trifasico_400v" ? 400 : 230,
-        powerWatts: 3450,
-        cosPhi: 0.9,
-        simultaneityFactor: 1.0,
-        utilizationFactor: 1.0,
-        correctionFactor: 1.0,
-        lengthMeters: 20,
-        installationMethod: "B1",
-        insulationType: "PVC_70",
-        material: "Cu",
-      },
-    ]);
-  };
-
-  const removeCircuit = (index: number) => {
-    setCircuits((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const updateCircuit = <K extends keyof RebtCircuitInput>(
-    index: number,
-    field: K,
-    value: RebtCircuitInput[K]
-  ) => {
-    setCircuits((prev) =>
-      prev.map((c, i) => {
-        if (i !== index) return c;
-        const updated = { ...c, [field]: value };
-        if (field === "phaseSystem") {
-          updated.voltage = value === "trifasico" ? 400 : 230;
-          updated.phaseAssigned = value === "trifasico" ? "L1-L2-L3" : "L1";
-        }
-        return updated;
-      })
-    );
+    if (!error) {
+      if (activeProjectId === projectId) {
+        setActiveProjectId(null);
+      }
+      await fetchDirectoryAndProjects();
+      setStatusBanner({
+        type: "success",
+        text: `Expediente #${projectId} eliminado.`,
+      });
+    }
   };
 
   const handleSaveToSupabase = async () => {
+    if (!currentUser.can_create_projects) {
+      setStatusBanner({
+        type: "warning",
+        text: "Tu perfil actual no tiene permiso para crear o guardar expedientes.",
+      });
+      return;
+    }
+
     if (!supabase) {
-      setSaveStatus(
-        "Configura NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE_ANON_KEY para guardar en Supabase."
-      );
+      setStatusBanner({
+        type: "error",
+        text: "Configura las credenciales de Supabase para guardar.",
+      });
       return;
     }
 
     setIsSaving(true);
-    setSaveStatus(null);
+    setStatusBanner(null);
 
     try {
       const { data: project, error: projectErr } = await supabase
         .from("electrical_projects")
         .insert({
-          name: `M.T.D. ${mtdMeta.expedienteNum} - ${mtdMeta.usoDestino}`,
-          client_name: mtdMeta.titularNombre,
+          tenant_id: currentUser.tenant_id,
+          owner_user_id: currentUser.id,
+          name: `M.T.D. ${mtdMeta.expedienteNum} - ${mtdMeta.usoDestino || "Instalación BT"}`,
+          client_name: mtdMeta.titularNombre || "Titular sin especificar",
           location: `${mtdMeta.direccionCalle} ${mtdMeta.direccionNum}, ${mtdMeta.terminoMunicipal} (${mtdMeta.isla})`,
           system_type: supplyType,
           electrification_grade: electrificationGrade,
@@ -406,7 +670,9 @@ export default function SistemaCalculoRebtPage() {
         .single();
 
       if (projectErr || !project) {
-        throw new Error(projectErr?.message || "No se pudo insertar el expediente M.T.D.");
+        throw new Error(
+          projectErr?.message || "No se pudo guardar el expediente"
+        );
       }
 
       const circuitRows = calculatedCircuits.map((c, idx) => ({
@@ -449,1000 +715,2395 @@ export default function SistemaCalculoRebtPage() {
         throw new Error(circuitsErr.message);
       }
 
-      await fetchSavedProjects();
-      setSaveStatus(
-        `✓ Expediente M.T.D. #${project.id} (${mtdMeta.expedienteNum}) y sus ${calculatedCircuits.length} circuitos guardados en Supabase (bercfavycekkkqwlwmap).`
-      );
+      setActiveProjectId(project.id);
+      await fetchDirectoryAndProjects();
+      setStatusBanner({
+        type: "success",
+        text: `Expediente #${project.id} guardado exclusivamente bajo el usuario ${currentUser.full_name} (${currentTenant.name}).`,
+      });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Error desconocido";
-      setSaveStatus(`Error al guardar en Supabase: ${msg}`);
+      setStatusBanner({
+        type: "error",
+        text: `Error al guardar en Supabase: ${msg}`,
+      });
     } finally {
       setIsSaving(false);
     }
   };
 
+  // Funciones Administrativas (Crear Empresa/Tenant, Crear Usuario, Actualizar Permisos RBAC)
+  const handleCreateTenant = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTenantName.trim()) return;
+    if (!supabase) return;
+
+    const { data, error } = await supabase
+      .from("app_tenants")
+      .insert({
+        name: newTenantName.trim(),
+        cif: newTenantCif.trim(),
+        empresa_instaladora_num: newTenantNum.trim(),
+        isla: newTenantIsla,
+      })
+      .select("*")
+      .single();
+
+    if (error) {
+      setStatusBanner({
+        type: "error",
+        text: `No se pudo crear la empresa: ${error.message}`,
+      });
+      return;
+    }
+
+    if (data) {
+      setNewTenantName("");
+      setNewTenantCif("");
+      setNewTenantNum("");
+      await fetchDirectoryAndProjects();
+      setStatusBanner({
+        type: "success",
+        text: `Empresa / Tenant "${data.name}" creada correctamente.`,
+      });
+    }
+  };
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newUserName.trim() || !newUserEmail.trim()) return;
+    if (!supabase) return;
+
+    const isAdminRole =
+      newUserRole === "super_admin" || newUserRole === "admin_empresa";
+    const isReadOnly = newUserRole === "visor_auditor";
+
+    const { data, error } = await supabase
+      .from("app_users")
+      .insert({
+        tenant_id: newUserTenantId,
+        full_name: newUserName.trim(),
+        email: newUserEmail.trim().toLowerCase(),
+        access_pin: newUserPin.trim() || "1234",
+        doi_nif: newUserDoi.trim(),
+        role: newUserRole,
+        cci_or_colegiado: newUserCci.trim(),
+        can_create_projects: !isReadOnly,
+        can_edit_calculations: !isReadOnly,
+        can_export_mtd: true,
+        can_delete_projects: isAdminRole,
+        can_manage_users: isAdminRole,
+      })
+      .select("*")
+      .single();
+
+    if (error) {
+      setStatusBanner({
+        type: "error",
+        text: `Error al crear usuario: ${error.message}`,
+      });
+      return;
+    }
+
+    if (data) {
+      setNewUserName("");
+      setNewUserEmail("");
+      setNewUserDoi("");
+      setNewUserCci("");
+      await fetchDirectoryAndProjects();
+      setStatusBanner({
+        type: "success",
+        text: `Usuario "${data.full_name}" creado con su propio espacio aislado de reportes.`,
+      });
+    }
+  };
+
+  const handleTogglePermission = async (
+    targetUser: AppUser,
+    permField:
+      | "can_create_projects"
+      | "can_edit_calculations"
+      | "can_export_mtd"
+      | "can_delete_projects"
+      | "can_manage_users"
+      | "is_active"
+  ) => {
+    if (!currentUser.can_manage_users && currentUser.role !== "super_admin") {
+      setStatusBanner({
+        type: "warning",
+        text: "Solo un usuario con permiso de Administración puede modificar la matriz de permisología.",
+      });
+      return;
+    }
+
+    const nextVal = !targetUser[permField];
+    setUsers((prev) =>
+      prev.map((u) =>
+        u.id === targetUser.id ? { ...u, [permField]: nextVal } : u
+      )
+    );
+
+    if (supabase) {
+      await supabase
+        .from("app_users")
+        .update({ [permField]: nextVal })
+        .eq("id", targetUser.id);
+    }
+  };
+
+  const loadPresetDwellings = (preset: "basica" | "elevada_ve") => {
+    if (!currentUser.can_edit_calculations) return;
+    if (preset === "basica") {
+      setElectrificationGrade("basica");
+      setCircuits(ITC_BT_25_TEMPLATES.slice(0, 5));
+    } else {
+      setElectrificationGrade("elevada");
+      setCircuits(ITC_BT_25_TEMPLATES);
+    }
+  };
+
+  const addCircuit = () => {
+    if (!currentUser.can_edit_calculations) return;
+    const nextIdx = circuits.length + 1;
+    setCircuits((prev) => [
+      ...prev,
+      {
+        code: `C${nextIdx}`,
+        description: `Circuito interior ${nextIdx}`,
+        usageType: "fuerza_otros",
+        phaseSystem:
+          supplyType === "trifasico_400v" ? "trifasico" : "monofasico",
+        phaseAssigned: supplyType === "trifasico_400v" ? "L1-L2-L3" : "L1",
+        voltage: supplyType === "trifasico_400v" ? 400 : 230,
+        powerWatts: 3450,
+        cosPhi: 0.9,
+        simultaneityFactor: 1.0,
+        utilizationFactor: 1.0,
+        correctionFactor: 1.0,
+        lengthMeters: 20,
+        installationMethod: "B1",
+        insulationType: "PVC_70",
+        material: "Cu",
+      },
+    ]);
+  };
+
+  const removeCircuit = (index: number) => {
+    if (!currentUser.can_edit_calculations) return;
+    setCircuits((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const updateCircuit = <K extends keyof RebtCircuitInput>(
+    index: number,
+    field: K,
+    value: RebtCircuitInput[K]
+  ) => {
+    if (!currentUser.can_edit_calculations) return;
+    setCircuits((prev) =>
+      prev.map((c, i) => {
+        if (i !== index) return c;
+        const updated = { ...c, [field]: value };
+        if (field === "phaseSystem") {
+          updated.voltage = value === "trifasico" ? 400 : 230;
+          updated.phaseAssigned = value === "trifasico" ? "L1-L2-L3" : "L1";
+        }
+        return updated;
+      })
+    );
+  };
+
+  const navItems: {
+    id: ActiveSection;
+    label: string;
+    subtitle: string;
+    icon: React.ReactNode;
+    badge?: string;
+  }[] = [
+    {
+      id: "expedientes",
+      label: "Mis Expedientes",
+      subtitle: "Reportes aislados por usuario",
+      icon: <FolderOpen className="h-4 w-4" />,
+      badge: String(isolatedProjects.length),
+    },
+    {
+      id: "titular_ubicacion",
+      label: "1. Titular y Ubicación",
+      subtitle: "Datos administrativos e instalador",
+      icon: <MapPin className="h-4 w-4" />,
+    },
+    {
+      id: "circuitos",
+      label: "2. Cuadro de Circuitos",
+      subtitle: "ITC-BT-15 / 19 / 25 (mm² y PIA)",
+      icon: <Activity className="h-4 w-4" />,
+      badge: `${calculatedCircuits.length} cir.`,
+    },
+    {
+      id: "edificio_itc10",
+      label: "3. Previsión Edificio y LGA",
+      subtitle: "ITC-BT-10 / 14 / 52 (Recarga VE)",
+      icon: <Building2 className="h-4 w-4" />,
+    },
+    {
+      id: "tierras_legalizacion",
+      label: "4. Tierra y Legalización",
+      subtitle: "ITC-BT-04 / 05 / 18 / 24",
+      icon: <FileCheck2 className="h-4 w-4" />,
+    },
+    {
+      id: "ficha_mtd",
+      label: "5. Ficha Oficial M.T.D.",
+      subtitle: "Vista previa y descarga opcional",
+      icon: <FileSpreadsheet className="h-4 w-4" />,
+      badge: "Opcional",
+    },
+    {
+      id: "administracion",
+      label: "6. Administración y Usuarios",
+      subtitle: "Multitenencia y Permisología",
+      icon: <ShieldCheck className="h-4 w-4" />,
+      badge: `${users.length} usu.`,
+    },
+  ];
+
   return (
-    <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-      {/* Cabecera de la Aplicación (No se imprime cuando se exporta la Ficha M.T.D.) */}
-      <header className="no-print mb-6 flex flex-col justify-between gap-4 border-b border-slate-800 pb-5 md:flex-row md:items-center">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-400 ring-1 ring-amber-500/30">
-              <Zap className="h-3.5 w-3.5" /> REBT RD 842/2002 (ITC-BT-01 a BT-52)
-            </span>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-500/10 px-3 py-1 text-xs font-medium text-sky-400 ring-1 ring-sky-500/30">
-              <BookOpen className="h-3.5 w-3.5" /> Ficha Oficial M.T.D. B.T. (Gobierno de Canarias · 11 Págs)
-            </span>
-            <span
-              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ring-1 ${
-                isSupabaseConfigured
-                  ? "bg-emerald-500/10 text-emerald-400 ring-emerald-500/30"
-                  : "bg-slate-800 text-slate-400 ring-slate-700"
-              }`}
-            >
-              <Database className="h-3.5 w-3.5" />
-              {isSupabaseConfigured
-                ? `Supabase Conectado (${savedProjects.length} expedientes)`
-                : "Modo Local"}
-            </span>
+    <div className="flex min-h-screen bg-[#f8fafc] text-slate-900">
+      {/* =====================================================================
+          MENÚ LATERAL IZQUIERDO (ESTILO GOOGLE WORKSPACE / MICROSOFT FLUENT)
+         ===================================================================== */}
+      <aside className="no-print sticky top-0 flex h-screen w-72 shrink-0 flex-col border-r border-slate-200 bg-white">
+        {/* Marca / Cabecera Lateral */}
+        <div className="flex items-center gap-3 border-b border-slate-200 px-5 py-4">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#0f6cbd] text-white shadow-xs">
+            <Zap className="h-5 w-5" />
           </div>
-          <h1 className="mt-2.5 text-2xl font-bold tracking-tight text-white sm:text-3xl">
-            Sistema de Cálculo Eléctrico REBT y Generador Automático de M.T.D. B.T.
-          </h1>
-          <p className="mt-1 text-sm text-slate-400">
-            Registra los datos del titular, circuitos y edificio, calcula automáticamente secciones (mm²), PIAs, caídas de tensión, LGA/DI y puesta a tierra, y rellena las 11 páginas de la Memoria Técnica de Diseño.
-          </p>
+          <div>
+            <h1 className="text-sm font-bold tracking-tight text-slate-900">
+              REBT Cloud Suite
+            </h1>
+            <p className="text-[11px] font-medium text-slate-500">
+              Cálculo B.T. y Gestión M.T.D.
+            </p>
+          </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
-          {savedProjects.length > 0 && (
-            <div className="flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1.5">
-              <FolderOpen className="h-4 w-4 text-sky-400" />
-              <select
-                onChange={(e) => {
-                  const id = Number(e.target.value);
-                  if (id) handleLoadProject(id);
-                }}
-                defaultValue=""
-                className="bg-transparent text-xs text-slate-200 focus:outline-none"
+        {/* Tarjeta de Usuario y Tenant Activo */}
+        <div className="border-b border-slate-200 bg-slate-50/70 p-4">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-[#0f6cbd] ring-1 ring-[#0f6cbd]/20">
+                <Building className="h-3 w-3" />
+                {currentTenant?.name}
+              </span>
+              <p className="mt-1.5 truncate text-xs font-bold text-slate-900">
+                {currentUser?.full_name}
+              </p>
+              <p className="truncate text-[11px] text-slate-500">
+                {currentUser?.email}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setLoginEmail(currentUser?.email || "");
+                setLoginPin("1234");
+                setShowLoginModal(true);
+              }}
+              className="shrink-0 rounded-lg border border-slate-300 bg-white p-1.5 text-slate-600 shadow-2xs transition hover:bg-slate-100 hover:text-slate-900"
+              title="Cambiar de Usuario / Iniciar Sesión"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          {/* Selector Rápido de Usuario para probar el aislamiento de reportes */}
+          <div className="mt-3">
+            <label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+              Cambio rápido de cuenta (Multitenant):
+            </label>
+            <select
+              value={currentUser?.id || 1}
+              onChange={(e) => {
+                const target = users.find(
+                  (u) => u.id === Number(e.target.value)
+                );
+                if (target) switchActiveUser(target);
+              }}
+              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 shadow-2xs focus:border-[#0f6cbd] focus:outline-none"
+            >
+              {users
+                .filter((u) => u.is_active)
+                .map((u) => {
+                  const t = tenants.find((ten) => ten.id === u.tenant_id);
+                  return (
+                    <option key={u.id} value={u.id}>
+                      {u.full_name} — [{t?.name}]
+                    </option>
+                  );
+                })}
+            </select>
+          </div>
+        </div>
+
+        {/* Navegación por Apartados */}
+        <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+          <div className="px-2 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            Módulos del Sistema
+          </div>
+          {navItems.map((item) => {
+            const isActive = activeSection === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setActiveSection(item.id)}
+                className={`group flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left transition ${
+                  isActive
+                    ? "bg-[#e8f0fe] text-[#0f6cbd] font-semibold shadow-2xs"
+                    : "text-slate-700 hover:bg-slate-100"
+                }`}
               >
-                <option value="" disabled className="bg-slate-900">
-                  Cargar Expediente Guardado...
-                </option>
-                {savedProjects.map((p) => (
-                  <option key={p.id} value={p.id} className="bg-slate-900">
-                    #{p.id} · {p.client_name} ({p.name})
-                  </option>
-                ))}
-              </select>
+                <div className="flex items-center gap-3 min-w-0">
+                  <div
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition ${
+                      isActive
+                        ? "bg-[#0f6cbd] text-white"
+                        : "bg-slate-100 text-slate-600 group-hover:bg-white"
+                    }`}
+                  >
+                    {item.icon}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="truncate text-xs font-semibold">
+                      {item.label}
+                    </div>
+                    <div className="truncate text-[10px] text-slate-500">
+                      {item.subtitle}
+                    </div>
+                  </div>
+                </div>
+                {item.badge && (
+                  <span
+                    className={`ml-2 shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                      isActive
+                        ? "bg-[#0f6cbd] text-white"
+                        : "bg-slate-200/80 text-slate-600"
+                    }`}
+                  >
+                    {item.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* Pie del Menú Lateral */}
+        <div className="border-t border-slate-200 p-4 text-[11px] text-slate-500">
+          <div className="flex items-center justify-between">
+            <span>Estado Base de Datos:</span>
+            <span className="inline-flex items-center gap-1 font-semibold text-emerald-700">
+              <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
+              {isSupabaseConfigured ? "Supabase Online" : "Local"}
+            </span>
+          </div>
+          <p className="mt-1 text-[10px] text-slate-400">
+            REBT RD 842/2002 · ITC-BT-01 a BT-52
+          </p>
+        </div>
+      </aside>
+
+      {/* =====================================================================
+          ÁREA DE CONTENIDO PRINCIPAL
+         ===================================================================== */}
+      <div className="flex flex-1 flex-col min-w-0">
+        {/* Barra Superior Limpia estilo Google / Microsoft */}
+        <header className="no-print sticky top-0 z-10 flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 bg-white/95 px-6 py-3.5 backdrop-blur">
+          <div className="flex items-center gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-[#0f6cbd]">
+                  {mtdMeta.expedienteNum}
+                </span>
+                <ChevronRight className="h-3.5 w-3.5 text-slate-400" />
+                <span className="text-sm font-bold text-slate-900">
+                  {mtdMeta.titularNombre || "Nuevo Expediente REBT (Sin Titular)"}
+                </span>
+                {activeProjectId && (
+                  <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 ring-1 ring-emerald-600/20">
+                    ID #{activeProjectId}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-500">
+                Propietario del reporte:{" "}
+                <strong className="text-slate-700">
+                  {currentUser?.full_name}
+                </strong>{" "}
+                · Empresa:{" "}
+                <strong className="text-slate-700">
+                  {currentTenant?.name}
+                </strong>{" "}
+                · Potencia prevista:{" "}
+                <strong className="text-[#0f6cbd]">
+                  {cgmpSummary.contractDesignWatts.toLocaleString()} W (IGA{" "}
+                  {cgmpSummary.igaAmps} A)
+                </strong>
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() =>
+                startNewBlankProjectForUser(currentUser, currentTenant)
+              }
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50"
+            >
+              <FilePlus2 className="h-4 w-4 text-slate-500" />
+              Nuevo Reporte Limpio
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveSection("ficha_mtd")}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50/70 px-3 py-2 text-xs font-semibold text-[#0f6cbd] transition hover:bg-blue-100/70"
+            >
+              <Printer className="h-4 w-4" />
+              Ficha M.T.D. (Opcional)
+            </button>
+
+            <button
+              type="button"
+              onClick={handleSaveToSupabase}
+              disabled={isSaving || !currentUser?.can_create_projects}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[#0f6cbd] px-4 py-2 text-xs font-semibold text-white shadow-xs transition hover:bg-[#115ea3] disabled:opacity-50"
+            >
+              <Save className="h-4 w-4" />
+              {isSaving ? "Guardando..." : "Guardar Reporte del Usuario"}
+            </button>
+          </div>
+        </header>
+
+        {/* Contenedor de Secciones */}
+        <main className="flex-1 p-6 lg:p-8">
+          {statusBanner && (
+            <div
+              className={`no-print mb-6 flex items-center justify-between rounded-xl border px-4 py-3 text-xs font-medium shadow-2xs ${
+                statusBanner.type === "success"
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                  : statusBanner.type === "warning"
+                  ? "border-amber-200 bg-amber-50 text-amber-900"
+                  : "border-rose-200 bg-rose-50 text-rose-900"
+              }`}
+            >
+              <span>{statusBanner.text}</span>
+              <button
+                type="button"
+                onClick={() => setStatusBanner(null)}
+                className="ml-4 text-xs font-bold underline"
+              >
+                Cerrar
+              </button>
             </div>
           )}
 
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab("ficha_mtd");
-              setTimeout(() => window.print(), 150);
-            }}
-            className="inline-flex items-center gap-2 rounded-lg border border-amber-500/50 bg-amber-500/10 px-3.5 py-2 text-xs font-semibold text-amber-300 transition hover:bg-amber-500/20"
-          >
-            <Printer className="h-4 w-4" />
-            Imprimir / PDF (11 Págs)
-          </button>
+          {/* =================================================================
+              APARTADO 0: MIS EXPEDIENTES Y REPORTES (AISLADOS POR USUARIO)
+             ================================================================= */}
+          {activeSection === "expedientes" && (
+            <div className="space-y-6">
+              <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-xs">
+                <div>
+                  <span className="inline-flex items-center gap-1.5 rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-[#0f6cbd]">
+                    <Lock className="h-3.5 w-3.5" />
+                    Espacio de Trabajo Aislado (Multitenant)
+                  </span>
+                  <h2 className="mt-2 text-lg font-bold text-slate-900">
+                    Reportes y Expedientes de {currentUser?.full_name}
+                  </h2>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    Los expedientes creados bajo tu usuario quedan asociados exclusivamente a tu identificador (
+                    <code>owner_user_id = {currentUser?.id}</code>) y organización (
+                    <code>{currentTenant?.name}</code>), evitando que se mezclen con los reportes de otros usuarios.
+                  </p>
+                </div>
 
-          <button
-            type="button"
-            onClick={handleSaveToSupabase}
-            disabled={isSaving}
-            className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-xs font-bold text-slate-950 shadow-sm transition hover:bg-amber-400 disabled:opacity-50"
-          >
-            <Save className="h-4 w-4" />
-            {isSaving ? "Guardando..." : "Guardar en Supabase"}
-          </button>
-        </div>
-      </header>
+                <div className="flex flex-wrap items-center gap-2.5">
+                  {(currentUser.role === "super_admin" ||
+                    currentUser.role === "admin_empresa") && (
+                    <select
+                      value={isolationScope}
+                      onChange={(e) =>
+                        setIsolationScope(
+                          e.target.value as "strict_user" | "tenant_shared"
+                        )
+                      }
+                      className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700"
+                    >
+                      <option value="strict_user">
+                        Vista Estricta: Solo mis reportes ({currentUser.full_name})
+                      </option>
+                      <option value="tenant_shared">
+                        Vista Empresa: Todos los de {currentTenant.name}
+                      </option>
+                    </select>
+                  )}
 
-      {saveStatus && (
-        <div className="no-print mb-5 rounded-lg border border-emerald-500/40 bg-emerald-950/40 px-4 py-2.5 text-xs font-medium text-emerald-200">
-          {saveStatus}
-        </div>
-      )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      startNewBlankProjectForUser(currentUser, currentTenant);
+                      setActiveSection("titular_ubicacion");
+                    }}
+                    className="inline-flex items-center gap-2 rounded-lg bg-[#0f6cbd] px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-[#115ea3]"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Crear Nuevo Expediente REBT
+                  </button>
+                </div>
+              </div>
 
-      {/* Panel Rápido de Datos del Titular, Emplazamiento y Suministro (No se imprime) */}
-      <section className="no-print mb-6 grid grid-cols-1 gap-3 rounded-xl border border-slate-800 bg-slate-900/60 p-4 sm:grid-cols-2 md:grid-cols-6">
-        <div className="md:col-span-2">
-          <label className="block text-[11px] font-medium text-slate-400">
-            Titular / Razón Social (Pág. 1/11)
-          </label>
-          <input
-            type="text"
-            value={mtdMeta.titularNombre}
-            onChange={(e) =>
-              setMtdMeta((prev) => ({ ...prev, titularNombre: e.target.value }))
-            }
-            className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-xs text-white focus:border-amber-500 focus:outline-none"
-          />
-        </div>
-        <div>
-          <label className="block text-[11px] font-medium text-slate-400">
-            D.O.I. / C.I.F.
-          </label>
-          <input
-            type="text"
-            value={mtdMeta.titularNif}
-            onChange={(e) =>
-              setMtdMeta((prev) => ({ ...prev, titularNif: e.target.value }))
-            }
-            className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-xs text-white focus:border-amber-500 focus:outline-none"
-          />
-        </div>
-        <div>
-          <label className="block text-[11px] font-medium text-slate-400">
-            Municipio / Isla
-          </label>
-          <input
-            type="text"
-            value={mtdMeta.terminoMunicipal}
-            onChange={(e) =>
-              setMtdMeta((prev) => ({
-                ...prev,
-                terminoMunicipal: e.target.value,
-              }))
-            }
-            className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-xs text-white focus:border-amber-500 focus:outline-none"
-          />
-        </div>
-        <div>
-          <label className="block text-[11px] font-medium text-slate-400">
-            Tensión Suministro
-          </label>
-          <select
-            value={supplyType}
-            onChange={(e) => setSupplyType(e.target.value as SystemSupplyType)}
-            className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-xs text-white focus:border-amber-500 focus:outline-none"
-          >
-            <option value="monofasico_230v">Monofásico 230 V</option>
-            <option value="trifasico_400v">Trifásico 400 V</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-[11px] font-medium text-slate-400">
-            Electrificación Vivienda
-          </label>
-          <select
-            value={electrificationGrade}
-            onChange={(e) =>
-              setElectrificationGrade(e.target.value as "basica" | "elevada")
-            }
-            className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-xs text-white focus:border-amber-500 focus:outline-none"
-          >
-            <option value="basica">Básica (5.750 W)</option>
-            <option value="elevada">Elevada (9.200 W)</option>
-          </select>
-        </div>
-      </section>
+              {/* Tarjetas de Resumen Rápido del Expediente en Curso */}
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
+                  <span className="text-xs font-medium text-slate-500">
+                    Usuario Activo
+                  </span>
+                  <p className="mt-1 truncate text-base font-bold text-slate-900">
+                    {currentUser?.full_name}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {currentTenant?.name} · {currentTenant?.isla}
+                  </p>
+                </div>
 
-      {/* Navegación por Pestañas de Módulos (No se imprime) */}
-      <div className="no-print mb-6 flex flex-wrap gap-2 border-b border-slate-800 pb-3">
-        <button
-          type="button"
-          onClick={() => setActiveTab("ficha_mtd")}
-          className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-bold transition ${
-            activeTab === "ficha_mtd"
-              ? "bg-amber-500 text-slate-950 shadow"
-              : "bg-slate-900 text-slate-300 hover:bg-slate-800"
-          }`}
-        >
-          <FileSpreadsheet className="h-4 w-4" />
-          1. Ficha Técnica Oficial M.T.D. B.T. (11 Páginas Autollenadas)
-        </button>
+                <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
+                  <span className="text-xs font-medium text-slate-500">
+                    Mis Reportes Guardados
+                  </span>
+                  <p className="mt-1 text-2xl font-bold text-[#0f6cbd]">
+                    {isolatedProjects.length}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Aislados de otros usuarios ({allProjects.length} totales en BD)
+                  </p>
+                </div>
 
-        <button
-          type="button"
-          onClick={() => setActiveTab("circuitos")}
-          className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-bold transition ${
-            activeTab === "circuitos"
-              ? "bg-amber-500 text-slate-950 shadow"
-              : "bg-slate-900 text-slate-300 hover:bg-slate-800"
-          }`}
-        >
-          <Activity className="h-4 w-4" />
-          2. Cálculo de Circuitos y D.I. (ITC-BT-15 / 19 / 25)
-        </button>
+                <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
+                  <span className="text-xs font-medium text-slate-500">
+                    Expediente en Edición
+                  </span>
+                  <p className="mt-1 truncate text-base font-bold text-slate-900">
+                    {mtdMeta.expedienteNum}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {calculatedCircuits.length} circuitos ·{" "}
+                    {cgmpSummary.contractDesignWatts.toLocaleString()} W
+                  </p>
+                </div>
 
-        <button
-          type="button"
-          onClick={() => setActiveTab("edificio_itc10")}
-          className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-bold transition ${
-            activeTab === "edificio_itc10"
-              ? "bg-amber-500 text-slate-950 shadow"
-              : "bg-slate-900 text-slate-300 hover:bg-slate-800"
-          }`}
-        >
-          <Building2 className="h-4 w-4" />
-          3. Previsión de Cargas Edificio y LGA (ITC-BT-10 / 14 / 52)
-        </button>
+                <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
+                  <span className="text-xs font-medium text-slate-500">
+                    Descarga Ficha M.T.D. (11 Págs)
+                  </span>
+                  <div className="mt-2">
+                    <button
+                      type="button"
+                      onClick={() => setActiveSection("ficha_mtd")}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-800 hover:bg-slate-200"
+                    >
+                      <FileSpreadsheet className="h-3.5 w-3.5 text-[#0f6cbd]" />
+                      Ir a Vista / Descarga Opcional
+                    </button>
+                  </div>
+                </div>
+              </div>
 
-        <button
-          type="button"
-          onClick={() => setActiveTab("tierras_legalizacion")}
-          className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-bold transition ${
-            activeTab === "tierras_legalizacion"
-              ? "bg-amber-500 text-slate-950 shadow"
-              : "bg-slate-900 text-slate-300 hover:bg-slate-800"
-          }`}
-        >
-          <FileCheck2 className="h-4 w-4" />
-          4. Puesta a Tierra y Legalización (ITC-BT-04 / 05 / 18 / 24)
-        </button>
+              {/* Tabla de Expedientes Aislados por Usuario */}
+              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
+                <div className="border-b border-slate-200 px-5 py-3.5 flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-slate-900">
+                    Listado de Reportes de {currentUser?.full_name}
+                  </h3>
+                  <span className="text-xs text-slate-500">
+                    Mostrando {isolatedProjects.length} expediente(s)
+                  </span>
+                </div>
+
+                {isolatedProjects.length === 0 ? (
+                  <div className="p-8 text-center">
+                    <p className="text-sm font-medium text-slate-700">
+                      Este usuario aún no tiene reportes guardados en su espacio aislado.
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Pulsa en &ldquo;Guardar Reporte del Usuario&rdquo; arriba a la derecha o crea un nuevo expediente para registrarlo bajo {currentUser?.full_name}.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold uppercase text-slate-500">
+                        <tr>
+                          <th className="px-4 py-3">ID</th>
+                          <th className="px-4 py-3">Expediente / Uso</th>
+                          <th className="px-4 py-3">Titular</th>
+                          <th className="px-4 py-3">Emplazamiento</th>
+                          <th className="px-4 py-3 text-right">Potencia</th>
+                          <th className="px-4 py-3 text-right">IGA</th>
+                          <th className="px-4 py-3">Fecha</th>
+                          <th className="px-4 py-3 text-right">Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200">
+                        {isolatedProjects.map((proj) => (
+                          <tr
+                            key={proj.id}
+                            className={`hover:bg-slate-50 ${
+                              activeProjectId === proj.id ? "bg-blue-50/40" : ""
+                            }`}
+                          >
+                            <td className="px-4 py-3 font-mono font-bold text-[#0f6cbd]">
+                              #{proj.id}
+                            </td>
+                            <td className="px-4 py-3 font-semibold text-slate-900">
+                              {proj.name}
+                            </td>
+                            <td className="px-4 py-3 text-slate-700">
+                              {proj.client_name}
+                            </td>
+                            <td className="px-4 py-3 text-slate-600">
+                              {proj.location}
+                            </td>
+                            <td className="px-4 py-3 text-right font-mono font-semibold text-slate-800">
+                              {Number(proj.total_demand_va).toLocaleString()} W
+                            </td>
+                            <td className="px-4 py-3 text-right font-mono text-slate-700">
+                              {proj.iga_amps} A
+                            </td>
+                            <td className="px-4 py-3 text-slate-500">
+                              {new Date(proj.created_at).toLocaleDateString()}
+                            </td>
+                            <td className="px-4 py-3 text-right space-x-2">
+                              <button
+                                type="button"
+                                onClick={() => handleLoadProject(proj.id)}
+                                className="rounded-lg bg-[#e8f0fe] px-3 py-1 text-xs font-semibold text-[#0f6cbd] hover:bg-blue-100"
+                              >
+                                Abrir Cálculos
+                              </button>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  await handleLoadProject(proj.id);
+                                  setActiveSection("ficha_mtd");
+                                }}
+                                className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                              >
+                                Ver M.T.D.
+                              </button>
+                              {currentUser.can_delete_projects && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteProject(proj.id)}
+                                  className="rounded-lg p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                                  title="Eliminar reporte"
+                                >
+                                  <Trash2 className="inline h-4 w-4" />
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* =================================================================
+              APARTADO 1: DATOS DEL TITULAR, UBICACIÓN E INSTALADOR
+             ================================================================= */}
+          {activeSection === "titular_ubicacion" && (
+            <div className="space-y-6">
+              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-xs">
+                <h2 className="text-base font-bold text-slate-900">
+                  1. Datos del Titular y Ubicación de la Instalación (Página 1/11 M.T.D.)
+                </h2>
+                <p className="mt-1 text-xs text-slate-500">
+                  Introduce los datos administrativos del expediente. Se sincronizan automáticamente con la cabecera, la Página 1, la Memoria Descriptiva (Pág. 5) y el Croquis de Situación (Pág. 9).
+                </p>
+
+                <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Nº de Instalación
+                    </label>
+                    <input
+                      type="text"
+                      value={mtdMeta.instalacionNum}
+                      onChange={(e) =>
+                        setMtdMeta((p) => ({
+                          ...p,
+                          instalacionNum: e.target.value,
+                        }))
+                      }
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Nº de Expediente
+                    </label>
+                    <input
+                      type="text"
+                      value={mtdMeta.expedienteNum}
+                      onChange={(e) =>
+                        setMtdMeta((p) => ({
+                          ...p,
+                          expedienteNum: e.target.value,
+                        }))
+                      }
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Nombre / Razón Social del Titular
+                    </label>
+                    <input
+                      type="text"
+                      value={mtdMeta.titularNombre}
+                      onChange={(e) =>
+                        setMtdMeta((p) => ({
+                          ...p,
+                          titularNombre: e.target.value,
+                        }))
+                      }
+                      placeholder="Ej. Comunidad de Propietarios Edificio Atlántico"
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">
+                      D.O.I. / C.I.F. del Titular
+                    </label>
+                    <input
+                      type="text"
+                      value={mtdMeta.titularNif}
+                      onChange={(e) =>
+                        setMtdMeta((p) => ({ ...p, titularNif: e.target.value }))
+                      }
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Dirección (Calle / Avenida)
+                    </label>
+                    <input
+                      type="text"
+                      value={mtdMeta.direccionCalle}
+                      onChange={(e) =>
+                        setMtdMeta((p) => ({
+                          ...p,
+                          direccionCalle: e.target.value,
+                        }))
+                      }
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700">
+                        Número
+                      </label>
+                      <input
+                        type="text"
+                        value={mtdMeta.direccionNum}
+                        onChange={(e) =>
+                          setMtdMeta((p) => ({
+                            ...p,
+                            direccionNum: e.target.value,
+                          }))
+                        }
+                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700">
+                        Portal / Planta
+                      </label>
+                      <input
+                        type="text"
+                        value={mtdMeta.portalPlanta}
+                        onChange={(e) =>
+                          setMtdMeta((p) => ({
+                            ...p,
+                            portalPlanta: e.target.value,
+                          }))
+                        }
+                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Término Municipal (T.M.)
+                    </label>
+                    <input
+                      type="text"
+                      value={mtdMeta.terminoMunicipal}
+                      onChange={(e) =>
+                        setMtdMeta((p) => ({
+                          ...p,
+                          terminoMunicipal: e.target.value,
+                        }))
+                      }
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Isla
+                    </label>
+                    <select
+                      value={mtdMeta.isla}
+                      onChange={(e) =>
+                        setMtdMeta((p) => ({ ...p, isla: e.target.value }))
+                      }
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
+                    >
+                      <option value="Tenerife">Tenerife</option>
+                      <option value="Gran Canaria">Gran Canaria</option>
+                      <option value="Lanzarote">Lanzarote</option>
+                      <option value="Fuerteventura">Fuerteventura</option>
+                      <option value="La Palma">La Palma</option>
+                      <option value="La Gomera">La Gomera</option>
+                      <option value="El Hierro">El Hierro</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Teléfono(s)
+                    </label>
+                    <input
+                      type="text"
+                      value={mtdMeta.telefono}
+                      onChange={(e) =>
+                        setMtdMeta((p) => ({ ...p, telefono: e.target.value }))
+                      }
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Código Postal (C.P.)
+                    </label>
+                    <input
+                      type="text"
+                      value={mtdMeta.codigoPostal}
+                      onChange={(e) =>
+                        setMtdMeta((p) => ({
+                          ...p,
+                          codigoPostal: e.target.value,
+                        }))
+                      }
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Superficie Útil (m²)
+                    </label>
+                    <input
+                      type="number"
+                      value={mtdMeta.superficieUtilM2}
+                      onChange={(e) =>
+                        setMtdMeta((p) => ({
+                          ...p,
+                          superficieUtilM2: Number(e.target.value) || 0,
+                        }))
+                      }
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Uso a que se destina
+                    </label>
+                    <input
+                      type="text"
+                      value={mtdMeta.usoDestino}
+                      onChange={(e) =>
+                        setMtdMeta((p) => ({ ...p, usoDestino: e.target.value }))
+                      }
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Presupuesto Total (Euros)
+                    </label>
+                    <input
+                      type="number"
+                      value={mtdMeta.presupuestoTotalEuros}
+                      onChange={(e) =>
+                        setMtdMeta((p) => ({
+                          ...p,
+                          presupuestoTotalEuros: Number(e.target.value) || 0,
+                        }))
+                      }
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Autor Firmante de la M.T.D. (Página 11/11) */}
+              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-xs">
+                <h3 className="text-base font-bold text-slate-900">
+                  Datos del Profesional Habilitado (PH) / Técnico Competente (Página 11/11 M.T.D.)
+                </h3>
+                <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Modalidad de Firma
+                    </label>
+                    <select
+                      value={mtdMeta.autorTipo}
+                      onChange={(e) =>
+                        setMtdMeta((p) => ({
+                          ...p,
+                          autorTipo: e.target.value as
+                            | "instalador_ph"
+                            | "tecnico_competente",
+                        }))
+                      }
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
+                    >
+                      <option value="instalador_ph">
+                        Instalador Autorizado (Profesional Habilitado PH)
+                      </option>
+                      <option value="tecnico_competente">
+                        Técnico Competente Colegiado
+                      </option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Nombre del Instalador PH / Técnico
+                    </label>
+                    <input
+                      type="text"
+                      value={mtdMeta.instaladorNombrePh}
+                      onChange={(e) =>
+                        setMtdMeta((p) => ({
+                          ...p,
+                          instaladorNombrePh: e.target.value,
+                          tecnicoNombre: e.target.value,
+                        }))
+                      }
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">
+                      D.O.I. / N.I.F. Firmante
+                    </label>
+                    <input
+                      type="text"
+                      value={mtdMeta.instaladorDoi}
+                      onChange={(e) =>
+                        setMtdMeta((p) => ({
+                          ...p,
+                          instaladorDoi: e.target.value,
+                        }))
+                      }
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Nº C.C.I. / Nº Colegiado
+                    </label>
+                    <input
+                      type="text"
+                      value={mtdMeta.instaladorCciNum}
+                      onChange={(e) =>
+                        setMtdMeta((p) => ({
+                          ...p,
+                          instaladorCciNum: e.target.value,
+                          tecnicoColegiadoNum: e.target.value,
+                        }))
+                      }
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Empresa Instaladora
+                    </label>
+                    <input
+                      type="text"
+                      value={mtdMeta.empresaInstaladoraNombre}
+                      onChange={(e) =>
+                        setMtdMeta((p) => ({
+                          ...p,
+                          empresaInstaladoraNombre: e.target.value,
+                        }))
+                      }
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Nº Empresa Instaladora
+                    </label>
+                    <input
+                      type="text"
+                      value={mtdMeta.empresaInstaladoraNum}
+                      onChange={(e) =>
+                        setMtdMeta((p) => ({
+                          ...p,
+                          empresaInstaladoraNum: e.target.value,
+                        }))
+                      }
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Lugar de Firma
+                    </label>
+                    <input
+                      type="text"
+                      value={mtdMeta.ciudadFirma}
+                      onChange={(e) =>
+                        setMtdMeta((p) => ({
+                          ...p,
+                          ciudadFirma: e.target.value,
+                        }))
+                      }
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* =================================================================
+              APARTADO 2: CUADRO DE CIRCUITOS INTERIORES Y D.I.
+             ================================================================= */}
+          {activeSection === "circuitos" && (
+            <div className="space-y-6">
+              {/* Tarjetas Resumen en Diseño Claro */}
+              <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
+                  <span className="text-xs font-medium text-slate-500">
+                    Potencia Prevista / Instalada
+                  </span>
+                  <p className="mt-1 text-2xl font-bold text-slate-900">
+                    {cgmpSummary.contractDesignWatts.toLocaleString()} W
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Instalada: {cgmpSummary.totalInstalledWatts.toLocaleString()} W
+                  </p>
+                </div>
+
+                <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
+                  <span className="text-xs font-medium text-slate-500">
+                    Protección General (CGMP)
+                  </span>
+                  <p className="mt-1 text-2xl font-bold text-[#0f6cbd]">
+                    IGA {cgmpSummary.igaAmps} A
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Diferenciales {rcdSensitivityMa} mA:{" "}
+                    <strong className="text-slate-900">
+                      {cgmpSummary.rcd30mACount} ud.
+                    </strong>
+                  </p>
+                </div>
+
+                <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-slate-500">
+                      Derivación Individual (ITC-BT-15)
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min={1}
+                        value={diLengthMeters}
+                        onChange={(e) =>
+                          setDiLengthMeters(Number(e.target.value) || 1)
+                        }
+                        className="w-14 rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 text-right text-xs text-slate-900"
+                      />
+                      <span className="text-xs text-slate-500">m</span>
+                    </div>
+                  </div>
+                  <p className="mt-1 text-xl font-bold text-slate-900">
+                    {cgmpSummary.diCalculation.conductorsSummary} + PE{" "}
+                    {cgmpSummary.diCalculation.peSectionMm2} mm²
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    ΔU = {cgmpSummary.diCalculation.voltageDropPct}% · Tubo Ø{" "}
+                    {cgmpSummary.diCalculation.tubeDiameterMm} mm
+                  </p>
+                </div>
+
+                <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
+                  <span className="text-xs font-medium text-slate-500">
+                    Verificación REBT (ITC-BT-19 / 22)
+                  </span>
+                  <div className="mt-1 flex items-center gap-2">
+                    {cgmpSummary.nonCompliantCircuits === 0 ? (
+                      <>
+                        <CheckCircle2 className="h-6 w-6 text-emerald-600" />
+                        <span className="text-lg font-bold text-emerald-700">
+                          Cumple REBT
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <AlertTriangle className="h-6 w-6 text-amber-600" />
+                        <span className="text-lg font-bold text-amber-700">
+                          {cgmpSummary.nonCompliantCircuits} alerta(s)
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Condición Ib ≤ In ≤ Iz y caída ΔU%
+                  </p>
+                </div>
+              </section>
+
+              {/* Controles de Suministro y Plantillas ITC-BT-25 */}
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700">
+                    <Sparkles className="h-4 w-4 text-[#0f6cbd]" />
+                    Plantillas Oficiales ITC-BT-25:
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => loadPresetDwellings("basica")}
+                    className="rounded-lg border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                  >
+                    Electrificación Básica (C1 a C5)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => loadPresetDwellings("elevada_ve")}
+                    className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-[#0f6cbd] hover:bg-blue-100"
+                  >
+                    Electrificación Elevada + VE (C1 a C13)
+                  </button>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    value={supplyType}
+                    onChange={(e) =>
+                      setSupplyType(e.target.value as SystemSupplyType)
+                    }
+                    className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700"
+                  >
+                    <option value="monofasico_230v">Monofásico 230 V</option>
+                    <option value="trifasico_400v">Trifásico 400 V</option>
+                  </select>
+
+                  <select
+                    value={diType}
+                    onChange={(e) =>
+                      setDiType(e.target.value as "di_concentrada" | "di_unico")
+                    }
+                    className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700"
+                  >
+                    <option value="di_concentrada">
+                      DI Contadores Concentrados (ΔU 1,0%)
+                    </option>
+                    <option value="di_unico">DI Único Usuario (ΔU 1,5%)</option>
+                  </select>
+
+                  <button
+                    type="button"
+                    onClick={addCircuit}
+                    disabled={!currentUser.can_edit_calculations}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-[#0f6cbd] px-3.5 py-1.5 text-xs font-semibold text-white shadow-2xs hover:bg-[#115ea3] disabled:opacity-50"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Añadir Circuito
+                  </button>
+                </div>
+              </div>
+
+              {/* Tabla de Circuitos */}
+              <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold uppercase text-slate-500">
+                      <tr>
+                        <th className="px-2.5 py-3">Cód.</th>
+                        <th className="px-2.5 py-3">Descripción del Circuito</th>
+                        <th className="px-2.5 py-3">Uso / ITC</th>
+                        <th className="px-2.5 py-3">Tensión</th>
+                        <th className="px-2.5 py-3">Potencia (W)</th>
+                        <th className="px-2.5 py-3">Long. (m)</th>
+                        <th className="px-2.5 py-3">Aisl. / Mét.</th>
+                        <th className="px-2.5 py-3 text-right">Ib (A)</th>
+                        <th className="px-2.5 py-3 text-right">PIA (A)</th>
+                        <th className="px-2.5 py-3 text-right">Iz (A)</th>
+                        <th className="px-2.5 py-3">Sección (mm²)</th>
+                        <th className="px-2.5 py-3 text-right">ΔU (%)</th>
+                        <th className="px-2.5 py-3 text-right">Icc (A)</th>
+                        <th className="px-2.5 py-3 text-right">Tubo Ø</th>
+                        <th className="px-2.5 py-3 text-center">Acción</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                      {calculatedCircuits.map((c, index) => (
+                        <tr key={index} className="hover:bg-slate-50/80">
+                          <td className="px-2.5 py-2">
+                            <input
+                              type="text"
+                              value={c.code}
+                              onChange={(e) =>
+                                updateCircuit(index, "code", e.target.value)
+                              }
+                              className="w-12 rounded border border-slate-300 bg-white px-1.5 py-1 font-bold text-[#0f6cbd]"
+                            />
+                          </td>
+                          <td className="px-2.5 py-2">
+                            <input
+                              type="text"
+                              value={c.description}
+                              onChange={(e) =>
+                                updateCircuit(
+                                  index,
+                                  "description",
+                                  e.target.value
+                                )
+                              }
+                              className="w-48 rounded border border-slate-300 bg-white px-2 py-1 text-slate-900"
+                            />
+                          </td>
+                          <td className="px-2.5 py-2">
+                            <select
+                              value={c.usageType}
+                              onChange={(e) =>
+                                updateCircuit(
+                                  index,
+                                  "usageType",
+                                  e.target.value as CircuitUsageType
+                                )
+                              }
+                              className="rounded border border-slate-300 bg-white px-1.5 py-1 text-slate-800"
+                            >
+                              <option value="vivienda_interior">
+                                Vivienda (3%)
+                              </option>
+                              <option value="alumbrado">Alumbrado (3%)</option>
+                              <option value="alumbrado_descarga">
+                                Descarga x1,8 (3%)
+                              </option>
+                              <option value="fuerza_otros">
+                                Fuerza / Otros (5%)
+                              </option>
+                              <option value="motor">Motor x1,25 (5%)</option>
+                              <option value="recarga_ve">Recarga VE (5%)</option>
+                            </select>
+                          </td>
+                          <td className="px-2.5 py-2">
+                            <select
+                              value={c.phaseSystem}
+                              onChange={(e) =>
+                                updateCircuit(
+                                  index,
+                                  "phaseSystem",
+                                  e.target.value as "monofasico" | "trifasico"
+                                )
+                              }
+                              className="rounded border border-slate-300 bg-white px-1.5 py-1 text-slate-800"
+                            >
+                              <option value="monofasico">230V 1F</option>
+                              <option value="trifasico">400V 3F</option>
+                            </select>
+                          </td>
+                          <td className="px-2.5 py-2">
+                            <input
+                              type="number"
+                              min={0}
+                              step={100}
+                              value={c.powerWatts}
+                              onChange={(e) =>
+                                updateCircuit(
+                                  index,
+                                  "powerWatts",
+                                  Number(e.target.value) || 0
+                                )
+                              }
+                              className="w-20 rounded border border-slate-300 bg-white px-2 py-1 text-right text-slate-900"
+                            />
+                          </td>
+                          <td className="px-2.5 py-2">
+                            <input
+                              type="number"
+                              min={1}
+                              value={c.lengthMeters}
+                              onChange={(e) =>
+                                updateCircuit(
+                                  index,
+                                  "lengthMeters",
+                                  Number(e.target.value) || 1
+                                )
+                              }
+                              className="w-14 rounded border border-slate-300 bg-white px-1.5 py-1 text-right text-slate-900"
+                            />
+                          </td>
+                          <td className="px-2.5 py-2">
+                            <div className="flex items-center gap-1">
+                              <select
+                                value={c.insulationType}
+                                onChange={(e) =>
+                                  updateCircuit(
+                                    index,
+                                    "insulationType",
+                                    e.target.value as InsulationType
+                                  )
+                                }
+                                className="rounded border border-slate-300 bg-white px-1 py-1 text-slate-800"
+                              >
+                                <option value="PVC_70">PVC 70°C</option>
+                                <option value="XLPE_90">XLPE 90°C</option>
+                              </select>
+                              <select
+                                value={c.installationMethod}
+                                onChange={(e) =>
+                                  updateCircuit(
+                                    index,
+                                    "installationMethod",
+                                    e.target.value as InstallationMethod
+                                  )
+                                }
+                                className="rounded border border-slate-300 bg-white px-1 py-1 text-slate-800"
+                              >
+                                <option value="B1">B1</option>
+                                <option value="E">E/F</option>
+                              </select>
+                            </div>
+                          </td>
+                          <td className="px-2.5 py-2 text-right font-mono text-slate-700">
+                            {c.currentIbAmps} A
+                          </td>
+                          <td className="px-2.5 py-2 text-right font-mono font-bold text-[#0f6cbd]">
+                            {c.piaAmps} A
+                          </td>
+                          <td className="px-2.5 py-2 text-right font-mono text-slate-600">
+                            {c.ampacityIzAmps} A
+                          </td>
+                          <td className="px-2.5 py-2 font-mono font-semibold text-slate-900">
+                            {c.conductorsSummary} + PE {c.peSectionMm2} mm²
+                          </td>
+                          <td className="px-2.5 py-2 text-right font-mono">
+                            <span
+                              className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-semibold ${
+                                c.voltageDropPct <= c.maxAllowedDropPct
+                                  ? "bg-emerald-50 text-emerald-700"
+                                  : "bg-rose-50 text-rose-700"
+                              }`}
+                            >
+                              {c.voltageDropPct}%
+                            </span>
+                          </td>
+                          <td className="px-2.5 py-2 text-right font-mono text-slate-600">
+                            {c.shortCircuitCurrentAmps} A
+                          </td>
+                          <td className="px-2.5 py-2 text-right font-mono text-slate-700">
+                            Ø {c.tubeDiameterMm} mm
+                          </td>
+                          <td className="px-2.5 py-2 text-center">
+                            <button
+                              type="button"
+                              onClick={() => removeCircuit(index)}
+                              className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            </div>
+          )}
+
+          {/* =================================================================
+              APARTADO 3: PREVISIÓN DE CARGAS DEL EDIFICIO Y LGA (ITC-BT-10 / 52)
+             ================================================================= */}
+          {activeSection === "edificio_itc10" && (
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+              <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-xs lg:col-span-2">
+                <h2 className="text-base font-bold text-slate-900">
+                  3. Previsión de Cargas del Edificio (ITC-BT-10 + ITC-BT-52)
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Estos valores dimensionan automáticamente la Línea General de Alimentación (LGA), el IGM y rellenan la Página 2/11 de la Memoria Técnica de Diseño.
+                </p>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Nº Viviendas Electrificación Básica (5.750 W)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={basicDwellings}
+                      onChange={(e) =>
+                        setBasicDwellings(Number(e.target.value) || 0)
+                      }
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Nº Viviendas Electrificación Elevada (9.200 W)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={elevatedDwellings}
+                      onChange={(e) =>
+                        setElevatedDwellings(Number(e.target.value) || 0)
+                      }
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Servicios Generales: Alumbrado Zonas Comunes [W]
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={commonLightingW}
+                      onChange={(e) =>
+                        setCommonLightingW(Number(e.target.value) || 0)
+                      }
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Servicios Generales: Hidros / Grupo Presión [W]
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={hydroW}
+                      onChange={(e) => setHydroW(Number(e.target.value) || 0)}
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Servicios Generales: Otros Servicios (Ascensor, ICT) [W]
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={otherServicesW}
+                      onChange={(e) =>
+                        setOtherServicesW(Number(e.target.value) || 0)
+                      }
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Locales Comerciales: Nº Locales y Superficie [m²]
+                    </label>
+                    <div className="mt-1 grid grid-cols-2 gap-2">
+                      <input
+                        type="number"
+                        min={0}
+                        value={commercialCount}
+                        onChange={(e) =>
+                          setCommercialCount(Number(e.target.value) || 0)
+                        }
+                        className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
+                        placeholder="Nº locales"
+                      />
+                      <input
+                        type="number"
+                        min={0}
+                        value={commercialAreaM2}
+                        onChange={(e) =>
+                          setCommercialAreaM2(Number(e.target.value) || 0)
+                        }
+                        className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
+                        placeholder="m²"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Garaje: Superficie [m²] y Ventilación
+                    </label>
+                    <div className="mt-1 flex items-center gap-2">
+                      <input
+                        type="number"
+                        min={0}
+                        value={garageAreaM2}
+                        onChange={(e) =>
+                          setGarageAreaM2(Number(e.target.value) || 0)
+                        }
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
+                      />
+                      <label className="flex items-center gap-1.5 whitespace-nowrap text-xs text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={garageForcedVent}
+                          onChange={(e) =>
+                            setGarageForcedVent(e.target.checked)
+                          }
+                        />
+                        Forzada (20 W/m²)
+                      </label>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Plazas Aparcamiento (VE) y Longitud LGA [m]
+                    </label>
+                    <div className="mt-1 grid grid-cols-2 gap-2">
+                      <input
+                        type="number"
+                        min={0}
+                        value={parkingSpaces}
+                        onChange={(e) =>
+                          setParkingSpaces(Number(e.target.value) || 0)
+                        }
+                        className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
+                      />
+                      <input
+                        type="number"
+                        min={1}
+                        value={lgaLengthMeters}
+                        onChange={(e) =>
+                          setLgaLengthMeters(Number(e.target.value) || 1)
+                        }
+                        className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-xs">
+                <h3 className="text-base font-bold text-[#0f6cbd]">
+                  Resumen de Carga del Edificio y LGA
+                </h3>
+
+                <div className="space-y-2.5 text-xs">
+                  <div className="flex justify-between border-b border-slate-100 pb-2">
+                    <span className="text-slate-600">Potencia Media Viviendas:</span>
+                    <span className="font-mono font-bold text-slate-900">
+                      {buildingForecast.avgDwellingPowerWatts.toLocaleString()} W
+                    </span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-100 pb-2">
+                    <span className="text-slate-600">
+                      Coef. Simultaneidad ({buildingForecast.totalDwellings} viv.):
+                    </span>
+                    <span className="font-mono font-bold text-slate-900">
+                      {buildingForecast.simultaneityCoefficient}
+                    </span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-100 pb-2">
+                    <span className="text-slate-600">P1 Viviendas Simultánea:</span>
+                    <span className="font-mono font-bold text-slate-900">
+                      {buildingForecast.p1DwellingsWatts.toLocaleString()} W
+                    </span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-100 pb-2">
+                    <span className="text-slate-600">P2 Servicios Generales:</span>
+                    <span className="font-mono font-bold text-slate-900">
+                      {buildingForecast.p2GeneralServicesWatts.toLocaleString()} W
+                    </span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-100 pb-2">
+                    <span className="text-slate-600">P3 Locales Comerciales:</span>
+                    <span className="font-mono font-bold text-slate-900">
+                      {buildingForecast.p3CommercialWatts.toLocaleString()} W
+                    </span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-100 pb-2">
+                    <span className="text-slate-600">P4 Garaje:</span>
+                    <span className="font-mono font-bold text-slate-900">
+                      {buildingForecast.p4GarageWatts.toLocaleString()} W
+                    </span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-100 pb-2">
+                    <span className="text-slate-600">
+                      P5 Recarga VE ({buildingForecast.evChargingStations} pl.):
+                    </span>
+                    <span className="font-mono font-bold text-slate-900">
+                      {buildingForecast.p5EffectiveEvWatts.toLocaleString()} W
+                    </span>
+                  </div>
+                  <div className="flex justify-between pt-2 text-sm font-extrabold text-[#0f6cbd]">
+                    <span>POTENCIA TOTAL EDIFICIO:</span>
+                    <span className="font-mono">
+                      {buildingForecast.totalBuildingPowerWatts.toLocaleString()} W
+                    </span>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-4 text-xs text-slate-700 space-y-1">
+                  <div className="font-bold text-[#0f6cbd]">
+                    Línea General de Alimentación (ITC-BT-14):
+                  </div>
+                  <div>
+                    • Sección:{" "}
+                    <strong>
+                      3×{buildingForecast.lgaCalculation.sectionMm2} + 1×
+                      {buildingForecast.lgaCalculation.neutralSectionMm2} mm² Cu XLPE
+                    </strong>
+                  </div>
+                  <div>
+                    • Caída de tensión:{" "}
+                    <strong>
+                      {buildingForecast.lgaCalculation.voltageDropPct}% (máx. 0,5%)
+                    </strong>
+                  </div>
+                  <div>
+                    • Tubo:{" "}
+                    <strong>
+                      Ø {buildingForecast.lgaCalculation.tubeDiameterMm} mm
+                    </strong>{" "}
+                    · IGM: <strong>{buildingForecast.igmAmps} A</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* =================================================================
+              APARTADO 4: PUESTA A TIERRA Y LEGALIZACIÓN (ITC-BT-04 / 18 / 24)
+             ================================================================= */}
+          {activeSection === "tierras_legalizacion" && (
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-xs">
+                <h2 className="text-base font-bold text-slate-900">
+                  Cálculo de Puesta a Tierra (ITC-BT-18 / ITC-BT-24)
+                </h2>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Resistividad del Terreno ρ [Ω·m]
+                    </label>
+                    <input
+                      type="number"
+                      min={5}
+                      value={soilResistivity}
+                      onChange={(e) =>
+                        setSoilResistivity(Number(e.target.value) || 10)
+                      }
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Nº de Picas Verticales (n)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={numRods}
+                      onChange={(e) => setNumRods(Number(e.target.value) || 0)}
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Longitud de cada Pica [m]
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      step={0.5}
+                      value={rodLengthMeters}
+                      onChange={(e) =>
+                        setRodLengthMeters(Number(e.target.value) || 1)
+                      }
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Conductor Cobre Enterrado [m] (≥35 mm²)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={buriedConductorMeters}
+                      onChange={(e) =>
+                        setBuriedConductorMeters(Number(e.target.value) || 0)
+                      }
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Sensibilidad Diferencial IΔn [mA]
+                    </label>
+                    <select
+                      value={rcdSensitivityMa}
+                      onChange={(e) =>
+                        setRcdSensitivityMa(
+                          Number(e.target.value) as 30 | 100 | 300 | 500
+                        )
+                      }
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
+                    >
+                      <option value={30}>30 mA</option>
+                      <option value={100}>100 mA</option>
+                      <option value={300}>300 mA</option>
+                      <option value={500}>500 mA</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Tensión Límite de Contacto UL
+                    </label>
+                    <select
+                      value={maxContactVoltageV}
+                      onChange={(e) => {
+                        const v = Number(e.target.value) as 50 | 24;
+                        setMaxContactVoltageV(v);
+                        setMtdMeta((prev) => ({
+                          ...prev,
+                          tensionSeguridad: v,
+                        }));
+                      }}
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
+                    >
+                      <option value={50}>50 V (Locales secos)</option>
+                      <option value={24}>24 V (Locales húmedos)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-xs text-emerald-900">
+                  Resistencia Óhmica Prevista:{" "}
+                  <strong className="font-mono text-base text-emerald-800">
+                    {earthingResult.estimatedResistanceOhm} Ω
+                  </strong>{" "}
+                  (Límite máx. RA = {earthingResult.maxAllowedRaOhm} Ω)
+                </div>
+              </div>
+
+              <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-xs">
+                <h2 className="text-base font-bold text-slate-900">
+                  Clasificador ITC-BT-04 (Proyecto vs M.T.D.) e Inspección OCA (ITC-BT-05)
+                </h2>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700">
+                    Grupo de Instalación según ITC-BT-04
+                  </label>
+                  <select
+                    value={itc04Group}
+                    onChange={(e) =>
+                      setItc04Group(e.target.value as Itc04GroupCode)
+                    }
+                    className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
+                  >
+                    <option value="f_vivienda_unifamiliar">
+                      Grupo f) Vivienda unifamiliar (M.T.D. hasta 50 kW)
+                    </option>
+                    <option value="e_edificio_viviendas">
+                      Grupo e) Edificio de viviendas / locales (M.T.D. hasta 100 kW)
+                    </option>
+                    <option value="a_industria">
+                      Grupo a) Industrias (M.T.D. hasta 20 kW)
+                    </option>
+                    <option value="i_publica_concurrencia">
+                      Grupo i) Locales de Pública Concurrencia (Proyecto siempre)
+                    </option>
+                    <option value="g_garaje_forzada">
+                      Grupo g) Garajes con ventilación forzada (Proyecto siempre)
+                    </option>
+                    <option value="h_garaje_natural">
+                      Grupo h) Garajes con ventilación natural (M.T.D. hasta 5 plazas)
+                    </option>
+                    <option value="k_alumbrado_exterior">
+                      Grupo k) Alumbrado Exterior (M.T.D. hasta 5 kW)
+                    </option>
+                    <option value="z_recarga_ve_interior">
+                      Grupo z) Recarga de Vehículo Eléctrico (M.T.D. hasta 50 kW)
+                    </option>
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Potencia a Legalizar [kW]
+                    </label>
+                    <input
+                      type="number"
+                      value={itc04CustomPowerKw}
+                      onChange={(e) =>
+                        setItc04CustomPowerKw(Number(e.target.value) || 0)
+                      }
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Nº Plazas Estacionamiento
+                    </label>
+                    <input
+                      type="number"
+                      value={itc04ParkingSpaces}
+                      onChange={(e) =>
+                        setItc04ParkingSpaces(Number(e.target.value) || 0)
+                      }
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
+                    />
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-4 space-y-1">
+                  <div className="text-[11px] font-semibold uppercase text-[#0f6cbd]">
+                    Dictamen Reglamentario ITC-BT-04 / 05:
+                  </div>
+                  <div className="text-base font-bold text-slate-900">
+                    {itc04Evaluation.documentType}
+                  </div>
+                  <p className="text-xs text-slate-600">
+                    {itc04Evaluation.normativeRule}
+                  </p>
+                  <p className="pt-1 text-xs font-bold text-slate-800">
+                    Inspección Inicial por OCA:{" "}
+                    {itc04Evaluation.requiresInitialOcaInspection
+                      ? "SÍ REQUERIDA"
+                      : "NO REQUERIDA"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* =================================================================
+              APARTADO 5: FICHA TÉCNICA M.T.D. B.T. (VISTA Y DESCARGA OPCIONAL)
+             ================================================================= */}
+          {activeSection === "ficha_mtd" && (
+            <MtdCanariasOfficialForm
+              meta={mtdMeta}
+              setMeta={setMtdMeta}
+              supplyType={supplyType}
+              electrificationGrade={electrificationGrade}
+              calculatedCircuits={calculatedCircuits}
+              cgmpSummary={cgmpSummary}
+              buildingForecast={buildingForecast}
+              buildingInputs={{
+                basicDwellings,
+                elevatedDwellings,
+                commonLightingW,
+                hydroW,
+                otherServicesW,
+                commercialCount,
+                commercialAreaM2,
+                garageAreaM2,
+                garageForcedVent,
+                parkingSpaces,
+              }}
+              earthingResult={earthingResult}
+              rcdSensitivityMa={rcdSensitivityMa}
+              canExportMtd={currentUser?.can_export_mtd}
+            />
+          )}
+
+          {/* =================================================================
+              APARTADO 6: ADMINISTRACIÓN, CREACIÓN DE USUARIOS Y PERMISOLOGÍA
+             ================================================================= */}
+          {activeSection === "administracion" && (
+            <div className="space-y-6">
+              <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs">
+                <span className="inline-flex items-center gap-1.5 rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-[#0f6cbd]">
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  Centro de Administración Multi-Tenant y RBAC
+                </span>
+                <h2 className="mt-2 text-lg font-bold text-slate-900">
+                  Gestión de Empresas (Tenants), Creación de Usuarios y Matriz de Permisología
+                </h2>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  Crea nuevas empresas instaladoras y usuarios independientes. Cada usuario creado dispone de su propio espacio de trabajo aislado para que sus reportes nunca se mezclen con los de otros usuarios.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                {/* Formulario 1: Crear Nuevo Usuario */}
+                <form
+                  onSubmit={handleCreateUser}
+                  className="rounded-xl border border-slate-200 bg-white p-6 shadow-xs space-y-4"
+                >
+                  <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+                    <Users className="h-5 w-5 text-[#0f6cbd]" />
+                    <h3 className="text-sm font-bold text-slate-900">
+                      Registrar Nuevo Usuario
+                    </h3>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-semibold text-slate-700">
+                        Nombre Completo y Cargo
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={newUserName}
+                        onChange={(e) => setNewUserName(e.target.value)}
+                        placeholder="Ej. Javier Padrón (Instalador PH)"
+                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700">
+                        Correo Electrónico (Usuario)
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        value={newUserEmail}
+                        onChange={(e) => setNewUserEmail(e.target.value)}
+                        placeholder="javier@empresa.es"
+                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700">
+                        PIN / Contraseña de Acceso
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={newUserPin}
+                        onChange={(e) => setNewUserPin(e.target.value)}
+                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-mono text-slate-900"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700">
+                        Empresa / Organización (Tenant)
+                      </label>
+                      <select
+                        value={newUserTenantId}
+                        onChange={(e) =>
+                          setNewUserTenantId(Number(e.target.value))
+                        }
+                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
+                      >
+                        {tenants.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.name} ({t.isla})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700">
+                        Rol de Permisología (RBAC)
+                      </label>
+                      <select
+                        value={newUserRole}
+                        onChange={(e) =>
+                          setNewUserRole(e.target.value as UserRole)
+                        }
+                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
+                      >
+                        <option value="ingeniero_instalador">
+                          Ingeniero / Instalador Autorizado PH
+                        </option>
+                        <option value="admin_empresa">
+                          Administrador de Empresa Instaladora
+                        </option>
+                        <option value="visor_auditor">
+                          Visor / Auditor OCA (Solo lectura)
+                        </option>
+                        <option value="super_admin">
+                          Super Administrador Global
+                        </option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700">
+                        D.O.I. / N.I.F.
+                      </label>
+                      <input
+                        type="text"
+                        value={newUserDoi}
+                        onChange={(e) => setNewUserDoi(e.target.value)}
+                        placeholder="43.000.000-A"
+                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700">
+                        Nº C.C.I. / Nº Colegiado
+                      </label>
+                      <input
+                        type="text"
+                        value={newUserCci}
+                        onChange={(e) => setNewUserCci(e.target.value)}
+                        placeholder="CCI-TF-6021"
+                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="inline-flex items-center gap-2 rounded-lg bg-[#0f6cbd] px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-[#115ea3]"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Crear Usuario con Espacio Aislado
+                  </button>
+                </form>
+
+                {/* Formulario 2: Crear Nueva Empresa / Tenant */}
+                <form
+                  onSubmit={handleCreateTenant}
+                  className="rounded-xl border border-slate-200 bg-white p-6 shadow-xs space-y-4"
+                >
+                  <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+                    <Building className="h-5 w-5 text-[#0f6cbd]" />
+                    <h3 className="text-sm font-bold text-slate-900">
+                      Registrar Nueva Empresa Instaladora / Tenant
+                    </h3>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-semibold text-slate-700">
+                        Razón Social de la Empresa / Estudio
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={newTenantName}
+                        onChange={(e) => setNewTenantName(e.target.value)}
+                        placeholder="Ej. Instalaciones Eléctricas Teide S.L."
+                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700">
+                        C.I.F. Empresa
+                      </label>
+                      <input
+                        type="text"
+                        value={newTenantCif}
+                        onChange={(e) => setNewTenantCif(e.target.value)}
+                        placeholder="B-38000000"
+                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700">
+                        Nº Empresa Instaladora Habilitada
+                      </label>
+                      <input
+                        type="text"
+                        value={newTenantNum}
+                        onChange={(e) => setNewTenantNum(e.target.value)}
+                        placeholder="EI-38-04500"
+                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-semibold text-slate-700">
+                        Isla Principal
+                      </label>
+                      <select
+                        value={newTenantIsla}
+                        onChange={(e) => setNewTenantIsla(e.target.value)}
+                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
+                      >
+                        <option value="Tenerife">Tenerife</option>
+                        <option value="Gran Canaria">Gran Canaria</option>
+                        <option value="Lanzarote">Lanzarote</option>
+                        <option value="Fuerteventura">Fuerteventura</option>
+                        <option value="La Palma">La Palma</option>
+                        <option value="La Gomera">La Gomera</option>
+                        <option value="El Hierro">El Hierro</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-slate-800"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Registrar Empresa (Tenant)
+                  </button>
+                </form>
+              </div>
+
+              {/* Matriz de Permisología (RBAC) por Usuario */}
+              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
+                <div className="border-b border-slate-200 px-6 py-4 flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">
+                      Matriz de Usuarios, Multitenencia y Permisología (RBAC)
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      Activa o desactiva permisos granulares para cada usuario o cambia de sesión con un clic para verificar que los reportes están aislados.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold uppercase text-slate-500">
+                      <tr>
+                        <th className="px-4 py-3">Usuario / Correo</th>
+                        <th className="px-4 py-3">Empresa (Tenant)</th>
+                        <th className="px-4 py-3">Rol</th>
+                        <th className="px-3 py-3 text-center">Reportes Propios</th>
+                        <th className="px-3 py-3 text-center">Crear Reportes</th>
+                        <th className="px-3 py-3 text-center">Editar Cálculos</th>
+                        <th className="px-3 py-3 text-center">Descargar M.T.D.</th>
+                        <th className="px-3 py-3 text-center">Borrar Reportes</th>
+                        <th className="px-3 py-3 text-center">Admin Usuarios</th>
+                        <th className="px-4 py-3 text-right">Sesión</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                      {users.map((u) => {
+                        const t = tenants.find((ten) => ten.id === u.tenant_id);
+                        const userProjectsCount = allProjects.filter(
+                          (p) => p.owner_user_id === u.id
+                        ).length;
+                        const isCurrent = u.id === currentUser?.id;
+
+                        return (
+                          <tr
+                            key={u.id}
+                            className={
+                              isCurrent ? "bg-blue-50/40" : "hover:bg-slate-50"
+                            }
+                          >
+                            <td className="px-4 py-3">
+                              <div className="font-bold text-slate-900">
+                                {u.full_name}
+                              </div>
+                              <div className="text-[11px] text-slate-500">
+                                {u.email} · PIN:{" "}
+                                <code className="font-mono">{u.access_pin}</code>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="font-medium text-slate-800">
+                                {t?.name}
+                              </span>
+                              <div className="text-[10px] text-slate-500">
+                                {t?.empresa_instaladora_num} ({t?.isla})
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="inline-flex rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
+                                {u.role}
+                              </span>
+                            </td>
+                            <td className="px-3 py-3 text-center font-mono font-bold text-[#0f6cbd]">
+                              {userProjectsCount}
+                            </td>
+                            {(
+                              [
+                                "can_create_projects",
+                                "can_edit_calculations",
+                                "can_export_mtd",
+                                "can_delete_projects",
+                                "can_manage_users",
+                              ] as const
+                            ).map((perm) => (
+                              <td key={perm} className="px-3 py-3 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={u[perm]}
+                                  onChange={() =>
+                                    handleTogglePermission(u, perm)
+                                  }
+                                  className="h-4 w-4 rounded border-slate-300 text-[#0f6cbd] focus:ring-[#0f6cbd]"
+                                />
+                              </td>
+                            ))}
+                            <td className="px-4 py-3 text-right">
+                              {isCurrent ? (
+                                <span className="inline-flex items-center gap-1 rounded-md bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-800">
+                                  <UserCheck className="h-3.5 w-3.5" />
+                                  Sesión Activa
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => switchActiveUser(u)}
+                                  className="rounded-lg border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                >
+                                  Entrar como este usuario
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+        </main>
       </div>
 
       {/* =====================================================================
-          PESTAÑA 1: FICHA TÉCNICA OFICIAL M.T.D. B.T. (11 PÁGINAS)
+          MODAL DE INICIO DE SESIÓN / CAMBIO DE USUARIO MULTI-TENANT
          ===================================================================== */}
-      {activeTab === "ficha_mtd" && (
-        <MtdCanariasOfficialForm
-          meta={mtdMeta}
-          setMeta={setMtdMeta}
-          supplyType={supplyType}
-          electrificationGrade={electrificationGrade}
-          calculatedCircuits={calculatedCircuits}
-          cgmpSummary={cgmpSummary}
-          buildingForecast={buildingForecast}
-          buildingInputs={{
-            basicDwellings,
-            elevatedDwellings,
-            commonLightingW,
-            hydroW,
-            otherServicesW,
-            commercialCount,
-            commercialAreaM2,
-            garageAreaM2,
-            garageForcedVent,
-            parkingSpaces,
-          }}
-          earthingResult={earthingResult}
-          rcdSensitivityMa={rcdSensitivityMa}
-        />
-      )}
-
-      {/* =====================================================================
-          PESTAÑA 2: REGISTRO Y CÁLCULO DE CIRCUITOS INTERIORES Y D.I.
-         ===================================================================== */}
-      {activeTab === "circuitos" && (
-        <div className="space-y-6">
-          <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
-              <span className="text-xs text-slate-400">
-                Potencia Prevista / Instalada (Pág. 1 M.T.D.)
-              </span>
-              <p className="mt-1 text-2xl font-bold text-white">
-                {cgmpSummary.contractDesignWatts.toLocaleString()} W
-              </p>
-              <p className="mt-1 text-xs text-slate-400">
-                Instalada: {cgmpSummary.totalInstalledWatts.toLocaleString()} W · Simultánea:{" "}
-                {cgmpSummary.totalDesignWatts.toLocaleString()} W
-              </p>
-            </div>
-
-            <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
-              <span className="text-xs text-slate-400">
-                I.G.A. y Diferenciales (Pág. 1 y 8 M.T.D.)
-              </span>
-              <p className="mt-1 text-2xl font-bold text-amber-400">
-                IGA {cgmpSummary.igaAmps} A
-              </p>
-              <p className="mt-1 text-xs text-slate-400">
-                Diferenciales {rcdSensitivityMa} mA:{" "}
-                <strong className="text-white">{cgmpSummary.rcd30mACount} ud.</strong>
-              </p>
-            </div>
-
-            <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-slate-400">
-                  Derivación Individual (ITC-BT-15)
-                </span>
-                <div className="flex items-center gap-1">
-                  <input
-                    type="number"
-                    min={1}
-                    value={diLengthMeters}
-                    onChange={(e) => setDiLengthMeters(Number(e.target.value) || 1)}
-                    className="w-14 rounded border border-slate-700 bg-slate-950 px-1.5 py-0.5 text-right text-xs text-white"
-                  />
-                  <span className="text-xs text-slate-500">m</span>
+      {showLoginModal && (
+        <div className="no-print fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#0f6cbd] text-white">
+                  <Lock className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    Acceso Multi-Usuario (Aislamiento de Reportes)
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    Ingresa con tu correo y PIN o selecciona una cuenta
+                  </p>
                 </div>
               </div>
-              <p className="mt-1 text-xl font-bold text-sky-400">
-                {cgmpSummary.diCalculation.conductorsSummary} + PE{" "}
-                {cgmpSummary.diCalculation.peSectionMm2} mm²
-              </p>
-              <p className="mt-1 text-xs text-slate-400">
-                ΔU = {cgmpSummary.diCalculation.voltageDropPct}% · Tubo Ø{" "}
-                {cgmpSummary.diCalculation.tubeDiameterMm} mm · Icc ={" "}
-                {cgmpSummary.diCalculation.shortCircuitCurrentAmps} A
-              </p>
-            </div>
-
-            <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
-              <span className="text-xs text-slate-400">
-                Estado Reglamentario (Pág. 6 M.T.D.)
-              </span>
-              <div className="mt-1 flex items-center gap-2">
-                {cgmpSummary.nonCompliantCircuits === 0 ? (
-                  <>
-                    <CheckCircle2 className="h-6 w-6 text-emerald-400" />
-                    <span className="text-lg font-bold text-emerald-400">
-                      Cumple REBT
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <AlertTriangle className="h-6 w-6 text-amber-400" />
-                    <span className="text-lg font-bold text-amber-400">
-                      {cgmpSummary.nonCompliantCircuits} alerta(s)
-                    </span>
-                  </>
-                )}
-              </div>
-              <p className="mt-1 text-xs text-slate-400">
-                Vuelca directo al Cuadro Resumen Pág. 6/11
-              </p>
-            </div>
-          </section>
-
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-900/40 px-4 py-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-300">
-                <Sparkles className="h-4 w-4 text-amber-400" />
-                Plantillas ITC-BT-25:
-              </span>
               <button
                 type="button"
-                onClick={() => loadPresetDwellings("basica")}
-                className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-700"
+                onClick={() => setShowLoginModal(false)}
+                className="text-xs font-semibold text-slate-400 hover:text-slate-700"
               >
-                Cargar Electrificación Básica (C1 a C5)
-              </button>
-              <button
-                type="button"
-                onClick={() => loadPresetDwellings("elevada_ve")}
-                className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-300 hover:bg-amber-500/20"
-              >
-                Cargar Electrificación Elevada + Recarga VE (C1 a C13)
+                ✕
               </button>
             </div>
 
-            <div className="flex items-center gap-2">
-              <select
-                value={diType}
-                onChange={(e) =>
-                  setDiType(e.target.value as "di_concentrada" | "di_unico")
-                }
-                className="rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-xs text-slate-200"
-              >
-                <option value="di_concentrada">DI Contadores Concentrados (ΔU 1,0%)</option>
-                <option value="di_unico">DI Único Usuario (ΔU 1,5%)</option>
-              </select>
-              <button
-                type="button"
-                onClick={addCircuit}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-bold text-slate-950 hover:bg-amber-400"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                Añadir Circuito
-              </button>
-            </div>
-          </div>
-
-          <section className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/60">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="border-b border-slate-800 bg-slate-950/70 text-[11px] uppercase text-slate-400">
-                  <tr>
-                    <th className="px-2.5 py-3">Cód.</th>
-                    <th className="px-2.5 py-3">Descripción del Circuito</th>
-                    <th className="px-2.5 py-3">Uso / ITC</th>
-                    <th className="px-2.5 py-3">Sistema</th>
-                    <th className="px-2.5 py-3">Potencia (W)</th>
-                    <th className="px-2.5 py-3">Long. (m)</th>
-                    <th className="px-2.5 py-3">Aisl. / Mét.</th>
-                    <th className="px-2.5 py-3 text-right">Ib (A)</th>
-                    <th className="px-2.5 py-3 text-right">PIA (A)</th>
-                    <th className="px-2.5 py-3 text-right">Iz (A)</th>
-                    <th className="px-2.5 py-3">Sección (mm²)</th>
-                    <th className="px-2.5 py-3 text-right">ΔU (%)</th>
-                    <th className="px-2.5 py-3 text-right">Icc (A)</th>
-                    <th className="px-2.5 py-3 text-right">Tubo Ø</th>
-                    <th className="px-2.5 py-3 text-center">Acción</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/70">
-                  {calculatedCircuits.map((c, index) => (
-                    <tr key={index} className="hover:bg-slate-800/30">
-                      <td className="px-2.5 py-2">
-                        <input
-                          type="text"
-                          value={c.code}
-                          onChange={(e) =>
-                            updateCircuit(index, "code", e.target.value)
-                          }
-                          className="w-12 rounded border border-slate-700 bg-slate-950 px-1.5 py-1 font-semibold text-amber-400"
-                        />
-                      </td>
-                      <td className="px-2.5 py-2">
-                        <input
-                          type="text"
-                          value={c.description}
-                          onChange={(e) =>
-                            updateCircuit(index, "description", e.target.value)
-                          }
-                          className="w-48 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-white"
-                        />
-                      </td>
-                      <td className="px-2.5 py-2">
-                        <select
-                          value={c.usageType}
-                          onChange={(e) =>
-                            updateCircuit(
-                              index,
-                              "usageType",
-                              e.target.value as CircuitUsageType
-                            )
-                          }
-                          className="rounded border border-slate-700 bg-slate-950 px-1.5 py-1 text-white"
-                        >
-                          <option value="vivienda_interior">Vivienda (3%)</option>
-                          <option value="alumbrado">Alumbrado (3%)</option>
-                          <option value="alumbrado_descarga">Descarga x1,8 (3%)</option>
-                          <option value="fuerza_otros">Fuerza / Otros (5%)</option>
-                          <option value="motor">Motor x1,25 (5%)</option>
-                          <option value="recarga_ve">Recarga VE (5%)</option>
-                        </select>
-                      </td>
-                      <td className="px-2.5 py-2">
-                        <select
-                          value={c.phaseSystem}
-                          onChange={(e) =>
-                            updateCircuit(
-                              index,
-                              "phaseSystem",
-                              e.target.value as "monofasico" | "trifasico"
-                            )
-                          }
-                          className="rounded border border-slate-700 bg-slate-950 px-1.5 py-1 text-white"
-                        >
-                          <option value="monofasico">230V 1F</option>
-                          <option value="trifasico">400V 3F</option>
-                        </select>
-                      </td>
-                      <td className="px-2.5 py-2">
-                        <input
-                          type="number"
-                          min={0}
-                          step={100}
-                          value={c.powerWatts}
-                          onChange={(e) =>
-                            updateCircuit(
-                              index,
-                              "powerWatts",
-                              Number(e.target.value) || 0
-                            )
-                          }
-                          className="w-20 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-right text-white"
-                        />
-                      </td>
-                      <td className="px-2.5 py-2">
-                        <input
-                          type="number"
-                          min={1}
-                          value={c.lengthMeters}
-                          onChange={(e) =>
-                            updateCircuit(
-                              index,
-                              "lengthMeters",
-                              Number(e.target.value) || 1
-                            )
-                          }
-                          className="w-14 rounded border border-slate-700 bg-slate-950 px-1.5 py-1 text-right text-white"
-                        />
-                      </td>
-                      <td className="px-2.5 py-2">
-                        <div className="flex items-center gap-1">
-                          <select
-                            value={c.insulationType}
-                            onChange={(e) =>
-                              updateCircuit(
-                                index,
-                                "insulationType",
-                                e.target.value as InsulationType
-                              )
-                            }
-                            className="rounded border border-slate-700 bg-slate-950 px-1 py-1 text-white"
-                          >
-                            <option value="PVC_70">PVC 70°C</option>
-                            <option value="XLPE_90">XLPE 90°C</option>
-                          </select>
-                          <select
-                            value={c.installationMethod}
-                            onChange={(e) =>
-                              updateCircuit(
-                                index,
-                                "installationMethod",
-                                e.target.value as InstallationMethod
-                              )
-                            }
-                            className="rounded border border-slate-700 bg-slate-950 px-1 py-1 text-white"
-                          >
-                            <option value="B1">B1</option>
-                            <option value="E">E/F</option>
-                          </select>
-                        </div>
-                      </td>
-                      <td className="px-2.5 py-2 text-right font-mono text-slate-200">
-                        {c.currentIbAmps} A
-                      </td>
-                      <td className="px-2.5 py-2 text-right font-mono font-bold text-amber-400">
-                        {c.piaAmps} A
-                      </td>
-                      <td className="px-2.5 py-2 text-right font-mono text-slate-300">
-                        {c.ampacityIzAmps} A
-                      </td>
-                      <td className="px-2.5 py-2 font-mono font-semibold text-sky-400">
-                        {c.conductorsSummary} + PE {c.peSectionMm2} mm²
-                      </td>
-                      <td className="px-2.5 py-2 text-right font-mono">
-                        <span
-                          className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-semibold ${
-                            c.voltageDropPct <= c.maxAllowedDropPct
-                              ? "bg-emerald-500/10 text-emerald-400"
-                              : "bg-rose-500/10 text-rose-400"
-                          }`}
-                        >
-                          {c.voltageDropPct}%
-                        </span>
-                      </td>
-                      <td className="px-2.5 py-2 text-right font-mono text-slate-300">
-                        {c.shortCircuitCurrentAmps} A
-                      </td>
-                      <td className="px-2.5 py-2 text-right font-mono text-slate-300">
-                        Ø {c.tubeDiameterMm} mm
-                      </td>
-                      <td className="px-2.5 py-2 text-center">
-                        <button
-                          type="button"
-                          onClick={() => removeCircuit(index)}
-                          className="rounded p-1 text-slate-400 hover:bg-rose-500/10 hover:text-rose-400"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        </div>
-      )}
-
-      {/* =====================================================================
-          PESTAÑA 3: PREVISIÓN DE CARGAS DEL EDIFICIO (PÁGINA 2/11 M.T.D.)
-         ===================================================================== */}
-      {activeTab === "edificio_itc10" && (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <div className="space-y-4 rounded-xl border border-slate-800 bg-slate-900/60 p-5 lg:col-span-2">
-            <h2 className="text-lg font-semibold text-white">
-              Datos del Edificio para la Página 2/11 de la M.T.D. (ITC-BT-10 + ITC-BT-52)
-            </h2>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <form onSubmit={handleLoginSubmit} className="mt-4 space-y-3">
               <div>
-                <label className="block text-xs font-medium text-slate-400">
-                  Nº Viviendas Electrificación Básica (5.750 W)
+                <label className="block text-xs font-semibold text-slate-700">
+                  Correo Electrónico
                 </label>
                 <input
-                  type="number"
-                  min={0}
-                  value={basicDwellings}
-                  onChange={(e) => setBasicDwellings(Number(e.target.value) || 0)}
-                  className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white"
+                  type="email"
+                  required
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-xs text-slate-900"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-400">
-                  Nº Viviendas Electrificación Elevada (9.200 W)
+                <label className="block text-xs font-semibold text-slate-700">
+                  PIN de Acceso
                 </label>
                 <input
-                  type="number"
-                  min={0}
-                  value={elevatedDwellings}
-                  onChange={(e) => setElevatedDwellings(Number(e.target.value) || 0)}
-                  className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white"
+                  type="password"
+                  required
+                  value={loginPin}
+                  onChange={(e) => setLoginPin(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-xs text-slate-900"
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-slate-400">
-                  Servicios Generales: Alumbrado Zonas Comunes [W]
-                </label>
-                <input
-                  type="number"
-                  min={0}
-                  value={commonLightingW}
-                  onChange={(e) => setCommonLightingW(Number(e.target.value) || 0)}
-                  className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white"
-                />
-              </div>
+              {loginError && (
+                <p className="rounded-lg bg-rose-50 p-2 text-xs font-medium text-rose-700">
+                  {loginError}
+                </p>
+              )}
 
-              <div>
-                <label className="block text-xs font-medium text-slate-400">
-                  Servicios Generales: Hidros / Grupo Presión [W]
-                </label>
-                <input
-                  type="number"
-                  min={0}
-                  value={hydroW}
-                  onChange={(e) => setHydroW(Number(e.target.value) || 0)}
-                  className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-400">
-                  Servicios Generales: Otros Servicios (Ascensores, ICT) [W]
-                </label>
-                <input
-                  type="number"
-                  min={0}
-                  value={otherServicesW}
-                  onChange={(e) => setOtherServicesW(Number(e.target.value) || 0)}
-                  className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-400">
-                  Locales Comerciales: Nº Locales y Superficie [m²]
-                </label>
-                <div className="mt-1 grid grid-cols-2 gap-2">
-                  <input
-                    type="number"
-                    min={0}
-                    value={commercialCount}
-                    onChange={(e) => setCommercialCount(Number(e.target.value) || 0)}
-                    className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white"
-                    placeholder="Nº locales"
-                  />
-                  <input
-                    type="number"
-                    min={0}
-                    value={commercialAreaM2}
-                    onChange={(e) =>
-                      setCommercialAreaM2(Number(e.target.value) || 0)
-                    }
-                    className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white"
-                    placeholder="m²"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-400">
-                  Garaje: Superficie [m²] y Tipo de Ventilación
-                </label>
-                <div className="mt-1 flex items-center gap-2">
-                  <input
-                    type="number"
-                    min={0}
-                    value={garageAreaM2}
-                    onChange={(e) => setGarageAreaM2(Number(e.target.value) || 0)}
-                    className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white"
-                  />
-                  <label className="flex items-center gap-1.5 whitespace-nowrap text-xs text-slate-300">
-                    <input
-                      type="checkbox"
-                      checked={garageForcedVent}
-                      onChange={(e) => setGarageForcedVent(e.target.checked)}
-                    />
-                    Forzada (20 W/m²)
-                  </label>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-400">
-                  Plazas de Aparcamiento (ITC-BT-52) y Longitud LGA [m]
-                </label>
-                <div className="mt-1 grid grid-cols-2 gap-2">
-                  <input
-                    type="number"
-                    min={0}
-                    value={parkingSpaces}
-                    onChange={(e) => setParkingSpaces(Number(e.target.value) || 0)}
-                    className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white"
-                    title="Nº plazas aparcamiento"
-                  />
-                  <input
-                    type="number"
-                    min={1}
-                    value={lgaLengthMeters}
-                    onChange={(e) => setLgaLengthMeters(Number(e.target.value) || 1)}
-                    className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white"
-                    title="Longitud LGA (m)"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-4 rounded-xl border border-slate-800 bg-slate-900/80 p-5">
-            <h3 className="text-base font-bold text-amber-400">
-              Totales Volcados a Página 2/11 y 6/11 M.T.D.
-            </h3>
-
-            <div className="space-y-2.5 text-sm">
-              <div className="flex justify-between border-b border-slate-800 pb-2">
-                <span className="text-slate-400">Potencia Media Viviendas:</span>
-                <span className="font-mono font-semibold text-white">
-                  {buildingForecast.avgDwellingPowerWatts} W
-                </span>
-              </div>
-              <div className="flex justify-between border-b border-slate-800 pb-2">
-                <span className="text-slate-400">
-                  Coef. Simultaneidad ({buildingForecast.totalDwellings} viv.):
-                </span>
-                <span className="font-mono font-semibold text-white">
-                  {buildingForecast.simultaneityCoefficient}
-                </span>
-              </div>
-              <div className="flex justify-between border-b border-slate-800 pb-2">
-                <span className="text-slate-400">Potencia Total Simultánea Viv.:</span>
-                <span className="font-mono font-semibold text-white">
-                  {buildingForecast.p1DwellingsWatts.toLocaleString()} W
-                </span>
-              </div>
-              <div className="flex justify-between border-b border-slate-800 pb-2">
-                <span className="text-slate-400">Total Servicios Generales:</span>
-                <span className="font-mono font-semibold text-white">
-                  {buildingForecast.p2GeneralServicesWatts.toLocaleString()} W
-                </span>
-              </div>
-              <div className="flex justify-between border-b border-slate-800 pb-2">
-                <span className="text-slate-400">Total Locales Comerciales:</span>
-                <span className="font-mono font-semibold text-white">
-                  {buildingForecast.p3CommercialWatts.toLocaleString()} W
-                </span>
-              </div>
-              <div className="flex justify-between border-b border-slate-800 pb-2">
-                <span className="text-slate-400">Potencia de Garaje:</span>
-                <span className="font-mono font-semibold text-white">
-                  {buildingForecast.p4GarageWatts.toLocaleString()} W
-                </span>
-              </div>
-              <div className="flex justify-between pt-2 text-base font-bold">
-                <span className="text-amber-400">POTENCIA TOTAL EDIFICIO:</span>
-                <span className="font-mono text-amber-400">
-                  {buildingForecast.totalBuildingPowerWatts.toLocaleString()} W
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* =====================================================================
-          PESTAÑA 4: PUESTA A TIERRA Y LEGALIZACIÓN (ITC-BT-04 / 05 / 18 / 24)
-         ===================================================================== */}
-      {activeTab === "tierras_legalizacion" && (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          {/* Puesta a tierra */}
-          <div className="space-y-4 rounded-xl border border-slate-800 bg-slate-900/60 p-5">
-            <h2 className="text-lg font-semibold text-white">
-              Puesta a Tierra (ITC-BT-18 / 24) → Pág. 1/11 M.T.D.
-            </h2>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label className="block text-xs font-medium text-slate-400">
-                  Resistividad del Terreno ρ [Ω·m]
-                </label>
-                <input
-                  type="number"
-                  min={5}
-                  value={soilResistivity}
-                  onChange={(e) =>
-                    setSoilResistivity(Number(e.target.value) || 10)
-                  }
-                  className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-400">
-                  Nº de Picas Verticales (n)
-                </label>
-                <input
-                  type="number"
-                  min={0}
-                  value={numRods}
-                  onChange={(e) => setNumRods(Number(e.target.value) || 0)}
-                  className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-400">
-                  Longitud de cada Pica [m]
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  step={0.5}
-                  value={rodLengthMeters}
-                  onChange={(e) =>
-                    setRodLengthMeters(Number(e.target.value) || 1)
-                  }
-                  className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-400">
-                  Conductor Horizontal Enterrado [m] (Cu ≥ 35 mm²)
-                </label>
-                <input
-                  type="number"
-                  min={0}
-                  value={buriedConductorMeters}
-                  onChange={(e) =>
-                    setBuriedConductorMeters(Number(e.target.value) || 0)
-                  }
-                  className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-400">
-                  Sensibilidad Diferencial IΔn [mA]
-                </label>
-                <select
-                  value={rcdSensitivityMa}
-                  onChange={(e) =>
-                    setRcdSensitivityMa(
-                      Number(e.target.value) as 30 | 100 | 300 | 500
-                    )
-                  }
-                  className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white"
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowLoginModal(false)}
+                  className="rounded-lg border border-slate-300 px-3.5 py-2 text-xs font-semibold text-slate-700"
                 >
-                  <option value={30}>30 mA</option>
-                  <option value={100}>100 mA</option>
-                  <option value={300}>300 mA</option>
-                  <option value={500}>500 mA</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-400">
-                  Tensión de Seguridad UL
-                </label>
-                <select
-                  value={maxContactVoltageV}
-                  onChange={(e) => {
-                    const v = Number(e.target.value) as 50 | 24;
-                    setMaxContactVoltageV(v);
-                    setMtdMeta((prev) => ({ ...prev, tensionSeguridad: v }));
-                  }}
-                  className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white"
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-lg bg-[#0f6cbd] px-4 py-2 text-xs font-semibold text-white hover:bg-[#115ea3]"
                 >
-                  <option value={50}>50 V (Seco)</option>
-                  <option value={24}>24 V (Húmedo)</option>
-                </select>
+                  Iniciar Sesión
+                </button>
               </div>
-            </div>
-
-            <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm text-emerald-200">
-              Resistencia Óhmica Prevista (volcada a Pág. 1/11 M.T.D.):{" "}
-              <strong className="font-mono text-lg text-amber-400">
-                {earthingResult.estimatedResistanceOhm} Ω
-              </strong>{" "}
-              (Máx. admisible: {earthingResult.maxAllowedRaOhm} Ω)
-            </div>
-          </div>
-
-          {/* Clasificación ITC-BT-04 / 05 */}
-          <div className="space-y-4 rounded-xl border border-slate-800 bg-slate-900/60 p-5">
-            <h2 className="text-lg font-semibold text-white">
-              Verificación ITC-BT-04 (Proyecto vs M.T.D.) e Inspección OCA (ITC-BT-05)
-            </h2>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-400">
-                Grupo de Instalación según ITC-BT-04
-              </label>
-              <select
-                value={itc04Group}
-                onChange={(e) => setItc04Group(e.target.value as Itc04GroupCode)}
-                className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white"
-              >
-                <option value="f_vivienda_unifamiliar">
-                  Grupo f) Vivienda unifamiliar (MTD hasta 50 kW)
-                </option>
-                <option value="e_edificio_viviendas">
-                  Grupo e) Edificio de viviendas / locales (MTD hasta 100 kW)
-                </option>
-                <option value="a_industria">
-                  Grupo a) Industrias (MTD hasta 20 kW)
-                </option>
-                <option value="i_publica_concurrencia">
-                  Grupo i) Locales de Pública Concurrencia (Proyecto siempre)
-                </option>
-                <option value="g_garaje_forzada">
-                  Grupo g) Garajes con ventilación forzada (Proyecto siempre)
-                </option>
-                <option value="h_garaje_natural">
-                  Grupo h) Garajes con ventilación natural (MTD hasta 5 plazas)
-                </option>
-                <option value="k_alumbrado_exterior">
-                  Grupo k) Alumbrado Exterior (MTD hasta 5 kW)
-                </option>
-                <option value="z_recarga_ve_interior">
-                  Grupo z) Recarga de Vehículo Eléctrico (MTD hasta 50 kW)
-                </option>
-              </select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-slate-400">
-                  Potencia a Legalizar [kW]
-                </label>
-                <input
-                  type="number"
-                  value={itc04CustomPowerKw}
-                  onChange={(e) =>
-                    setItc04CustomPowerKw(Number(e.target.value) || 0)
-                  }
-                  className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-400">
-                  Plazas Garaje
-                </label>
-                <input
-                  type="number"
-                  value={itc04ParkingSpaces}
-                  onChange={(e) =>
-                    setItc04ParkingSpaces(Number(e.target.value) || 0)
-                  }
-                  className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white"
-                />
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
-              <p className="text-xs uppercase text-amber-300">
-                Documentación Exigida (ITC-BT-04):
-              </p>
-              <p className="mt-1 text-lg font-bold text-white">
-                {itc04Evaluation.documentType}
-              </p>
-              <p className="mt-1 text-xs text-slate-300">
-                {itc04Evaluation.normativeRule}
-              </p>
-              <p className="mt-2 text-xs font-semibold text-sky-300">
-                Inspección Inicial OCA (ITC-BT-05):{" "}
-                {itc04Evaluation.requiresInitialOcaInspection
-                  ? "SÍ REQUERIDA"
-                  : "NO REQUERIDA"}
-              </p>
-            </div>
+            </form>
           </div>
         </div>
       )}
-    </main>
+    </div>
   );
 }

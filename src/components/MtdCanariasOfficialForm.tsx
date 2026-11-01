@@ -59,6 +59,7 @@ interface MtdCanariasProps {
     isCompliant: boolean;
   };
   rcdSensitivityMa: number;
+  canExportMtd?: boolean;
 }
 
 export default function MtdCanariasOfficialForm({
@@ -72,8 +73,10 @@ export default function MtdCanariasOfficialForm({
   buildingInputs,
   earthingResult,
   rcdSensitivityMa,
+  canExportMtd = true,
 }: MtdCanariasProps) {
   const [selectedPage, setSelectedPage] = useState<number | "all">("all");
+  const [showPreview, setShowPreview] = useState<boolean>(true);
 
   const updateField = <K extends keyof MtdFormMetadata>(
     key: K,
@@ -253,7 +256,7 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
   );
 
   const shouldShowPage = (p: number) =>
-    selectedPage === "all" || selectedPage === p;
+    showPreview && (selectedPage === "all" || selectedPage === p);
 
   // Totales Página 2, 3, 4
   const totalOtrosServiciosReceptoresW = meta.otrosServiciosReceptores.reduce(
@@ -274,61 +277,87 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
       : 0;
 
   return (
-    <div className="space-y-6">
-      {/* Barra de Herramientas de la Ficha Oficial M.T.D. (No se imprime) */}
-      <div className="no-print flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/40 bg-slate-900/90 p-4 shadow-lg">
-        <div>
-          <h2 className="flex items-center gap-2 text-base font-bold text-amber-400">
-            <Sparkles className="h-5 w-5" />
-            Ficha Técnica Oficial M.T.D. B.T. (Gobierno de Canarias · 11 Páginas)
-          </h2>
-          <p className="text-xs text-slate-300">
-            Todos los cálculos del REBT (potencias, secciones en mm², diámetros de tubo, PIAs, caídas de tensión, puesta a tierra y esquema unifilar) se han volcado automáticamente en las 11 páginas oficiales. Puedes editar cualquier casilla directamente sobre el documento.
+    <div className="space-y-5">
+      {/* Barra de Herramientas Opcional de la Ficha Oficial M.T.D. (No se imprime) */}
+      <div className="no-print flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="max-w-2xl">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-600/20">
+              <Sparkles className="h-3.5 w-3.5" />
+              Descarga Opcional
+            </span>
+            <h2 className="text-base font-bold text-slate-900">
+              Ficha Técnica Oficial M.T.D. B.T. (Gobierno de Canarias · 11 Páginas)
+            </h2>
+          </div>
+          <p className="mt-1 text-xs text-slate-600">
+            Todos los datos registrados y los cálculos eléctricos del REBT se han volcado automáticamente en este documento. La descarga en PDF es totalmente opcional: puedes revisar o editar cualquier casilla en pantalla y exportar todas las 11 páginas o solo la hoja que necesites.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2.5">
           <button
             type="button"
-            onClick={() => window.print()}
-            className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-xs font-bold text-slate-950 shadow hover:bg-amber-400"
+            onClick={() => setShowPreview((prev) => !prev)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-xs transition hover:bg-slate-50"
           >
-            <Printer className="h-4 w-4" />
-            Imprimir / Guardar PDF Oficial (11 Páginas)
+            <Eye className="h-4 w-4 text-slate-500" />
+            {showPreview ? "Ocultar Vista Previa" : "Mostrar Vista Previa"}
           </button>
+
+          {canExportMtd ? (
+            <button
+              type="button"
+              onClick={() => {
+                setShowPreview(true);
+                setTimeout(() => window.print(), 100);
+              }}
+              className="inline-flex items-center gap-2 rounded-lg bg-[#0f6cbd] px-4 py-2 text-xs font-semibold text-white shadow-xs transition hover:bg-[#115ea3]"
+            >
+              <Printer className="h-4 w-4" />
+              {selectedPage === "all"
+                ? "Descargar / Imprimir Ficha M.T.D. (11 Páginas)"
+                : `Descargar / Imprimir solo Página ${selectedPage}/11`}
+            </button>
+          ) : (
+            <span className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+              Tu perfil no tiene permiso para exportar PDF (solicítalo en Administración)
+            </span>
+          )}
         </div>
       </div>
 
       {/* Selector de Página rápida (No se imprime) */}
-      <div className="no-print flex flex-wrap items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900/60 p-2.5">
-        <button
-          type="button"
-          onClick={() => setSelectedPage("all")}
-          className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition ${
-            selectedPage === "all"
-              ? "bg-amber-500 text-slate-950"
-              : "bg-slate-800 text-slate-300 hover:bg-slate-700"
-          }`}
-        >
-          <Layers className="h-3.5 w-3.5" />
-          Ver las 11 Páginas Completas
-        </button>
-        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((p) => (
+      {showPreview && (
+        <div className="no-print flex flex-wrap items-center gap-1.5 rounded-xl border border-slate-200 bg-white p-3 shadow-xs">
           <button
-            key={p}
             type="button"
-            onClick={() => setSelectedPage(p)}
-            className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium transition ${
-              selectedPage === p
-                ? "bg-sky-500 text-slate-950 font-bold"
-                : "bg-slate-800/80 text-slate-300 hover:bg-slate-700"
+            onClick={() => setSelectedPage("all")}
+            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+              selectedPage === "all"
+                ? "bg-[#0f6cbd] text-white shadow-xs"
+                : "bg-slate-100 text-slate-700 hover:bg-slate-200"
             }`}
           >
-            <Eye className="h-3 w-3" />
-            Pág. {p}/11
+            <Layers className="h-3.5 w-3.5" />
+            Todas las páginas (1 a 11)
           </button>
-        ))}
-      </div>
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => setSelectedPage(p)}
+              className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition ${
+                selectedPage === p
+                  ? "bg-blue-50 text-[#0f6cbd] font-bold ring-1 ring-[#0f6cbd]/30"
+                  : "bg-slate-50 text-slate-600 hover:bg-slate-100"
+              }`}
+            >
+              Pág. {p}/11
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* =====================================================================
           PÁGINA 1/11: DATOS TITULAR, UBICACIÓN Y CARACTERÍSTICAS ELÉCTRICAS
