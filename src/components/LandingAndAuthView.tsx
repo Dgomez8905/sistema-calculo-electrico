@@ -213,11 +213,11 @@ export default function LandingAndAuthView({
                   </h1>
 
                   <p className="max-w-2xl text-sm sm:text-base leading-relaxed text-slate-600">
-                    Plataforma multi-empresa en la nube para ingenieros e instaladores habilitados. Dimensiona cuadros de circuitos (ITC-BT-19/25), previsión de cargas de edificios (ITC-BT-10/52), puesta a tierra (ITC-BT-18/24) y genera las 11 páginas oficiales de la{" "}
+                    Plataforma multi-empresa en la nube para ingenieros e instaladores habilitados. Dimensiona cuadros de circuitos (ITC-BT-19/25), previsión de cargas de edificios (ITC-BT-10/52), puesta a tierra (ITC-BT-18/24) y genera la{" "}
                     <strong className="text-slate-900">
                       M.T.D. B.T. del Gobierno de Canarias
                     </strong>{" "}
-                    listas para firmar e imprimir.
+                    lista para firmar e imprimir.
                   </p>
 
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2">
@@ -255,7 +255,7 @@ export default function LandingAndAuthView({
                     </div>
                     <div className="flex items-center gap-2">
                       <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
-                      <span>Ficha Oficial 11 Hojas A4</span>
+                      <span>Ficha Oficial M.T.D.</span>
                     </div>
                     <div className="flex items-center gap-2 col-span-2 sm:col-span-1">
                       <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
@@ -316,14 +316,14 @@ export default function LandingAndAuthView({
                         <div className="flex items-center justify-between">
                           <span>Documento Generado:</span>
                           <strong className="font-semibold text-[#0f6cbd]">
-                            M.T.D. B.T. (11 Páginas A4)
+                            Memoria Técnica de Diseño B.T.
                           </strong>
                         </div>
                       </div>
 
                       <div className="grid grid-cols-2 gap-3 text-xs">
                         <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
-                          <div className="font-bold text-[#0f6cbd]">11 Secciones</div>
+                          <div className="font-bold text-[#0f6cbd]">Ficha M.T.D.</div>
                           <p className="mt-0.5 text-[11px] text-slate-500">
                             Autocompletado M.T.D. con Unifilar y Croquis SVG
                           </p>
@@ -393,7 +393,7 @@ export default function LandingAndAuthView({
                     <FileSpreadsheet className="h-5 w-5" />
                   </div>
                   <h3 className="mt-4 text-sm font-bold text-slate-900">
-                    Ficha Oficial M.T.D. B.T. (11 Hojas A4)
+                    Ficha Oficial M.T.D. B.T.
                   </h3>
                   <p className="mt-1.5 text-xs leading-relaxed text-slate-600">
                     Visualización en doble columna sin scroll innecesario, navegador por contenido de sección, edición en vivo e impresión directa en formato oficial.
