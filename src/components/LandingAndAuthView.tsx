@@ -250,32 +250,49 @@ export default function LandingAndAuthView({
                   </div>
                 </div>
 
-                {/* Tarjeta Visual Derecha con Resumen Técnico REBT */}
+                {/* Tarjeta Visual Derecha con Imagen Profesional e Información Técnica REBT */}
                 <div className="lg:col-span-5">
-                  <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-xl space-y-5">
-                    <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
+                    {/* Imagen Hero de Ingeniería Eléctrica y Cuadro Modular REBT */}
+                    <div className="relative h-56 sm:h-64 w-full overflow-hidden bg-slate-900">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
-                        src="/logo-gobierno-canarias.png"
-                        alt="Gobierno de Canarias"
-                        className="h-11 w-auto object-contain"
+                        src="/hero-rebt-banner.jpg"
+                        alt="Cuadro Eléctrico de Baja Tensión y Esquema Unifilar REBT"
+                        className="h-full w-full object-cover object-center transition duration-500 hover:scale-105"
                       />
-                      <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 ring-1 ring-emerald-600/20">
-                        100% Homologado
-                      </span>
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/75 via-slate-900/15 to-transparent" />
+                      <div className="absolute top-3 right-3">
+                        <span className="rounded-lg bg-emerald-500/95 px-2.5 py-1 text-[11px] font-bold text-white shadow-sm backdrop-blur-xs">
+                          100% Homologado REBT
+                        </span>
+                      </div>
+                      <div className="absolute bottom-3 left-4 right-4 flex items-end justify-between text-white">
+                        <div>
+                          <span className="text-[10px] font-semibold uppercase tracking-wider text-blue-200">
+                            Ingeniería de Baja Tensión
+                          </span>
+                          <p className="text-sm font-bold leading-snug">
+                            Cuadro CGMP, Esquema Unifilar y M.T.D. Oficial
+                          </p>
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="space-y-3">
-                      <h3 className="text-sm font-bold text-slate-900">
-                        Verificación Reglamentaria Automatizada
-                      </h3>
-                      <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4 text-xs space-y-2.5 text-slate-700">
-                        <div className="flex items-center justify-between">
-                          <span>Normativa Vigente:</span>
-                          <strong className="font-semibold text-[#0f6cbd]">
-                            REBT RD 842/2002
-                          </strong>
-                        </div>
+                    <div className="p-5 sm:p-6 space-y-4">
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-3.5">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src="/logo-gobierno-canarias.png"
+                          alt="Gobierno de Canarias"
+                          className="h-10 w-auto object-contain"
+                        />
+                        <span className="rounded-md bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-[#0f6cbd]">
+                          RD 842/2002
+                        </span>
+                      </div>
+
+                      <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-3.5 text-xs space-y-2 text-slate-700">
                         <div className="flex items-center justify-between">
                           <span>Instrucciones Técnicas:</span>
                           <strong className="font-semibold text-slate-900">
@@ -283,37 +300,37 @@ export default function LandingAndAuthView({
                           </strong>
                         </div>
                         <div className="flex items-center justify-between">
-                          <span>Formato Oficial:</span>
-                          <strong className="font-semibold text-slate-900">
+                          <span>Documento Generado:</span>
+                          <strong className="font-semibold text-[#0f6cbd]">
                             M.T.D. B.T. (11 Páginas A4)
                           </strong>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="grid grid-cols-2 gap-3 text-xs">
-                      <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
-                        <div className="font-bold text-[#0f6cbd]">11 Secciones</div>
-                        <p className="mt-0.5 text-[11px] text-slate-500">
-                          Autocompletado M.T.D. con Unifilar y Croquis SVG
-                        </p>
+                      <div className="grid grid-cols-2 gap-3 text-xs">
+                        <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+                          <div className="font-bold text-[#0f6cbd]">11 Secciones</div>
+                          <p className="mt-0.5 text-[11px] text-slate-500">
+                            Autocompletado M.T.D. con Unifilar y Croquis SVG
+                          </p>
+                        </div>
+                        <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+                          <div className="font-bold text-[#0f6cbd]">Multi-Dispositivo</div>
+                          <p className="mt-0.5 text-[11px] text-slate-500">
+                            Optimizado para móvil, tablet y escritorio
+                          </p>
+                        </div>
                       </div>
-                      <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
-                        <div className="font-bold text-[#0f6cbd]">Multi-Dispositivo</div>
-                        <p className="mt-0.5 text-[11px] text-slate-500">
-                          Optimizado para móvil, tablet y escritorio
-                        </p>
-                      </div>
-                    </div>
 
-                    <button
-                      type="button"
-                      onClick={() => setMode("login")}
-                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-xs font-bold text-white transition hover:bg-slate-800"
-                    >
-                      <Lock className="h-3.5 w-3.5" />
-                      Ir al Portal de Inicio de Sesión
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => setMode("login")}
+                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-xs font-bold text-white transition hover:bg-slate-800"
+                      >
+                        <Lock className="h-3.5 w-3.5" />
+                        Ir al Portal de Inicio de Sesión
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
