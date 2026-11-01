@@ -1184,7 +1184,15 @@ export default function SistemaCalculoRebtPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-[#f8fafc] text-slate-900">
+    <div className="relative flex min-h-screen bg-[#f8fafc] text-slate-900 isolate">
+      {/* Marca de agua de fondo en blanco y negro tenue (Esquema eléctrico CAD) */}
+      <div
+        aria-hidden="true"
+        className="no-print pointer-events-none fixed inset-0 -z-10 bg-cover bg-center bg-no-repeat opacity-[0.28] grayscale contrast-125 mix-blend-multiply"
+        style={{
+          backgroundImage: "url('/bg-electrical-cad.jpg')",
+        }}
+      />
       {/* =====================================================================
           DRAWER MÓVIL (RESPONSIVE PARA TELÉFONOS Y TABLETS)
          ===================================================================== */}
