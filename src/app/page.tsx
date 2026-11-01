@@ -47,6 +47,9 @@ import {
   TechnicianDashboard,
   AdminDashboardSummary,
 } from "@/components/DashboardsView";
+import SectionHistoryRegistry, {
+  SavedHistoryRecord,
+} from "@/components/SectionHistoryRegistry";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 
 type ActiveSection =
@@ -91,20 +94,7 @@ export interface AppUser {
   is_active: boolean;
 }
 
-interface SavedProjectRow {
-  id: number;
-  tenant_id: number | null;
-  owner_user_id: number | null;
-  name: string;
-  client_name: string;
-  location: string;
-  system_type: SystemSupplyType;
-  electrification_grade: "basica" | "elevada";
-  total_demand_va: number;
-  iga_amps: number;
-  mtd_metadata_json?: MtdFormMetadata;
-  created_at: string;
-}
+type SavedProjectRow = SavedHistoryRecord;
 
 const FALLBACK_TENANTS: AppTenant[] = [
   {
@@ -439,9 +429,7 @@ export default function SistemaCalculoRebtPage() {
       supabase.from("app_users").select("*").order("id", { ascending: true }),
       supabase
         .from("electrical_projects")
-        .select(
-          "id, tenant_id, owner_user_id, name, client_name, location, system_type, electrification_grade, total_demand_va, iga_amps, mtd_metadata_json, created_at"
-        )
+        .select("*")
         .order("created_at", { ascending: false }),
     ]);
 
@@ -459,6 +447,18 @@ export default function SistemaCalculoRebtPage() {
   useEffect(() => {
     fetchDirectoryAndProjects();
   }, [fetchDirectoryAndProjects]);
+
+  // Sembrar automáticamente el registro inicial en el historial si aún no hay registros para el usuario principal
+  useEffect(() => {
+    if (!supabase || typeof window === "undefined") return;
+    if (localStorage.getItem("rebt_seeded_initial_history_v1")) return;
+    const hasUser1Projects = allProjects.some((p) => p.owner_user_id === 1);
+    if (!hasUser1Projects && currentUser?.id === 1 && !isSaving) {
+      localStorage.setItem("rebt_seeded_initial_history_v1", "true");
+      handleSaveToSupabase("insert");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allProjects.length]);
 
   // Expedientes filtrados estrictamente para el usuario activo / tenant activo (Aislamiento Multi-Tenant)
   const isolatedProjects = useMemo(() => {
@@ -545,12 +545,16 @@ export default function SistemaCalculoRebtPage() {
     }
 
     setActiveProjectId(proj.id);
+
+    // 1. Restaurar Titular, Ubicación y Profesional Habilitado
     if (
       proj.mtd_metadata_json &&
       Object.keys(proj.mtd_metadata_json).length > 0
     ) {
       setMtdMeta({ ...DEFAULT_MTD_METADATA, ...proj.mtd_metadata_json });
     }
+
+    // 2. Restaurar Configuración de Suministro y Grado de Electrificación
     if (
       proj.system_type === "monofasico_230v" ||
       proj.system_type === "trifasico_400v"
@@ -564,6 +568,67 @@ export default function SistemaCalculoRebtPage() {
       setElectrificationGrade(proj.electrification_grade);
     }
 
+    // 3. Restaurar Previsión de Cargas del Edificio (ITC-BT-10 / 52)
+    if (proj.building_forecast_json) {
+      const bfIn = proj.building_forecast_json._inputs;
+      if (bfIn) {
+        if (typeof bfIn.basicDwellings === "number")
+          setBasicDwellings(bfIn.basicDwellings);
+        if (typeof bfIn.elevatedDwellings === "number")
+          setElevatedDwellings(bfIn.elevatedDwellings);
+        if (typeof bfIn.commonLightingW === "number")
+          setCommonLightingW(bfIn.commonLightingW);
+        if (typeof bfIn.hydroW === "number") setHydroW(bfIn.hydroW);
+        if (typeof bfIn.otherServicesW === "number")
+          setOtherServicesW(bfIn.otherServicesW);
+        if (typeof bfIn.commercialCount === "number")
+          setCommercialCount(bfIn.commercialCount);
+        if (typeof bfIn.commercialAreaM2 === "number")
+          setCommercialAreaM2(bfIn.commercialAreaM2);
+        if (typeof bfIn.garageAreaM2 === "number")
+          setGarageAreaM2(bfIn.garageAreaM2);
+        if (typeof bfIn.garageForcedVent === "boolean")
+          setGarageForcedVent(bfIn.garageForcedVent);
+        if (typeof bfIn.parkingSpaces === "number")
+          setParkingSpaces(bfIn.parkingSpaces);
+        if (typeof bfIn.hasSpl === "boolean") setHasSpl(bfIn.hasSpl);
+        if (typeof bfIn.lgaLengthMeters === "number")
+          setLgaLengthMeters(bfIn.lgaLengthMeters);
+      }
+    }
+
+    // 4. Restaurar Puesta a Tierra y Clasificador ITC-BT-04
+    if (proj.itc04_group) {
+      setItc04Group(proj.itc04_group);
+    }
+    if (proj.earthing_json) {
+      const eIn = proj.earthing_json._inputs;
+      if (eIn) {
+        if (typeof eIn.soilResistivity === "number")
+          setSoilResistivity(eIn.soilResistivity);
+        if (typeof eIn.rodLengthMeters === "number")
+          setRodLengthMeters(eIn.rodLengthMeters);
+        if (typeof eIn.numRods === "number") setNumRods(eIn.numRods);
+        if (typeof eIn.buriedConductorMeters === "number")
+          setBuriedConductorMeters(eIn.buriedConductorMeters);
+        if (eIn.maxContactVoltageV === 50 || eIn.maxContactVoltageV === 24)
+          setMaxContactVoltageV(eIn.maxContactVoltageV);
+        if (
+          eIn.rcdSensitivityMa === 30 ||
+          eIn.rcdSensitivityMa === 100 ||
+          eIn.rcdSensitivityMa === 300 ||
+          eIn.rcdSensitivityMa === 500
+        )
+          setRcdSensitivityMa(eIn.rcdSensitivityMa);
+        if (eIn.itc04Group) setItc04Group(eIn.itc04Group);
+        if (typeof eIn.itc04CustomPowerKw === "number")
+          setItc04CustomPowerKw(eIn.itc04CustomPowerKw);
+        if (typeof eIn.itc04ParkingSpaces === "number")
+          setItc04ParkingSpaces(eIn.itc04ParkingSpaces);
+      }
+    }
+
+    // 5. Restaurar Circuitos Interiores desde electrical_circuits
     const { data: dbCircuits } = await supabase
       .from("electrical_circuits")
       .select("*")
@@ -592,18 +657,19 @@ export default function SistemaCalculoRebtPage() {
           fixedPiaAmps: Number(row.breaker_amps) || undefined,
         }))
       );
-      setStatusBanner({
-        type: "success",
-        text: `Expediente #${projectId} (${proj.name}) cargado correctamente en el espacio de trabajo de ${currentUser.full_name}.`,
-      });
     }
+
+    setStatusBanner({
+      type: "success",
+      text: `Registro #${projectId} (${proj.name}) cargado en modo edición. Modifica cualquier dato y pulsa 'Guardar Cambios (#${projectId})'.`,
+    });
   };
 
   const handleDeleteProject = async (projectId: number) => {
     if (!currentUser.can_delete_projects) {
       setStatusBanner({
         type: "warning",
-        text: "No tienes permiso para eliminar expedientes. Solicita el permiso 'Eliminar Reportes' en Administración.",
+        text: "No tienes permiso para eliminar registros. Solicita el permiso 'Borrar Reportes' en Administración.",
       });
       return;
     }
@@ -620,16 +686,18 @@ export default function SistemaCalculoRebtPage() {
       await fetchDirectoryAndProjects();
       setStatusBanner({
         type: "success",
-        text: `Expediente #${projectId} eliminado.`,
+        text: `Registro #${projectId} eliminado del historial correctamente.`,
       });
     }
   };
 
-  const handleSaveToSupabase = async () => {
+  const handleSaveToSupabase = async (
+    mode: "auto" | "insert" | "update" = "auto"
+  ) => {
     if (!currentUser.can_create_projects) {
       setStatusBanner({
         type: "warning",
-        text: "Tu perfil actual no tiene permiso para crear o guardar expedientes.",
+        text: "Tu perfil actual no tiene permiso para crear o editar registros.",
       });
       return;
     }
@@ -645,44 +713,101 @@ export default function SistemaCalculoRebtPage() {
     setIsSaving(true);
     setStatusBanner(null);
 
-    try {
-      const { data: project, error: projectErr } = await supabase
-        .from("electrical_projects")
-        .insert({
-          tenant_id: currentUser.tenant_id,
-          owner_user_id: currentUser.id,
-          name: `M.T.D. ${mtdMeta.expedienteNum} - ${mtdMeta.usoDestino || "Instalación BT"}`,
-          client_name: mtdMeta.titularNombre || "Titular sin especificar",
-          location: `${mtdMeta.direccionCalle} ${mtdMeta.direccionNum}, ${mtdMeta.terminoMunicipal} (${mtdMeta.isla})`,
-          system_type: supplyType,
-          electrification_grade: electrificationGrade,
-          itc04_group: itc04Group,
-          document_type: itc04Evaluation.documentType,
-          requires_oca: itc04Evaluation.requiresInitialOcaInspection,
-          demand_factor: 1.0,
-          ambient_temp_c: 40,
-          total_connected_va: cgmpSummary.totalInstalledWatts,
-          total_demand_va: cgmpSummary.contractDesignWatts,
-          main_breaker_amps: cgmpSummary.igaAmps,
-          iga_amps: cgmpSummary.igaAmps,
-          di_section_mm2: cgmpSummary.diCalculation.sectionMm2,
-          rcd_count: cgmpSummary.rcd30mACount,
-          main_feeder_awg: `${cgmpSummary.diCalculation.sectionMm2} mm² Cu XLPE`,
-          building_forecast_json: buildingForecast,
-          earthing_json: earthingResult,
-          mtd_metadata_json: mtdMeta,
-        })
-        .select("id")
-        .single();
+    const shouldUpdate =
+      mode === "update" || (mode === "auto" && activeProjectId !== null);
 
-      if (projectErr || !project) {
-        throw new Error(
-          projectErr?.message || "No se pudo guardar el expediente"
-        );
+    const projectPayload = {
+      tenant_id: currentUser.tenant_id,
+      owner_user_id: currentUser.id,
+      name: `M.T.D. ${mtdMeta.expedienteNum} - ${mtdMeta.usoDestino || "Instalación BT"}`,
+      client_name: mtdMeta.titularNombre || "Titular sin especificar",
+      location: `${mtdMeta.direccionCalle} ${mtdMeta.direccionNum}, ${mtdMeta.terminoMunicipal} (${mtdMeta.isla})`,
+      system_type: supplyType,
+      electrification_grade: electrificationGrade,
+      itc04_group: itc04Group,
+      document_type: itc04Evaluation.documentType,
+      requires_oca: itc04Evaluation.requiresInitialOcaInspection,
+      demand_factor: 1.0,
+      ambient_temp_c: 40,
+      total_connected_va: cgmpSummary.totalInstalledWatts,
+      total_demand_va: cgmpSummary.contractDesignWatts,
+      main_breaker_amps: cgmpSummary.igaAmps,
+      iga_amps: cgmpSummary.igaAmps,
+      di_section_mm2: cgmpSummary.diCalculation.sectionMm2,
+      rcd_count: cgmpSummary.rcd30mACount,
+      main_feeder_awg: `${cgmpSummary.diCalculation.sectionMm2} mm² Cu XLPE`,
+      building_forecast_json: {
+        ...buildingForecast,
+        _inputs: {
+          basicDwellings,
+          elevatedDwellings,
+          commonLightingW,
+          hydroW,
+          otherServicesW,
+          commercialCount,
+          commercialAreaM2,
+          garageAreaM2,
+          garageForcedVent,
+          parkingSpaces,
+          hasSpl,
+          lgaLengthMeters,
+        },
+      },
+      earthing_json: {
+        ...earthingResult,
+        _inputs: {
+          soilResistivity,
+          rodLengthMeters,
+          numRods,
+          buriedConductorMeters,
+          maxContactVoltageV,
+          rcdSensitivityMa,
+          itc04Group,
+          itc04CustomPowerKw,
+          itc04ParkingSpaces,
+        },
+      },
+      mtd_metadata_json: mtdMeta,
+    };
+
+    try {
+      let targetProjectId = activeProjectId;
+
+      if (shouldUpdate && activeProjectId !== null) {
+        const { error: updateErr } = await supabase
+          .from("electrical_projects")
+          .update(projectPayload)
+          .eq("id", activeProjectId);
+
+        if (updateErr) {
+          throw new Error(updateErr.message);
+        }
+
+        await supabase
+          .from("electrical_circuits")
+          .delete()
+          .eq("project_id", activeProjectId);
+      } else {
+        const { data: project, error: projectErr } = await supabase
+          .from("electrical_projects")
+          .insert(projectPayload)
+          .select("id")
+          .single();
+
+        if (projectErr || !project) {
+          throw new Error(
+            projectErr?.message || "No se pudo guardar el registro"
+          );
+        }
+        targetProjectId = project.id;
+      }
+
+      if (!targetProjectId) {
+        throw new Error("ID de registro no válido");
       }
 
       const circuitRows = calculatedCircuits.map((c, idx) => ({
-        project_id: project.id,
+        project_id: targetProjectId,
         circuit_number: idx + 1,
         circuit_code: c.code,
         description: c.description,
@@ -721,11 +846,13 @@ export default function SistemaCalculoRebtPage() {
         throw new Error(circuitsErr.message);
       }
 
-      setActiveProjectId(project.id);
+      setActiveProjectId(targetProjectId);
       await fetchDirectoryAndProjects();
       setStatusBanner({
         type: "success",
-        text: `Expediente #${project.id} guardado exclusivamente bajo el usuario ${currentUser.full_name} (${currentTenant.name}).`,
+        text: shouldUpdate
+          ? `Registro #${targetProjectId} actualizado correctamente en el historial.`
+          : `Nuevo Registro #${targetProjectId} añadido al historial de ${currentUser.full_name}.`,
       });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Error desconocido";
@@ -1065,12 +1192,16 @@ export default function SistemaCalculoRebtPage() {
 
               <button
                 type="button"
-                onClick={handleSaveToSupabase}
+                onClick={() => handleSaveToSupabase("auto")}
                 disabled={isSaving || !currentUser?.can_create_projects}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-[#0f6cbd] px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:bg-[#115ea3] disabled:opacity-50"
               >
                 <Save className="h-3.5 w-3.5" />
-                {isSaving ? "Guardando..." : "Guardar"}
+                {isSaving
+                  ? "Guardando..."
+                  : activeProjectId
+                  ? `Guardar (#${activeProjectId})`
+                  : "Registrar"}
               </button>
             </div>
 
@@ -1772,6 +1903,27 @@ export default function SistemaCalculoRebtPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Historial de Registros de Titular, Ubicación y Profesional Habilitado */}
+              <SectionHistoryRegistry
+                section="titular_ubicacion"
+                records={isolatedProjects}
+                activeRecordId={activeProjectId}
+                isSaving={isSaving}
+                canEdit={currentUser?.can_create_projects}
+                canDelete={currentUser?.can_delete_projects}
+                onSaveNew={() => handleSaveToSupabase("insert")}
+                onUpdateActive={() => handleSaveToSupabase("update")}
+                onEditRecord={handleLoadProject}
+                onDeleteRecord={handleDeleteProject}
+                onOpenMtdForRecord={async (id) => {
+                  await handleLoadProject(id);
+                  setActiveSection("ficha_mtd");
+                }}
+                onResetForm={() =>
+                  startNewBlankProjectForUser(currentUser, currentTenant)
+                }
+              />
             </div>
           )}
 
@@ -2123,6 +2275,27 @@ export default function SistemaCalculoRebtPage() {
                   </table>
                 </div>
               </section>
+
+              {/* Historial de Registros de Cuadro de Circuitos y D.I. */}
+              <SectionHistoryRegistry
+                section="circuitos"
+                records={isolatedProjects}
+                activeRecordId={activeProjectId}
+                isSaving={isSaving}
+                canEdit={currentUser?.can_create_projects}
+                canDelete={currentUser?.can_delete_projects}
+                onSaveNew={() => handleSaveToSupabase("insert")}
+                onUpdateActive={() => handleSaveToSupabase("update")}
+                onEditRecord={handleLoadProject}
+                onDeleteRecord={handleDeleteProject}
+                onOpenMtdForRecord={async (id) => {
+                  await handleLoadProject(id);
+                  setActiveSection("ficha_mtd");
+                }}
+                onResetForm={() =>
+                  startNewBlankProjectForUser(currentUser, currentTenant)
+                }
+              />
             </div>
           )}
 
@@ -2382,6 +2555,29 @@ export default function SistemaCalculoRebtPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Historial de Registros de Previsión de Edificio y LGA */}
+              <div className="lg:col-span-3">
+                <SectionHistoryRegistry
+                  section="edificio_itc10"
+                  records={isolatedProjects}
+                  activeRecordId={activeProjectId}
+                  isSaving={isSaving}
+                  canEdit={currentUser?.can_create_projects}
+                  canDelete={currentUser?.can_delete_projects}
+                  onSaveNew={() => handleSaveToSupabase("insert")}
+                  onUpdateActive={() => handleSaveToSupabase("update")}
+                  onEditRecord={handleLoadProject}
+                  onDeleteRecord={handleDeleteProject}
+                  onOpenMtdForRecord={async (id) => {
+                    await handleLoadProject(id);
+                    setActiveSection("ficha_mtd");
+                  }}
+                  onResetForm={() =>
+                    startNewBlankProjectForUser(currentUser, currentTenant)
+                  }
+                />
+              </div>
             </div>
           )}
 
@@ -2595,6 +2791,29 @@ export default function SistemaCalculoRebtPage() {
                       : "NO REQUERIDA"}
                   </p>
                 </div>
+              </div>
+
+              {/* Historial de Registros de Puesta a Tierra y Legalización */}
+              <div className="lg:col-span-2">
+                <SectionHistoryRegistry
+                  section="tierras_legalizacion"
+                  records={isolatedProjects}
+                  activeRecordId={activeProjectId}
+                  isSaving={isSaving}
+                  canEdit={currentUser?.can_create_projects}
+                  canDelete={currentUser?.can_delete_projects}
+                  onSaveNew={() => handleSaveToSupabase("insert")}
+                  onUpdateActive={() => handleSaveToSupabase("update")}
+                  onEditRecord={handleLoadProject}
+                  onDeleteRecord={handleDeleteProject}
+                  onOpenMtdForRecord={async (id) => {
+                    await handleLoadProject(id);
+                    setActiveSection("ficha_mtd");
+                  }}
+                  onResetForm={() =>
+                    startNewBlankProjectForUser(currentUser, currentTenant)
+                  }
+                />
               </div>
             </div>
           )}
