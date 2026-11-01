@@ -1835,7 +1835,7 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
           <OfficialHeader isBtBox={true} />
 
           <div className="flex min-h-[215mm] flex-col justify-between border-2 border-black p-3">
-            <div>
+            <div className="flex flex-1 flex-col">
               <div className="flex items-center justify-between border-b border-black pb-1">
                 <span className="font-bold">MEMORIA DESCRIPTIVA</span>
                 <button
@@ -1847,12 +1847,16 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
                 </button>
               </div>
               <textarea
-                rows={32}
+                rows={Math.max(
+                  36,
+                  effectiveMemoriaTexto.split("\n").length + 14
+                )}
                 value={effectiveMemoriaTexto}
                 onChange={(e) =>
                   updateField("memoriaDescriptivaTexto", e.target.value)
                 }
-                className="mt-2 w-full resize-none bg-transparent font-serif text-[11px] leading-relaxed text-black focus:outline-none"
+                style={{ fieldSizing: "content" } as React.CSSProperties}
+                className="mt-2 w-full flex-1 resize-none overflow-hidden bg-transparent font-serif text-[10.5px] leading-[1.45] text-black focus:outline-none"
               />
             </div>
 
