@@ -170,6 +170,12 @@ const FALLBACK_USERS: AppUser[] = [
 export default function SistemaCalculoRebtPage() {
   const [activeSection, setActiveSection] =
     useState<ActiveSection>("dashboard_tecnico");
+  const [targetMtdPage, setTargetMtdPage] = useState<number | "all">("all");
+
+  const openMtdSheet = (page: number | "all") => {
+    setTargetMtdPage(page);
+    setActiveSection("ficha_mtd");
+  };
 
   // Estado Multi-Tenant y Usuarios (RBAC)
   const [tenants, setTenants] = useState<AppTenant[]>(FALLBACK_TENANTS);
@@ -1526,12 +1532,27 @@ export default function SistemaCalculoRebtPage() {
               <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
                 {/* Columna 1: Datos del Titular y Ubicación */}
                 <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs">
-                  <h2 className="text-sm font-bold text-slate-900">
-                    1. Datos del Titular y Ubicación de la Instalación (Página 1/11 M.T.D.)
-                  </h2>
-                  <p className="mt-0.5 text-[11px] text-slate-500">
-                    Datos administrativos del expediente sincronizados con la Ficha Técnica M.T.D.
-                  </p>
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <h2 className="text-sm font-bold text-slate-900">
+                        1. Datos del Titular y Ubicación de la Instalación
+                      </h2>
+                      <p className="mt-0.5 text-[11px] text-slate-500">
+                        Datos administrativos del expediente sincronizados con la Ficha Técnica M.T.D.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => openMtdSheet(1)}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50/70 px-3 py-1.5 text-[11px] font-semibold text-[#0f6cbd] transition hover:bg-blue-100/70"
+                      title="Abrir este apartado en la Ficha Técnica M.T.D."
+                    >
+                      <Printer className="h-3.5 w-3.5 shrink-0" />
+                      <span>
+                        Datos del Titular, Ubicación, Canalizaciones, Protecciones y Tierra
+                      </span>
+                    </button>
+                  </div>
 
                   <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <div>
@@ -1771,15 +1792,30 @@ export default function SistemaCalculoRebtPage() {
                   </div>
                 </div>
 
-                {/* Columna 2: Datos del Profesional Habilitado (PH) / Técnico Competente (Página 11/11) */}
+                {/* Columna 2: Datos del Profesional Habilitado (PH) / Técnico Competente */}
                 <div className="flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-5 shadow-xs">
                   <div>
-                    <h3 className="text-sm font-bold text-slate-900">
-                      Datos del Profesional Habilitado (PH) / Técnico Competente (Página 11/11 M.T.D.)
-                    </h3>
-                    <p className="mt-0.5 text-[11px] text-slate-500">
-                      Identificación del instalador o ingeniero firmante y empresa instaladora habilitada.
-                    </p>
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-900">
+                          Datos del Profesional Habilitado (PH) / Técnico Competente
+                        </h3>
+                        <p className="mt-0.5 text-[11px] text-slate-500">
+                          Identificación del instalador o ingeniero firmante y empresa instaladora habilitada.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => openMtdSheet(11)}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50/70 px-3 py-1.5 text-[11px] font-semibold text-[#0f6cbd] transition hover:bg-blue-100/70"
+                        title="Abrir este apartado en la Ficha Técnica M.T.D."
+                      >
+                        <Printer className="h-3.5 w-3.5 shrink-0" />
+                        <span>
+                          Declaración del Autor (Instalador PH / Técnico) y Notas Oficiales
+                        </span>
+                      </button>
+                    </div>
 
                     <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <div className="sm:col-span-2">
@@ -2062,6 +2098,15 @@ export default function SistemaCalculoRebtPage() {
                   >
                     Electrificación Elevada + VE (C1 a C13)
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => openMtdSheet(6)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50/70 px-3 py-1.5 text-[11px] font-semibold text-[#0f6cbd] transition hover:bg-blue-100/70"
+                    title="Abrir Tabla de Cálculos en la Ficha Técnica M.T.D."
+                  >
+                    <Printer className="h-3.5 w-3.5 shrink-0" />
+                    <span>Tabla de Cálculos Eléctricos: LGA, D.I. y Circuitos C1 a C5</span>
+                  </button>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
@@ -2326,12 +2371,27 @@ export default function SistemaCalculoRebtPage() {
           {activeSection === "edificio_itc10" && (
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
               <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-xs lg:col-span-2">
-                <h2 className="text-base font-bold text-slate-900">
-                  3. Previsión de Cargas del Edificio (ITC-BT-10 + ITC-BT-52)
-                </h2>
-                <p className="text-xs text-slate-500">
-                  Estos valores dimensionan automáticamente la Línea General de Alimentación (LGA), el IGM y rellenan la Página 2/11 de la Memoria Técnica de Diseño.
-                </p>
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <h2 className="text-base font-bold text-slate-900">
+                      3. Previsión de Cargas del Edificio (ITC-BT-10 + ITC-BT-52)
+                    </h2>
+                    <p className="mt-0.5 text-xs text-slate-500">
+                      Estos valores dimensionan automáticamente la Línea General de Alimentación (LGA), el IGM y rellenan la Memoria Técnica de Diseño.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => openMtdSheet(2)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50/70 px-3 py-1.5 text-[11px] font-semibold text-[#0f6cbd] transition hover:bg-blue-100/70"
+                    title="Abrir este apartado en la Ficha Técnica M.T.D."
+                  >
+                    <Printer className="h-3.5 w-3.5 shrink-0" />
+                    <span>
+                      Previsión de Potencia de Viviendas y Servicios Generales (ITC-BT-10)
+                    </span>
+                  </button>
+                </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
@@ -2608,9 +2668,20 @@ export default function SistemaCalculoRebtPage() {
           {activeSection === "tierras_legalizacion" && (
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-xs">
-                <h2 className="text-base font-bold text-slate-900">
-                  Cálculo de Puesta a Tierra (ITC-BT-18 / ITC-BT-24)
-                </h2>
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <h2 className="text-base font-bold text-slate-900">
+                    Cálculo de Puesta a Tierra (ITC-BT-18 / ITC-BT-24)
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => openMtdSheet(1)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50/70 px-3 py-1.5 text-[11px] font-semibold text-[#0f6cbd] transition hover:bg-blue-100/70"
+                    title="Abrir este apartado en la Ficha Técnica M.T.D."
+                  >
+                    <Printer className="h-3.5 w-3.5 shrink-0" />
+                    <span>Datos del Titular, Ubicación, Canalizaciones, Protecciones y Tierra</span>
+                  </button>
+                </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
@@ -2724,9 +2795,20 @@ export default function SistemaCalculoRebtPage() {
               </div>
 
               <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-xs">
-                <h2 className="text-base font-bold text-slate-900">
-                  Clasificador ITC-BT-04 (Proyecto vs M.T.D.) e Inspección OCA (ITC-BT-05)
-                </h2>
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <h2 className="text-base font-bold text-slate-900">
+                    Clasificador ITC-BT-04 (Proyecto vs M.T.D.) e Inspección OCA (ITC-BT-05)
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => openMtdSheet(5)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50/70 px-3 py-1.5 text-[11px] font-semibold text-[#0f6cbd] transition hover:bg-blue-100/70"
+                    title="Abrir este apartado en la Ficha Técnica M.T.D."
+                  >
+                    <Printer className="h-3.5 w-3.5 shrink-0" />
+                    <span>Memoria Descriptiva Reglamentaria (REBT e ITC-BT)</span>
+                  </button>
+                </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700">
@@ -2866,6 +2948,7 @@ export default function SistemaCalculoRebtPage() {
               earthingResult={earthingResult}
               rcdSensitivityMa={rcdSensitivityMa}
               canExportMtd={currentUser?.can_export_mtd}
+              initialPage={targetMtdPage}
             />
           )}
 

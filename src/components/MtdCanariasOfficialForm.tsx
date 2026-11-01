@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Printer,
   Sparkles,
@@ -166,6 +166,7 @@ interface MtdCanariasProps {
   };
   rcdSensitivityMa: number;
   canExportMtd?: boolean;
+  initialPage?: number | "all";
 }
 
 export default function MtdCanariasOfficialForm({
@@ -180,8 +181,14 @@ export default function MtdCanariasOfficialForm({
   earthingResult,
   rcdSensitivityMa,
   canExportMtd = true,
+  initialPage = "all",
 }: MtdCanariasProps) {
-  const [selectedPage, setSelectedPage] = useState<number | "all">("all");
+  const [selectedPage, setSelectedPage] =
+    useState<number | "all">(initialPage);
+
+  useEffect(() => {
+    setSelectedPage(initialPage);
+  }, [initialPage]);
   const [showPreview, setShowPreview] = useState<boolean>(true);
   const [isSheetDropdownOpen, setIsSheetDropdownOpen] =
     useState<boolean>(false);
@@ -248,27 +255,16 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
   // Cabecera oficial repetida en las 11 páginas
   const OfficialHeader = ({ isBtBox = true }: { isBtBox?: boolean }) => (
     <div className="mb-3 flex items-start justify-between border-b-2 border-black pb-2 text-black">
-      <div className="flex items-start gap-4">
-        <div className="flex flex-col items-center">
-          <div className="flex h-10 w-10 flex-col items-center justify-center rounded border border-black bg-slate-100 text-[10px] font-bold leading-tight text-black">
-            <Shield className="h-3.5 w-3.5 text-black" />
-            <span>CAN</span>
-          </div>
-          <span className="mt-0.5 text-[11px] font-bold leading-none">
-            Gobierno
-          </span>
-          <span className="text-[11px] font-bold leading-none">
-            de Canarias
-          </span>
-          <span className="mt-1 text-sm font-extrabold tracking-tight">
-            INSTALACIÓN DE BAJA TENSIÓN
-          </span>
-        </div>
-        <div className="pt-2 text-[10px] leading-tight text-slate-800">
-          <p className="font-semibold">Consejería de Empleo,</p>
-          <p className="font-semibold">Industria y Comercio</p>
-          <p>Dirección General de Energía</p>
-        </div>
+      <div className="flex flex-col items-start">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/logo-gobierno-canarias.png"
+          alt="Gobierno de Canarias - Consejería de Empleo, Industria y Comercio - Dirección General de Energía"
+          className="h-14 w-auto object-contain"
+        />
+        <span className="mt-1 text-sm font-extrabold tracking-tight text-black">
+          INSTALACIÓN DE BAJA TENSIÓN
+        </span>
       </div>
 
       <div className="flex items-stretch gap-2 text-[10px]">
