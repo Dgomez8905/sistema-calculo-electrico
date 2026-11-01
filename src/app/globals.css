@@ -204,6 +204,12 @@ select:not(.mtd-raw-select):focus {
   }
 }
 
+@media (max-width: 768px) {
+  .mtd-print-page {
+    min-width: 720px;
+  }
+}
+
 @media print {
   @page {
     size: A4 portrait;

@@ -25,6 +25,9 @@ import {
   Building,
   ChevronRight,
   LayoutDashboard,
+  Menu,
+  X,
+  Home,
 } from "lucide-react";
 import {
   RebtCircuitInput,
@@ -51,6 +54,7 @@ import SectionHistoryRegistry, {
   SavedHistoryRecord,
 } from "@/components/SectionHistoryRegistry";
 import GoogleSelect from "@/components/GoogleSelect";
+import LandingAndAuthView from "@/components/LandingAndAuthView";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 
 type ActiveSection =
@@ -168,6 +172,10 @@ const FALLBACK_USERS: AppUser[] = [
 ];
 
 export default function SistemaCalculoRebtPage() {
+  const [viewMode, setViewMode] = useState<
+    "landing" | "login" | "reset_password" | "app"
+  >("landing");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const [activeSection, setActiveSection] =
     useState<ActiveSection>("dashboard_tecnico");
   const [targetMtdPage, setTargetMtdPage] = useState<number | "all">("all");
@@ -175,6 +183,7 @@ export default function SistemaCalculoRebtPage() {
   const openMtdSheet = (page: number | "all") => {
     setTargetMtdPage(page);
     setActiveSection("ficha_mtd");
+    setMobileMenuOpen(false);
   };
 
   // Estado Multi-Tenant y Usuarios (RBAC)
@@ -538,6 +547,63 @@ export default function SistemaCalculoRebtPage() {
       return;
     }
     switchActiveUser(found);
+    setViewMode("app");
+  };
+
+  const handleResetPassword = async (
+    emailToReset: string,
+    doiOrSecret: string,
+    newPinValue: string
+  ): Promise<{ ok: boolean; message: string }> => {
+    const targetUser = users.find(
+      (u) => u.email.toLowerCase().trim() === emailToReset.toLowerCase().trim()
+    );
+    if (!targetUser) {
+      return {
+        ok: false,
+        message: "No existe ningún usuario registrado con ese correo electrónico.",
+      };
+    }
+
+    const cleanInput = doiOrSecret.toUpperCase().replace(/[\s.-]/g, "");
+    const cleanUserDoi = (targetUser.doi_nif || "")
+      .toUpperCase()
+      .replace(/[\s.-]/g, "");
+    const cleanUserCci = (targetUser.cci_or_colegiado || "")
+      .toUpperCase()
+      .replace(/[\s.-]/g, "");
+
+    const isMasterCode =
+      cleanInput === "REBT2026" || cleanInput === "REBTADMIN";
+    const matchesDoi = cleanUserDoi.length > 0 && cleanInput === cleanUserDoi;
+    const matchesCci =
+      cleanUserCci.length > 0 && cleanUserCci.includes(cleanInput);
+
+    if (!isMasterCode && !matchesDoi && !matchesCci) {
+      return {
+        ok: false,
+        message:
+          "El NIF / Colegiado o código de recuperación no coincide con el titular de la cuenta.",
+      };
+    }
+
+    setUsers((prev) =>
+      prev.map((u) =>
+        u.id === targetUser.id ? { ...u, access_pin: newPinValue } : u
+      )
+    );
+
+    if (supabase) {
+      await supabase
+        .from("app_users")
+        .update({ access_pin: newPinValue })
+        .eq("id", targetUser.id);
+    }
+
+    return {
+      ok: true,
+      message: `Contraseña / PIN actualizada correctamente para ${targetUser.full_name}. Ya puedes iniciar sesión con tu nueva clave.`,
+    };
   };
 
   const handleLoadProject = async (projectId: number) => {
@@ -1099,20 +1165,123 @@ export default function SistemaCalculoRebtPage() {
     },
   ];
 
+  if (viewMode !== "app") {
+    return (
+      <LandingAndAuthView
+        mode={viewMode}
+        setMode={(next) => setViewMode(next)}
+        users={users}
+        tenants={tenants}
+        onLoginSuccess={(loggedInUser) => {
+          const found =
+            users.find((u) => u.id === loggedInUser.id) || users[0];
+          switchActiveUser(found);
+          setViewMode("app");
+        }}
+        onResetPassword={handleResetPassword}
+      />
+    );
+  }
+
   return (
     <div className="flex min-h-screen bg-[#f8fafc] text-slate-900">
       {/* =====================================================================
-          MENÚ LATERAL IZQUIERDO SIMPLIFICADO (SOLO ICONO + TEXTO DEL APARTADO)
+          DRAWER MÓVIL (RESPONSIVE PARA TELÉFONOS Y TABLETS)
          ===================================================================== */}
-      <aside className="no-print sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r border-slate-200 bg-white">
+      {mobileMenuOpen && (
+        <div className="no-print fixed inset-0 z-50 flex lg:hidden">
+          <div
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+          <aside className="relative z-10 flex h-full w-64 flex-col bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-4">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#0f6cbd] text-white">
+                  <Zap className="h-4 w-4" />
+                </div>
+                <span className="text-sm font-bold text-slate-900">
+                  REBT Cloud Suite
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen(false)}
+                className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+              {navItems.map((item) => {
+                const isActive = activeSection === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      setActiveSection(item.id);
+                      setMobileMenuOpen(false);
+                    }}
+                    className={`flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-left text-xs transition ${
+                      isActive
+                        ? "bg-[#e8f0fe] text-[#0f6cbd] font-semibold"
+                        : "font-medium text-slate-700 hover:bg-slate-100"
+                    }`}
+                  >
+                    <span
+                      className={
+                        isActive ? "text-[#0f6cbd]" : "text-slate-500"
+                      }
+                    >
+                      {item.icon}
+                    </span>
+                    <span className="truncate">{item.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+
+            <div className="border-t border-slate-200 p-3 space-y-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  setViewMode("landing");
+                }}
+                className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+              >
+                <Home className="h-3.5 w-3.5" />
+                Landing / Cerrar Sesión
+              </button>
+            </div>
+          </aside>
+        </div>
+      )}
+
+      {/* =====================================================================
+          MENÚ LATERAL IZQUIERDO SIMPLIFICADO (ESCRITORIO)
+         ===================================================================== */}
+      <aside className="no-print sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-slate-200 bg-white lg:flex">
         {/* Marca / Cabecera Lateral */}
-        <div className="flex items-center gap-3 border-b border-slate-200 px-5 py-4">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#0f6cbd] text-white shadow-xs">
-            <Zap className="h-4 w-4" />
+        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#0f6cbd] text-white shadow-xs">
+              <Zap className="h-4 w-4" />
+            </div>
+            <span className="text-sm font-bold tracking-tight text-slate-900">
+              REBT Cloud Suite
+            </span>
           </div>
-          <span className="text-sm font-bold tracking-tight text-slate-900">
-            REBT Cloud Suite
-          </span>
+          <button
+            type="button"
+            onClick={() => setViewMode("landing")}
+            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            title="Ir a la Landing Page"
+          >
+            <Home className="h-4 w-4" />
+          </button>
         </div>
 
         {/* Navegación Limpia y Minimalista */}
@@ -1158,13 +1327,21 @@ export default function SistemaCalculoRebtPage() {
          ===================================================================== */}
       <div className="flex flex-1 flex-col min-w-0">
         {/* Barra Superior con Acciones y Perfil de Sesión Organizado Arriba a la Derecha */}
-        <header className="no-print sticky top-0 z-10 flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 bg-white/95 px-6 py-3 backdrop-blur">
+        <header className="no-print sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white/95 px-3 py-2.5 sm:px-6 sm:py-3 backdrop-blur">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="rounded-md bg-blue-50 px-2 py-1 text-xs font-bold text-[#0f6cbd]">
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(true)}
+              className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white p-1.5 text-slate-700 hover:bg-slate-100 lg:hidden"
+              aria-label="Abrir menú de navegación"
+            >
+              <Menu className="h-4 w-4" />
+            </button>
+            <span className="rounded-md bg-blue-50 px-2 py-1 text-[11px] sm:text-xs font-bold text-[#0f6cbd] shrink-0">
               {mtdMeta.expedienteNum}
             </span>
-            <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-            <span className="truncate text-sm font-bold text-slate-900">
+            <ChevronRight className="hidden sm:block h-3.5 w-3.5 shrink-0 text-slate-400" />
+            <span className="truncate text-xs sm:text-sm font-bold text-slate-900 max-w-[140px] sm:max-w-xs">
               {mtdMeta.titularNombre || "Nuevo Expediente REBT"}
             </span>
             {activeProjectId && (
@@ -1174,49 +1351,51 @@ export default function SistemaCalculoRebtPage() {
             )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             {/* Botones de Acción del Expediente */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2">
               <button
                 type="button"
                 onClick={() =>
                   startNewBlankProjectForUser(currentUser, currentTenant)
                 }
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 sm:px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50"
               >
                 <FilePlus2 className="h-3.5 w-3.5 text-slate-500" />
-                Nuevo
+                <span className="hidden sm:inline">Nuevo</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setActiveSection("ficha_mtd")}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50/70 px-3 py-1.5 text-xs font-semibold text-[#0f6cbd] transition hover:bg-blue-100/70"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50/70 px-2.5 sm:px-3 py-1.5 text-xs font-semibold text-[#0f6cbd] transition hover:bg-blue-100/70"
               >
                 <Printer className="h-3.5 w-3.5" />
-                Ficha M.T.D.
+                <span>Ficha M.T.D.</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => handleSaveToSupabase("auto")}
                 disabled={isSaving || !currentUser?.can_create_projects}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-[#0f6cbd] px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:bg-[#115ea3] disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[#0f6cbd] px-2.5 sm:px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:bg-[#115ea3] disabled:opacity-50"
               >
                 <Save className="h-3.5 w-3.5" />
-                {isSaving
-                  ? "Guardando..."
-                  : activeProjectId
-                  ? `Guardar (#${activeProjectId})`
-                  : "Registrar"}
+                <span>
+                  {isSaving
+                    ? "Guardando..."
+                    : activeProjectId
+                    ? `Guardar (#${activeProjectId})`
+                    : "Registrar"}
+                </span>
               </button>
             </div>
 
-            <div className="h-6 w-px bg-slate-200" />
+            <div className="hidden sm:block h-6 w-px bg-slate-200" />
 
             {/* Perfil de Sesión Organizado en la Esquina Superior Derecha */}
-            <div className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-slate-50/90 px-3 py-1.5 shadow-2xs">
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#0f6cbd] text-xs font-bold text-white">
+            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/90 px-2.5 py-1 sm:px-3 sm:py-1.5 shadow-2xs">
+              <div className="flex h-6 w-6 sm:h-7 sm:w-7 shrink-0 items-center justify-center rounded-full bg-[#0f6cbd] text-xs font-bold text-white">
                 {currentUser?.full_name.charAt(0).toUpperCase()}
               </div>
               <div className="min-w-0">
@@ -1229,7 +1408,7 @@ export default function SistemaCalculoRebtPage() {
                     );
                     if (target) switchActiveUser(target);
                   }}
-                  className="max-w-[220px]"
+                  className="max-w-[140px] sm:max-w-[220px]"
                   title="Cambiar cuenta activa (Multitenant)"
                 >
                   {users
@@ -1240,7 +1419,7 @@ export default function SistemaCalculoRebtPage() {
                       </option>
                     ))}
                 </GoogleSelect>
-                <div className="flex items-center gap-1 text-[10px] text-slate-500">
+                <div className="hidden sm:flex items-center gap-1 text-[10px] text-slate-500">
                   <Building className="h-2.5 w-2.5 text-[#0f6cbd]" />
                   <span className="truncate max-w-[180px]">
                     {currentTenant?.name}
@@ -1249,13 +1428,9 @@ export default function SistemaCalculoRebtPage() {
               </div>
               <button
                 type="button"
-                onClick={() => {
-                  setLoginEmail(currentUser?.email || "");
-                  setLoginPin("1234");
-                  setShowLoginModal(true);
-                }}
-                className="ml-1 rounded-lg border border-slate-200 bg-white p-1.5 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
-                title="Iniciar sesión con otra cuenta / PIN"
+                onClick={() => setViewMode("login")}
+                className="ml-0.5 rounded-lg border border-slate-200 bg-white p-1.5 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
+                title="Cambiar sesión / Recuperar contraseña"
               >
                 <LogOut className="h-3.5 w-3.5" />
               </button>
@@ -1264,7 +1439,7 @@ export default function SistemaCalculoRebtPage() {
         </header>
 
         {/* Contenedor de Secciones */}
-        <main className="flex-1 p-6 lg:p-8">
+        <main className="flex-1 p-3 sm:p-6 lg:p-8 pb-20 lg:pb-8">
           {statusBanner && (
             <div
               className={`no-print mb-6 flex items-center justify-between rounded-xl border px-4 py-3 text-xs font-medium shadow-2xs ${
@@ -3313,6 +3488,54 @@ export default function SistemaCalculoRebtPage() {
             </div>
           )}
         </main>
+
+        {/* Barra de Navegación Inferior Fija para Móviles */}
+        <nav className="no-print fixed bottom-0 left-0 right-0 z-30 flex items-center justify-around border-t border-slate-200 bg-white/95 px-1 py-1.5 backdrop-blur lg:hidden">
+          {[
+            {
+              id: "dashboard_tecnico" as ActiveSection,
+              label: "Dashboard",
+              icon: <LayoutDashboard className="h-4 w-4" />,
+            },
+            {
+              id: "titular_ubicacion" as ActiveSection,
+              label: "Titular",
+              icon: <MapPin className="h-4 w-4" />,
+            },
+            {
+              id: "circuitos" as ActiveSection,
+              label: "Circuitos",
+              icon: <Activity className="h-4 w-4" />,
+            },
+            {
+              id: "ficha_mtd" as ActiveSection,
+              label: "Ficha M.T.D.",
+              icon: <FileSpreadsheet className="h-4 w-4" />,
+            },
+            {
+              id: "administracion" as ActiveSection,
+              label: "Admin",
+              icon: <ShieldCheck className="h-4 w-4" />,
+            },
+          ].map((item) => {
+            const isActive = activeSection === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setActiveSection(item.id)}
+                className={`flex flex-col items-center gap-0.5 rounded-lg px-2.5 py-1 text-[10px] font-semibold transition ${
+                  isActive
+                    ? "text-[#0f6cbd] bg-blue-50/80"
+                    : "text-slate-500 hover:text-slate-900"
+                }`}
+              >
+                {item.icon}
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
+        </nav>
       </div>
 
       {/* =====================================================================

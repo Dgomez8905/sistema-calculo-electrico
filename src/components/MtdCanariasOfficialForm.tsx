@@ -613,9 +613,9 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
       </div>
 
       {/* =====================================================================
-          COLUMNA DERECHA: DOCUMENTO OFICIAL M.T.D. B.T. (SIN SCROLL EXTRA)
+          COLUMNA DERECHA: DOCUMENTO OFICIAL M.T.D. B.T. (RESPONSIVE EN MÓVIL Y ESCRITORIO)
          ===================================================================== */}
-      <div className="min-w-0 flex-1 space-y-6">
+      <div className="min-w-0 flex-1 space-y-6 overflow-x-auto pb-4">
 
       {/* =====================================================================
           PÁGINA 1/11: DATOS TITULAR, UBICACIÓN Y CARACTERÍSTICAS ELÉCTRICAS
