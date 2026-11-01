@@ -50,6 +50,7 @@ import {
 import SectionHistoryRegistry, {
   SavedHistoryRecord,
 } from "@/components/SectionHistoryRegistry";
+import GoogleSelect from "@/components/GoogleSelect";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 
 type ActiveSection =
@@ -1213,7 +1214,8 @@ export default function SistemaCalculoRebtPage() {
                 {currentUser?.full_name.charAt(0).toUpperCase()}
               </div>
               <div className="min-w-0">
-                <select
+                <GoogleSelect
+                  variant="ghost"
                   value={currentUser?.id || 1}
                   onChange={(e) => {
                     const target = users.find(
@@ -1221,7 +1223,7 @@ export default function SistemaCalculoRebtPage() {
                     );
                     if (target) switchActiveUser(target);
                   }}
-                  className="block max-w-[210px] truncate bg-transparent text-xs font-bold text-slate-900 focus:outline-none cursor-pointer"
+                  className="max-w-[220px]"
                   title="Cambiar cuenta activa (Multitenant)"
                 >
                   {users
@@ -1231,7 +1233,7 @@ export default function SistemaCalculoRebtPage() {
                         {u.full_name}
                       </option>
                     ))}
-                </select>
+                </GoogleSelect>
                 <div className="flex items-center gap-1 text-[10px] text-slate-500">
                   <Building className="h-2.5 w-2.5 text-[#0f6cbd]" />
                   <span className="truncate max-w-[180px]">
@@ -1325,14 +1327,14 @@ export default function SistemaCalculoRebtPage() {
                 <div className="flex flex-wrap items-center gap-2.5">
                   {(currentUser.role === "super_admin" ||
                     currentUser.role === "admin_empresa") && (
-                    <select
+                    <GoogleSelect
                       value={isolationScope}
                       onChange={(e) =>
                         setIsolationScope(
                           e.target.value as "strict_user" | "tenant_shared"
                         )
                       }
-                      className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700"
+                      className="min-w-[260px]"
                     >
                       <option value="strict_user">
                         Vista Estricta: Solo mis reportes ({currentUser.full_name})
@@ -1340,7 +1342,7 @@ export default function SistemaCalculoRebtPage() {
                       <option value="tenant_shared">
                         Vista Empresa: Todos los de {currentTenant.name}
                       </option>
-                    </select>
+                    </GoogleSelect>
                   )}
 
                   <button
@@ -1685,12 +1687,12 @@ export default function SistemaCalculoRebtPage() {
                       <label className="block text-[11px] font-semibold text-slate-700">
                         Isla
                       </label>
-                      <select
+                      <GoogleSelect
                         value={mtdMeta.isla}
                         onChange={(e) =>
                           setMtdMeta((p) => ({ ...p, isla: e.target.value }))
                         }
-                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
+                        className="mt-1"
                       >
                         <option value="Tenerife">Tenerife</option>
                         <option value="Gran Canaria">Gran Canaria</option>
@@ -1699,7 +1701,7 @@ export default function SistemaCalculoRebtPage() {
                         <option value="La Palma">La Palma</option>
                         <option value="La Gomera">La Gomera</option>
                         <option value="El Hierro">El Hierro</option>
-                      </select>
+                      </GoogleSelect>
                     </div>
 
                     <div>
@@ -1784,7 +1786,7 @@ export default function SistemaCalculoRebtPage() {
                         <label className="block text-[11px] font-semibold text-slate-700">
                           Modalidad de Firma
                         </label>
-                        <select
+                        <GoogleSelect
                           value={mtdMeta.autorTipo}
                           onChange={(e) =>
                             setMtdMeta((p) => ({
@@ -1794,7 +1796,7 @@ export default function SistemaCalculoRebtPage() {
                                 | "tecnico_competente",
                             }))
                           }
-                          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900"
+                          className="mt-1"
                         >
                           <option value="instalador_ph">
                             Instalador Autorizado (Profesional Habilitado PH)
@@ -1802,7 +1804,7 @@ export default function SistemaCalculoRebtPage() {
                           <option value="tecnico_competente">
                             Técnico Competente Colegiado
                           </option>
-                        </select>
+                        </GoogleSelect>
                       </div>
 
                       <div>
@@ -2063,29 +2065,29 @@ export default function SistemaCalculoRebtPage() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                  <select
+                  <GoogleSelect
                     value={supplyType}
                     onChange={(e) =>
                       setSupplyType(e.target.value as SystemSupplyType)
                     }
-                    className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700"
+                    className="w-44"
                   >
                     <option value="monofasico_230v">Monofásico 230 V</option>
                     <option value="trifasico_400v">Trifásico 400 V</option>
-                  </select>
+                  </GoogleSelect>
 
-                  <select
+                  <GoogleSelect
                     value={diType}
                     onChange={(e) =>
                       setDiType(e.target.value as "di_concentrada" | "di_unico")
                     }
-                    className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700"
+                    className="w-64"
                   >
                     <option value="di_concentrada">
                       DI Contadores Concentrados (ΔU 1,0%)
                     </option>
                     <option value="di_unico">DI Único Usuario (ΔU 1,5%)</option>
-                  </select>
+                  </GoogleSelect>
 
                   <button
                     type="button"
@@ -2149,8 +2151,8 @@ export default function SistemaCalculoRebtPage() {
                               className="w-48 rounded border border-slate-300 bg-white px-2 py-1 text-slate-900"
                             />
                           </td>
-                          <td className="px-2.5 py-2">
-                            <select
+                          <td className="px-2.5 py-2 min-w-[140px]">
+                            <GoogleSelect
                               value={c.usageType}
                               onChange={(e) =>
                                 updateCircuit(
@@ -2159,7 +2161,6 @@ export default function SistemaCalculoRebtPage() {
                                   e.target.value as CircuitUsageType
                                 )
                               }
-                              className="rounded border border-slate-300 bg-white px-1.5 py-1 text-slate-800"
                             >
                               <option value="vivienda_interior">
                                 Vivienda (3%)
@@ -2173,10 +2174,10 @@ export default function SistemaCalculoRebtPage() {
                               </option>
                               <option value="motor">Motor x1,25 (5%)</option>
                               <option value="recarga_ve">Recarga VE (5%)</option>
-                            </select>
+                            </GoogleSelect>
                           </td>
-                          <td className="px-2.5 py-2">
-                            <select
+                          <td className="px-2.5 py-2 min-w-[100px]">
+                            <GoogleSelect
                               value={c.phaseSystem}
                               onChange={(e) =>
                                 updateCircuit(
@@ -2185,11 +2186,10 @@ export default function SistemaCalculoRebtPage() {
                                   e.target.value as "monofasico" | "trifasico"
                                 )
                               }
-                              className="rounded border border-slate-300 bg-white px-1.5 py-1 text-slate-800"
                             >
                               <option value="monofasico">230V 1F</option>
                               <option value="trifasico">400V 3F</option>
-                            </select>
+                            </GoogleSelect>
                           </td>
                           <td className="px-2.5 py-2">
                             <input
@@ -2222,9 +2222,9 @@ export default function SistemaCalculoRebtPage() {
                               className="w-14 rounded border border-slate-300 bg-white px-1.5 py-1 text-right text-slate-900"
                             />
                           </td>
-                          <td className="px-2.5 py-2">
+                          <td className="px-2.5 py-2 min-w-[165px]">
                             <div className="flex items-center gap-1">
-                              <select
+                              <GoogleSelect
                                 value={c.insulationType}
                                 onChange={(e) =>
                                   updateCircuit(
@@ -2233,12 +2233,11 @@ export default function SistemaCalculoRebtPage() {
                                     e.target.value as InsulationType
                                   )
                                 }
-                                className="rounded border border-slate-300 bg-white px-1 py-1 text-slate-800"
                               >
                                 <option value="PVC_70">PVC 70°C</option>
                                 <option value="XLPE_90">XLPE 90°C</option>
-                              </select>
-                              <select
+                              </GoogleSelect>
+                              <GoogleSelect
                                 value={c.installationMethod}
                                 onChange={(e) =>
                                   updateCircuit(
@@ -2247,11 +2246,10 @@ export default function SistemaCalculoRebtPage() {
                                     e.target.value as InstallationMethod
                                   )
                                 }
-                                className="rounded border border-slate-300 bg-white px-1 py-1 text-slate-800"
                               >
                                 <option value="B1">B1</option>
                                 <option value="E">E/F</option>
-                              </select>
+                              </GoogleSelect>
                             </div>
                           </td>
                           <td className="px-2.5 py-2 text-right font-mono text-slate-700">
@@ -2678,27 +2676,27 @@ export default function SistemaCalculoRebtPage() {
                     <label className="block text-xs font-semibold text-slate-700">
                       Sensibilidad Diferencial IΔn [mA]
                     </label>
-                    <select
+                    <GoogleSelect
                       value={rcdSensitivityMa}
                       onChange={(e) =>
                         setRcdSensitivityMa(
                           Number(e.target.value) as 30 | 100 | 300 | 500
                         )
                       }
-                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
+                      className="mt-1"
                     >
                       <option value={30}>30 mA</option>
                       <option value={100}>100 mA</option>
                       <option value={300}>300 mA</option>
                       <option value={500}>500 mA</option>
-                    </select>
+                    </GoogleSelect>
                   </div>
 
                   <div>
                     <label className="block text-xs font-semibold text-slate-700">
                       Tensión Límite de Contacto UL
                     </label>
-                    <select
+                    <GoogleSelect
                       value={maxContactVoltageV}
                       onChange={(e) => {
                         const v = Number(e.target.value) as 50 | 24;
@@ -2708,11 +2706,11 @@ export default function SistemaCalculoRebtPage() {
                           tensionSeguridad: v,
                         }));
                       }}
-                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
+                      className="mt-1"
                     >
                       <option value={50}>50 V (Locales secos)</option>
                       <option value={24}>24 V (Locales húmedos)</option>
-                    </select>
+                    </GoogleSelect>
                   </div>
                 </div>
 
@@ -2734,12 +2732,12 @@ export default function SistemaCalculoRebtPage() {
                   <label className="block text-xs font-semibold text-slate-700">
                     Grupo de Instalación según ITC-BT-04
                   </label>
-                  <select
+                  <GoogleSelect
                     value={itc04Group}
                     onChange={(e) =>
                       setItc04Group(e.target.value as Itc04GroupCode)
                     }
-                    className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
+                    className="mt-1"
                   >
                     <option value="f_vivienda_unifamiliar">
                       Grupo f) Vivienda unifamiliar (M.T.D. hasta 50 kW)
@@ -2765,7 +2763,7 @@ export default function SistemaCalculoRebtPage() {
                     <option value="z_recarga_ve_interior">
                       Grupo z) Recarga de Vehículo Eléctrico (M.T.D. hasta 50 kW)
                     </option>
-                  </select>
+                  </GoogleSelect>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -2957,31 +2955,31 @@ export default function SistemaCalculoRebtPage() {
                       <label className="block text-xs font-semibold text-slate-700">
                         Empresa / Organización (Tenant)
                       </label>
-                      <select
+                      <GoogleSelect
                         value={newUserTenantId}
                         onChange={(e) =>
                           setNewUserTenantId(Number(e.target.value))
                         }
-                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
+                        className="mt-1"
                       >
                         {tenants.map((t) => (
                           <option key={t.id} value={t.id}>
                             {t.name} ({t.isla})
                           </option>
                         ))}
-                      </select>
+                      </GoogleSelect>
                     </div>
 
                     <div>
                       <label className="block text-xs font-semibold text-slate-700">
                         Rol de Permisología (RBAC)
                       </label>
-                      <select
+                      <GoogleSelect
                         value={newUserRole}
                         onChange={(e) =>
                           setNewUserRole(e.target.value as UserRole)
                         }
-                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
+                        className="mt-1"
                       >
                         <option value="ingeniero_instalador">
                           Ingeniero / Instalador Autorizado PH
@@ -2995,7 +2993,7 @@ export default function SistemaCalculoRebtPage() {
                         <option value="super_admin">
                           Super Administrador Global
                         </option>
-                      </select>
+                      </GoogleSelect>
                     </div>
 
                     <div>
@@ -3091,10 +3089,10 @@ export default function SistemaCalculoRebtPage() {
                       <label className="block text-xs font-semibold text-slate-700">
                         Isla Principal
                       </label>
-                      <select
+                      <GoogleSelect
                         value={newTenantIsla}
                         onChange={(e) => setNewTenantIsla(e.target.value)}
-                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
+                        className="mt-1"
                       >
                         <option value="Tenerife">Tenerife</option>
                         <option value="Gran Canaria">Gran Canaria</option>
@@ -3103,7 +3101,7 @@ export default function SistemaCalculoRebtPage() {
                         <option value="La Palma">La Palma</option>
                         <option value="La Gomera">La Gomera</option>
                         <option value="El Hierro">El Hierro</option>
-                      </select>
+                      </GoogleSelect>
                     </div>
                   </div>
 
