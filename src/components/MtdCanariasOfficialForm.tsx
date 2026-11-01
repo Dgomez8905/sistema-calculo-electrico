@@ -8,102 +8,104 @@ import {
   Layers,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   FileText,
+  User,
+  Building2,
+  Factory,
+  Zap,
+  Calculator,
+  Sliders,
+  GitBranch,
+  MapPin,
+  LayoutGrid,
+  PenTool,
+  Shield,
+  Check,
 } from "lucide-react";
 
 const MTD_SHEETS_CATALOG: {
   page: number;
-  shortTitle: string;
-  fullLabel: string;
+  title: string;
   collectedInfo: string;
+  icon: React.ReactNode;
 }[] = [
   {
     page: 1,
-    shortTitle: "Datos del Titular, Ubicación y Características Eléctricas",
-    fullLabel:
-      "Hoja 1/11 — Datos del Titular, Ubicación, Canalizaciones, Protecciones y Tierra",
+    title: "Datos del Titular, Ubicación, Canalizaciones, Protecciones y Tierra",
     collectedInfo:
       "Recolecta NIF/CIF del titular, dirección, uso, potencias, acometida, LGA, D.I., IGA, diferenciales y puesta a tierra.",
+    icon: <User className="h-4 w-4" />,
   },
   {
     page: 2,
-    shortTitle: "Previsión de Potencia: Viviendas y Servicios Generales",
-    fullLabel:
-      "Hoja 2/11 — Previsión de Potencia de Viviendas y Servicios Generales (ITC-BT-10)",
+    title: "Previsión de Potencia de Viviendas y Servicios Generales (ITC-BT-10)",
     collectedInfo:
       "Recolecta nº de viviendas (básica/elevada), coeficiente de simultaneidad, ascensores, grupo de presión y alumbrado común.",
+    icon: <Building2 className="h-4 w-4" />,
   },
   {
     page: 3,
-    shortTitle: "Previsión de Potencia: Oficinas, Locales, Garajes e Industrias",
-    fullLabel:
-      "Hoja 3/11 — Previsión de Potencia en Oficinas, Locales, Garajes e Industrias",
+    title: "Previsión de Potencia en Oficinas, Locales, Garajes e Industrias",
     collectedInfo:
       "Recolecta superficies y potencias previstas de locales comerciales, oficinas, garajes (ventilación natural/forzada) y naves.",
+    icon: <Factory className="h-4 w-4" />,
   },
   {
     page: 4,
-    shortTitle: "Relación de Receptores de Alumbrado y Fuerza Motriz",
-    fullLabel:
-      "Hoja 4/11 — Cuadro de Receptores de Alumbrado, Fuerza y Presupuesto",
+    title: "Cuadro de Receptores de Alumbrado, Fuerza y Presupuesto",
     collectedInfo:
       "Recolecta el desglose de lámparas/luminarias, motores, tomas de fuerza, factor de potencia y presupuesto total de la obra.",
+    icon: <Zap className="h-4 w-4" />,
   },
   {
     page: 5,
-    shortTitle: "Memoria Descriptiva de la Instalación de Baja Tensión",
-    fullLabel:
-      "Hoja 5/11 — Memoria Descriptiva Reglamentaria (REBT e ITC-BT)",
+    title: "Memoria Descriptiva Reglamentaria (REBT e ITC-BT)",
     collectedInfo:
       "Recolecta la descripción técnica del objeto, suministro, instalaciones de enlace, cuadro de mando y puesta a tierra.",
+    icon: <FileText className="h-4 w-4" />,
   },
   {
     page: 6,
-    shortTitle: "Cálculos Justificativos de Líneas y Circuitos (Parte I)",
-    fullLabel:
-      "Hoja 6/11 — Tabla de Cálculos Eléctricos: LGA, D.I. y Circuitos C1 a C5",
+    title: "Tabla de Cálculos Eléctricos: LGA, D.I. y Circuitos C1 a C5",
     collectedInfo:
       "Recolecta potencia de cálculo, tensión, intensidad Ib, sección (mm²), PIA, caída de tensión ΔU% y diámetro de tubo.",
+    icon: <Calculator className="h-4 w-4" />,
   },
   {
     page: 7,
-    shortTitle: "Cálculos Justificativos de Líneas y Circuitos (Parte II)",
-    fullLabel:
-      "Hoja 7/11 — Tabla de Cálculos Eléctricos: Circuitos Adicionales y Recarga VE",
+    title: "Tabla de Cálculos Eléctricos: Circuitos Adicionales y Recarga VE",
     collectedInfo:
       "Recolecta el cálculo de circuitos de electrificación elevada (C6 a C12), recarga de vehículo eléctrico (C13) y subcuadros.",
+    icon: <Sliders className="h-4 w-4" />,
   },
   {
     page: 8,
-    shortTitle: "Esquema Unifilar del Cuadro General de Mando y Protección",
-    fullLabel:
-      "Hoja 8/11 — Esquema Unifilar de Protecciones (CGMP, IGA, Diferenciales y PIAs)",
+    title: "Esquema Unifilar de Protecciones (CGMP, IGA, Diferenciales y PIAs)",
     collectedInfo:
       "Recolecta el diagrama unifilar reglamentario desde acometida/contador hasta cada circuito interior y sus calibres.",
+    icon: <GitBranch className="h-4 w-4" />,
   },
   {
     page: 9,
-    shortTitle: "Croquis de Situación y Emplazamiento de la Instalación",
-    fullLabel:
-      "Hoja 9/11 — Croquis de Situación, Emplazamiento y Punto de Suministro",
+    title: "Croquis de Situación, Emplazamiento y Punto de Suministro",
     collectedInfo:
       "Recolecta el plano de localización geográfica del inmueble, callejero, coordenadas UTM y punto de conexión a la red.",
+    icon: <MapPin className="h-4 w-4" />,
   },
   {
     page: 10,
-    shortTitle: "Plano en Planta y Trazado de la Instalación Eléctrica",
-    fullLabel:
-      "Hoja 10/11 — Croquis de Trazado en Planta, Ubicación de CGP, CGMP y Tomas",
+    title: "Croquis de Trazado en Planta, Ubicación de CGP, CGMP y Tomas",
     collectedInfo:
       "Recolecta la distribución en planta de puntos de luz, interruptores, tomas de corriente, cuadro general y canalizaciones.",
+    icon: <LayoutGrid className="h-4 w-4" />,
   },
   {
     page: 11,
-    shortTitle: "Autoría, Firma del Profesional Habilitado / Técnico y Notas",
-    fullLabel:
-      "Hoja 11/11 — Declaración del Autor (Instalador PH / Técnico) y Notas Oficiales",
+    title: "Declaración del Autor (Instalador PH / Técnico) y Notas Oficiales",
     collectedInfo:
       "Recolecta los datos del Profesional Habilitado o Técnico Competente firmante, empresa instaladora, fecha/lugar y notas.",
+    icon: <PenTool className="h-4 w-4" />,
   },
 ];
 import {
@@ -181,6 +183,8 @@ export default function MtdCanariasOfficialForm({
 }: MtdCanariasProps) {
   const [selectedPage, setSelectedPage] = useState<number | "all">("all");
   const [showPreview, setShowPreview] = useState<boolean>(true);
+  const [isSheetDropdownOpen, setIsSheetDropdownOpen] =
+    useState<boolean>(false);
 
   const updateField = <K extends keyof MtdFormMetadata>(
     key: K,
@@ -246,10 +250,9 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
     <div className="mb-3 flex items-start justify-between border-b-2 border-black pb-2 text-black">
       <div className="flex items-start gap-4">
         <div className="flex flex-col items-center">
-          <div className="flex h-10 w-10 items-center justify-center rounded border border-black bg-slate-100 text-[10px] font-bold leading-tight text-black">
-            👑
-            <br />
-            CAN
+          <div className="flex h-10 w-10 flex-col items-center justify-center rounded border border-black bg-slate-100 text-[10px] font-bold leading-tight text-black">
+            <Shield className="h-3.5 w-3.5 text-black" />
+            <span>CAN</span>
           </div>
           <span className="mt-0.5 text-[11px] font-bold leading-none">
             Gobierno
@@ -431,37 +434,111 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
         </div>
       </div>
 
-      {/* Selector Desplegable (Dropdown) de Hojas según la Información que Recolecta */}
+      {/* Selector Desplegable (Dropdown) de Hojas con Iconos Minimalistas y Sin Emojis */}
       {showPreview && (
         <div className="no-print rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
           <div className="flex flex-wrap items-center justify-between gap-4">
-            {/* Dropdown principal de Hojas */}
-            <div className="flex flex-1 flex-wrap items-center gap-3 min-w-[280px]">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#e8f0fe] text-[#0f6cbd]">
-                <FileText className="h-4 w-4" />
-              </div>
-              <div className="flex-1 min-w-[240px] max-w-2xl">
-                <label className="block text-[11px] font-bold uppercase tracking-wide text-slate-500">
-                  Seleccionar Hoja de la Ficha M.T.D. según su Contenido
-                </label>
-                <select
-                  value={selectedPage === "all" ? "all" : String(selectedPage)}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setSelectedPage(val === "all" ? "all" : Number(val));
-                  }}
-                  className="mt-1 w-full rounded-lg border border-slate-300 bg-slate-50/70 px-3 py-2 text-xs font-bold text-slate-900 shadow-2xs transition focus:border-[#0f6cbd] focus:bg-white focus:outline-none cursor-pointer"
-                >
-                  <option value="all">
-                    📑 Vista Completa (Hojas 1 a 11) — Expediente M.T.D. B.T. Completo
-                  </option>
-                  {MTD_SHEETS_CATALOG.map((sheet) => (
-                    <option key={sheet.page} value={sheet.page}>
-                      {sheet.fullLabel}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            {/* Dropdown Minimalista con Iconos SVG */}
+            <div className="relative flex-1 min-w-[280px] max-w-2xl">
+              <label className="block text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                Seleccionar Apartado de la Ficha M.T.D. según su Contenido
+              </label>
+
+              <button
+                type="button"
+                onClick={() => setIsSheetDropdownOpen((prev) => !prev)}
+                className="mt-1.5 flex w-full items-center justify-between gap-3 rounded-lg border border-slate-300 bg-slate-50/70 px-3.5 py-2 text-left text-xs font-semibold text-slate-900 shadow-2xs transition hover:bg-white focus:border-[#0f6cbd] focus:outline-none"
+              >
+                <span className="flex items-center gap-2.5 truncate">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[#e8f0fe] text-[#0f6cbd]">
+                    {selectedPage === "all" ? (
+                      <Layers className="h-3.5 w-3.5" />
+                    ) : (
+                      MTD_SHEETS_CATALOG.find((s) => s.page === selectedPage)
+                        ?.icon
+                    )}
+                  </span>
+                  <span className="truncate">
+                    {selectedPage === "all"
+                      ? "Vista Completa — Expediente M.T.D. B.T. Completo"
+                      : MTD_SHEETS_CATALOG.find((s) => s.page === selectedPage)
+                          ?.title}
+                  </span>
+                </span>
+                <ChevronDown
+                  className={`h-4 w-4 shrink-0 text-slate-500 transition-transform ${
+                    isSheetDropdownOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+
+              {isSheetDropdownOpen && (
+                <div className="absolute left-0 z-30 mt-1.5 max-h-96 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedPage("all");
+                      setIsSheetDropdownOpen(false);
+                    }}
+                    className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-xs transition ${
+                      selectedPage === "all"
+                        ? "bg-[#e8f0fe] font-bold text-[#0f6cbd]"
+                        : "font-medium text-slate-700 hover:bg-slate-100"
+                    }`}
+                  >
+                    <span className="flex items-center gap-2.5 truncate">
+                      <Layers
+                        className={`h-4 w-4 shrink-0 ${
+                          selectedPage === "all"
+                            ? "text-[#0f6cbd]"
+                            : "text-slate-500"
+                        }`}
+                      />
+                      <span className="truncate">
+                        Vista Completa — Expediente M.T.D. B.T. Completo
+                      </span>
+                    </span>
+                    {selectedPage === "all" && (
+                      <Check className="h-3.5 w-3.5 shrink-0 text-[#0f6cbd]" />
+                    )}
+                  </button>
+
+                  <div className="my-1 border-t border-slate-100" />
+
+                  {MTD_SHEETS_CATALOG.map((sheet) => {
+                    const isActive = selectedPage === sheet.page;
+                    return (
+                      <button
+                        key={sheet.page}
+                        type="button"
+                        onClick={() => {
+                          setSelectedPage(sheet.page);
+                          setIsSheetDropdownOpen(false);
+                        }}
+                        className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-xs transition ${
+                          isActive
+                            ? "bg-[#e8f0fe] font-bold text-[#0f6cbd]"
+                            : "font-medium text-slate-700 hover:bg-slate-100"
+                        }`}
+                      >
+                        <span className="flex items-center gap-2.5 truncate">
+                          <span
+                            className={`shrink-0 ${
+                              isActive ? "text-[#0f6cbd]" : "text-slate-500"
+                            }`}
+                          >
+                            {sheet.icon}
+                          </span>
+                          <span className="truncate">{sheet.title}</span>
+                        </span>
+                        {isActive && (
+                          <Check className="h-3.5 w-3.5 shrink-0 text-[#0f6cbd]" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {/* Controles rápidos de Navegación entre Hojas */}
@@ -479,7 +556,7 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
                 className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-40"
               >
                 <ChevronLeft className="h-3.5 w-3.5" />
-                Hoja Anterior
+                Anterior
               </button>
 
               <button
@@ -494,7 +571,7 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
                 disabled={selectedPage === 11}
                 className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-40"
               >
-                Hoja Siguiente
+                Siguiente
                 <ChevronRight className="h-3.5 w-3.5" />
               </button>
 
@@ -505,7 +582,7 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
                   className="inline-flex items-center gap-1.5 rounded-lg bg-[#e8f0fe] px-3 py-2 text-xs font-semibold text-[#0f6cbd] transition hover:bg-blue-100"
                 >
                   <Layers className="h-3.5 w-3.5" />
-                  Ver las 11 Hojas
+                  Vista Completa
                 </button>
               )}
             </div>
@@ -516,14 +593,14 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
             {selectedPage === "all" ? (
               <span>
                 <strong className="text-[#0f6cbd]">
-                  Mostrando las 11 hojas oficiales:
+                  Mostrando el documento oficial completo:
                 </strong>{" "}
-                Titular y Características (1), Previsión Viviendas/Edificio (2-3), Receptores (4), Memoria Descriptiva (5), Cálculos de Circuitos (6-7), Esquema Unifilar (8), Croquis y Plano (9-10) y Firma del Autor (11).
+                Datos del Titular y Características, Previsión de Cargas, Cuadro de Receptores, Memoria Descriptiva, Cálculos de Circuitos, Esquema Unifilar, Croquis, Plano en Planta y Declaración del Autor.
               </span>
             ) : (
               <span>
                 <strong className="text-[#0f6cbd]">
-                  Información que recolecta la Hoja {selectedPage}/11:
+                  Información recolectada en esta sección:
                 </strong>{" "}
                 {
                   MTD_SHEETS_CATALOG.find((s) => s.page === selectedPage)
