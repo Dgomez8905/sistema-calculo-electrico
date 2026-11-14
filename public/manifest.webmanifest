@@ -1,0 +1,18 @@
+{
+  "name": "REBT Cloud & MONPIX Suite — Electricistas Instaladores",
+  "short_name": "REBT Suite",
+  "description": "De la obra a la oficina: cálculos REBT paso a paso, esquemas unifilares A3/CAD, boletines CIE/MTD 19 CCAA, presupuestos, facturas VeriFactu, gastos y equipo.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#0f6cbd",
+  "lang": "es-ES",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    }
+  ]
+}
+

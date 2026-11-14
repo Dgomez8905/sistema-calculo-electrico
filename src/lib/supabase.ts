@@ -12,6 +12,12 @@ export const isSupabaseConfigured = Boolean(
 );
 
 export const supabase = isSupabaseConfigured
-  ? createClient(supabaseUrl, supabaseAnonKey)
+  ? createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: typeof window !== "undefined",
+        autoRefreshToken: typeof window !== "undefined",
+        detectSessionInUrl: typeof window !== "undefined",
+      },
+    })
   : null;
 

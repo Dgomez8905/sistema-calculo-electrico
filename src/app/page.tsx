@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback } from "react";
+import dynamic from "next/dynamic";
 import {
   Zap,
   Plus,
@@ -28,6 +29,20 @@ import {
   Menu,
   X,
   Home,
+  Calculator,
+  GitBranch,
+  Tag,
+  ClipboardCheck,
+  Briefcase,
+  CheckSquare,
+  GraduationCap,
+  Search,
+  Sun,
+  Moon,
+  MessageSquareText,
+  WifiOff,
+  RefreshCw,
+  ArrowRight,
 } from "lucide-react";
 import {
   RebtCircuitInput,
@@ -56,14 +71,52 @@ import SectionHistoryRegistry, {
 import GoogleSelect from "@/components/GoogleSelect";
 import LandingAndAuthView from "@/components/LandingAndAuthView";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { useMonpixWorkspace } from "@/lib/monpix-store";
+import {
+  answerRebtQuestion,
+  ORIENTATIVE_DISCLAIMER,
+  type RebtQaResponse,
+} from "@/lib/monpix-engine";
+import AsistenteMonpixFloating from "@/components/monpix/AsistenteMonpixFloating";
+import ExpedientesSection from "@/components/sections/ExpedientesSection";
+import AdminRbacSection from "@/components/sections/AdminRbacSection";
 
-type ActiveSection =
+const CalculadorasObraView = dynamic(
+  () => import("@/components/monpix/CalculadorasObraView")
+);
+const UnifilarCuadroView = dynamic(
+  () => import("@/components/monpix/UnifilarCuadroView")
+);
+const PresupuestosPlanoView = dynamic(
+  () => import("@/components/monpix/PresupuestosPlanoView")
+);
+const TramitesOcaCatastroView = dynamic(
+  () => import("@/components/monpix/TramitesOcaCatastroView")
+);
+const OficinaGastosView = dynamic(
+  () => import("@/components/monpix/OficinaGastosView")
+);
+const TareasEquipoView = dynamic(
+  () => import("@/components/monpix/TareasEquipoView")
+);
+const AprenderSimuladorView = dynamic(
+  () => import("@/components/monpix/AprenderSimuladorView")
+);
+
+export type ActiveSection =
   | "dashboard_tecnico"
   | "expedientes"
   | "titular_ubicacion"
   | "circuitos"
+  | "calculadoras_obra"
+  | "unifilar_cuadro"
   | "edificio_itc10"
   | "tierras_legalizacion"
+  | "tramites_oca"
+  | "presupuestos_plano"
+  | "oficina_gastos"
+  | "tareas_equipo"
+  | "aprender"
   | "ficha_mtd"
   | "administracion";
 
@@ -212,6 +265,57 @@ export default function SistemaCalculoRebtPage() {
     [tenants, currentUser]
   );
 
+  // Estado aislado MONPIX (Oficina, Presupuestos, VeriFactu, Gastos, Tareas, Fichaje, Unifilares)
+  const {
+    workspace: monpixWorkspace,
+    updateWorkspace: updateMonpixWorkspace,
+    lastAutoSavedAt,
+    isOnline,
+    pendingSyncCount,
+  } = useMonpixWorkspace({
+    tenantId: currentTenant?.id || 1,
+    userId: currentUser?.id || 1,
+    tenantName: currentTenant?.name || "Empresa Instaladora",
+    islaOrRegion: currentTenant?.isla || "Tenerife",
+  });
+
+  // Tema Claro / Oscuro y registro PWA offline
+  const [darkMode, setDarkMode] = useState<boolean>(false);
+  const [globalSearch, setGlobalSearch] = useState<string>("");
+  const [homeRebtQuery, setHomeRebtQuery] = useState<string>("");
+  const [homeRebtAnswer, setHomeRebtAnswer] = useState<RebtQaResponse | null>(
+    null
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const savedTheme = window.localStorage.getItem("rebt_monpix_dark_mode");
+    if (savedTheme === "1") {
+      setDarkMode(true);
+    }
+    if ("serviceWorker" in navigator) {
+      const isLocalDev =
+        window.location.hostname === "localhost" ||
+        window.location.hostname === "127.0.0.1";
+      if (isLocalDev || process.env.NODE_ENV !== "production") {
+        navigator.serviceWorker
+          .getRegistrations()
+          .then((regs) => regs.forEach((r) => r.unregister()))
+          .catch(() => undefined);
+      } else {
+        navigator.serviceWorker.register("/sw.js").catch(() => undefined);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    document.documentElement.classList.toggle("monpix-dark", darkMode);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("rebt_monpix_dark_mode", darkMode ? "1" : "0");
+    }
+  }, [darkMode]);
+
   //Formularios de Creación en el Apartado Administrativo
   const [newTenantName, setNewTenantName] = useState("");
   const [newTenantCif, setNewTenantCif] = useState("");
@@ -287,6 +391,8 @@ export default function SistemaCalculoRebtPage() {
     text: string;
   } | null>(null);
   const [allProjects, setAllProjects] = useState<SavedProjectRow[]>([]);
+  const [panelOverrideIgaAmps, setPanelOverrideIgaAmps] = useState<number | null>(null);
+  const [panelOverrideRcdCount, setPanelOverrideRcdCount] = useState<number | null>(null);
 
   const generalServicesW = commonLightingW + hydroW + otherServicesW;
 
@@ -308,15 +414,20 @@ export default function SistemaCalculoRebtPage() {
     );
 
     const minNormativeWatts = electrificationGrade === "elevada" ? 9200 : 5750;
-    const contractDesignWatts = Math.max(totalDesignWatts, minNormativeWatts);
-
     const supplyVoltage = supplyType === "trifasico_400v" ? 400 : 230;
     const denom =
       supplyType === "trifasico_400v" ? Math.sqrt(3) * 400 : 230;
-    const designCurrentAmps = Number((contractDesignWatts / denom).toFixed(2));
 
-    const igaAmps =
-      REBT_PIA_RATINGS.find((r) => r >= designCurrentAmps && r >= 25) || 63;
+    const baseContractWatts = Math.max(totalDesignWatts, minNormativeWatts);
+    const baseDesignCurrentAmps = Number((baseContractWatts / denom).toFixed(2));
+    const autoIgaAmps =
+      REBT_PIA_RATINGS.find((r) => r >= baseDesignCurrentAmps && r >= 25) || 63;
+
+    const igaAmps = panelOverrideIgaAmps ?? autoIgaAmps;
+    const contractDesignWatts = panelOverrideIgaAmps
+      ? Math.round(panelOverrideIgaAmps * denom)
+      : baseContractWatts;
+    const designCurrentAmps = Number((contractDesignWatts / denom).toFixed(2));
 
     const hasEvCircuitC13 = calculatedCircuits.some(
       (c) => c.usageType === "recarga_ve" || c.code.toUpperCase() === "C13"
@@ -324,8 +435,9 @@ export default function SistemaCalculoRebtPage() {
     const interiorCount = calculatedCircuits.filter(
       (c) => c.usageType !== "recarga_ve" && c.code.toUpperCase() !== "C13"
     ).length;
-    const rcd30mACount =
+    const autoRcdCount =
       Math.max(1, Math.ceil(interiorCount / 5)) + (hasEvCircuitC13 ? 1 : 0);
+    const rcd30mACount = panelOverrideRcdCount ?? autoRcdCount;
 
     const diCalculation = calculateRebtCircuit({
       code: "DI",
@@ -367,6 +479,8 @@ export default function SistemaCalculoRebtPage() {
     supplyType,
     diLengthMeters,
     diType,
+    panelOverrideIgaAmps,
+    panelOverrideRcdCount,
   ]);
 
   // Previsión de Cargas del Edificio (ITC-BT-10 + ITC-BT-52 + ITC-BT-14)
@@ -514,6 +628,8 @@ export default function SistemaCalculoRebtPage() {
         empresaInstaladoraNum: tenant?.empresa_instaladora_num || "",
       });
       setCircuits(ITC_BT_25_TEMPLATES.slice(0, 5));
+      setPanelOverrideIgaAmps(null);
+      setPanelOverrideRcdCount(null);
     },
     []
   );
@@ -1118,52 +1234,163 @@ export default function SistemaCalculoRebtPage() {
     );
   };
 
+  type NavGroup =
+    | "1. Obra y Campo"
+    | "2. Expediente y Legalización"
+    | "3. Oficina y Almacén"
+    | "4. Formación y Admin";
+
   const navItems: {
     id: ActiveSection;
     label: string;
+    group: NavGroup;
+    keywords?: string;
     icon: React.ReactNode;
   }[] = [
     {
       id: "dashboard_tecnico",
-      label: "Dashboard",
+      label: "Inicio / Dashboard",
+      group: "1. Obra y Campo",
+      keywords: "inicio resumen kpi monitor",
       icon: <LayoutDashboard className="h-4 w-4" />,
     },
     {
       id: "expedientes",
       label: "Mis Expedientes",
+      group: "1. Obra y Campo",
+      keywords: "obras proyectos historial clientes",
       icon: <FolderOpen className="h-4 w-4" />,
     },
     {
+      id: "calculadoras_obra",
+      label: "Calculadoras de Obra",
+      group: "1. Obra y Campo",
+      keywords: "cable tubo itc-21 fases rst cgp cpm fusibles coche ve itc-52 factura luz",
+      icon: <Calculator className="h-4 w-4" />,
+    },
+    {
+      id: "unifilar_cuadro",
+      label: "Unifilar y Cuadro DIN",
+      group: "1. Obra y Campo",
+      keywords: "esquema unifilar foto voz din a3 svg cad subcuadros",
+      icon: <GitBranch className="h-4 w-4" />,
+    },
+    {
       id: "titular_ubicacion",
-      label: "Titular y Ubicación",
+      label: "1. Titular y Ubicación",
+      group: "2. Expediente y Legalización",
+      keywords: "direccion cliente nif acometida",
       icon: <MapPin className="h-4 w-4" />,
     },
     {
       id: "circuitos",
-      label: "Cuadro de Circuitos",
+      label: "2. Cuadro de Circuitos",
+      group: "2. Expediente y Legalización",
+      keywords: "pia diferencial seccion caida tension itc-bt-25",
       icon: <Activity className="h-4 w-4" />,
     },
     {
       id: "edificio_itc10",
-      label: "Previsión de Edificio",
+      label: "3. Previsión de Edificio",
+      group: "2. Expediente y Legalización",
+      keywords: "itc-bt-10 lga centralizacion viviendas garaje locales",
       icon: <Building2 className="h-4 w-4" />,
     },
     {
       id: "tierras_legalizacion",
-      label: "Tierra y Legalización",
+      label: "4. Tierra y Legalización",
+      group: "2. Expediente y Legalización",
+      keywords: "picas electrodo itc-bt-18 resistencia ra itc-bt-04",
       icon: <FileCheck2 className="h-4 w-4" />,
     },
     {
+      id: "tramites_oca",
+      label: "5. Trámites, OCA y Catastro",
+      group: "2. Expediente y Legalización",
+      keywords: "19 ccaa industria boletin cie inspeccion oca referencia catastral gps",
+      icon: <ClipboardCheck className="h-4 w-4" />,
+    },
+    {
       id: "ficha_mtd",
-      label: "Ficha Técnica M.T.D.",
+      label: "6. Ficha Técnica M.T.D.",
+      group: "2. Expediente y Legalización",
+      keywords: "memoria tecnica diseño canarias 11 paginas pdf",
       icon: <FileSpreadsheet className="h-4 w-4" />,
     },
     {
+      id: "presupuestos_plano",
+      label: "Presupuesto y Plano",
+      group: "3. Oficina y Almacén",
+      keywords: "presupuesto vivienda plano simbolos precios pedido almacen simon niessen",
+      icon: <Tag className="h-4 w-4" />,
+    },
+    {
+      id: "oficina_gastos",
+      label: "Oficina, Facturas y Pedido",
+      group: "3. Oficina y Almacén",
+      keywords: "verifactu qr factura ticket gasto rentabilidad gestoria logo pedido",
+      icon: <Briefcase className="h-4 w-4" />,
+    },
+    {
+      id: "tareas_equipo",
+      label: "Tareas, Equipo y Fichaje",
+      group: "3. Oficina y Almacén",
+      keywords: "whatsapp voz operarios fichar jornada partes firma",
+      icon: <CheckSquare className="h-4 w-4" />,
+    },
+    {
+      id: "aprender",
+      label: "Aprender y Simulador",
+      group: "4. Formación y Admin",
+      keywords: "simulador montar cuadro polimetro examen instalador",
+      icon: <GraduationCap className="h-4 w-4" />,
+    },
+    {
       id: "administracion",
-      label: "Administración",
+      label: "Administración (RBAC)",
+      group: "4. Formación y Admin",
+      keywords: "usuarios empresas permisos rbac pin",
       icon: <ShieldCheck className="h-4 w-4" />,
     },
   ];
+
+  const NAV_GROUPS: NavGroup[] = [
+    "1. Obra y Campo",
+    "2. Expediente y Legalización",
+    "3. Oficina y Almacén",
+    "4. Formación y Admin",
+  ];
+
+  const EXPEDIENTE_WIZARD_STEPS: { id: ActiveSection; stepLabel: string }[] = [
+    { id: "titular_ubicacion", stepLabel: "1. Titular" },
+    { id: "circuitos", stepLabel: "2. Circuitos" },
+    { id: "unifilar_cuadro", stepLabel: "3. Cuadro y Unifilar" },
+    { id: "presupuestos_plano", stepLabel: "4. Presupuesto" },
+    { id: "ficha_mtd", stepLabel: "5. Ficha M.T.D." },
+  ];
+  const wizardCurrentIdx = EXPEDIENTE_WIZARD_STEPS.findIndex(
+    (s) => s.id === activeSection
+  );
+
+  const globalSearchMatches = useMemo(() => {
+    const q = globalSearch.trim().toLowerCase();
+    if (!q) return { sections: [], projects: [] };
+    const sections = navItems.filter(
+      (item) =>
+        item.label.toLowerCase().includes(q) ||
+        (item.keywords && item.keywords.toLowerCase().includes(q))
+    );
+    const projects = isolatedProjects
+      .filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          p.client_name.toLowerCase().includes(q) ||
+          p.location.toLowerCase().includes(q)
+      )
+      .slice(0, 5);
+    return { sections, projects };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [globalSearch, isolatedProjects]);
 
   if (viewMode !== "app") {
     return (
@@ -1213,34 +1440,43 @@ export default function SistemaCalculoRebtPage() {
               </button>
             </div>
 
-            <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
-              {navItems.map((item) => {
-                const isActive = activeSection === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => {
-                      setActiveSection(item.id);
-                      setMobileMenuOpen(false);
-                    }}
-                    className={`flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-left text-xs transition ${
-                      isActive
-                        ? "bg-[#e8f0fe] text-[#0f6cbd] font-semibold"
-                        : "font-medium text-slate-700 hover:bg-slate-100"
-                    }`}
-                  >
-                    <span
-                      className={
-                        isActive ? "text-[#0f6cbd]" : "text-slate-500"
-                      }
-                    >
-                      {item.icon}
-                    </span>
-                    <span className="truncate">{item.label}</span>
-                  </button>
-                );
-              })}
+            <nav className="flex-1 space-y-3 overflow-y-auto px-3 py-4">
+              {NAV_GROUPS.map((group) => (
+                <div key={group} className="space-y-1">
+                  <div className="px-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    {group}
+                  </div>
+                  {navItems
+                    .filter((item) => item.group === group)
+                    .map((item) => {
+                      const isActive = activeSection === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => {
+                            setActiveSection(item.id);
+                            setMobileMenuOpen(false);
+                          }}
+                          className={`flex w-full items-center gap-3 rounded-xl px-3.5 py-2 text-left text-xs transition ${
+                            isActive
+                              ? "bg-[#e8f0fe] text-[#0f6cbd] font-semibold"
+                              : "font-medium text-slate-700 hover:bg-slate-100"
+                          }`}
+                        >
+                          <span
+                            className={
+                              isActive ? "text-[#0f6cbd]" : "text-slate-500"
+                            }
+                          >
+                            {item.icon}
+                          </span>
+                          <span className="truncate">{item.label}</span>
+                        </button>
+                      );
+                    })}
+                </div>
+              ))}
             </nav>
 
             <div className="border-t border-slate-200 p-3 space-y-2">
@@ -1284,40 +1520,71 @@ export default function SistemaCalculoRebtPage() {
           </button>
         </div>
 
-        {/* Navegación Limpia y Minimalista */}
-        <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
-          {navItems.map((item) => {
-            const isActive = activeSection === item.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setActiveSection(item.id)}
-                className={`flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-left text-xs transition ${
-                  isActive
-                    ? "bg-[#e8f0fe] text-[#0f6cbd] font-semibold"
-                    : "font-medium text-slate-700 hover:bg-slate-100"
-                }`}
-              >
-                <span
-                  className={
-                    isActive ? "text-[#0f6cbd]" : "text-slate-500"
-                  }
-                >
-                  {item.icon}
-                </span>
-                <span className="truncate">{item.label}</span>
-              </button>
-            );
-          })}
+        {/* Navegación Agrupada por Flujo de Trabajo */}
+        <nav className="flex-1 space-y-3 overflow-y-auto px-3 py-4">
+          {NAV_GROUPS.map((group) => (
+            <div key={group} className="space-y-0.5">
+              <div className="px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                {group}
+              </div>
+              {navItems
+                .filter((item) => item.group === group)
+                .map((item) => {
+                  const isActive = activeSection === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setActiveSection(item.id)}
+                      className={`flex w-full items-center gap-3 rounded-xl px-3.5 py-2 text-left text-xs transition ${
+                        isActive
+                          ? "bg-[#e8f0fe] text-[#0f6cbd] font-semibold"
+                          : "font-medium text-slate-700 hover:bg-slate-100"
+                      }`}
+                    >
+                      <span
+                        className={
+                          isActive ? "text-[#0f6cbd]" : "text-slate-500"
+                        }
+                      >
+                        {item.icon}
+                      </span>
+                      <span className="truncate">{item.label}</span>
+                    </button>
+                  );
+                })}
+            </div>
+          ))}
         </nav>
 
         {/* Estado compacto al pie */}
         <div className="border-t border-slate-200 px-4 py-3 text-[11px] text-slate-500 flex items-center justify-between">
           <span>REBT RD 842/2002</span>
-          <span className="inline-flex items-center gap-1 font-semibold text-emerald-700">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
-            {isSupabaseConfigured ? "Online" : "Local"}
+          <span
+            className={`inline-flex items-center gap-1 font-semibold ${
+              !isOnline
+                ? "text-amber-700"
+                : pendingSyncCount > 0
+                ? "text-blue-700"
+                : "text-emerald-700"
+            }`}
+          >
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${
+                !isOnline
+                  ? "bg-amber-500"
+                  : pendingSyncCount > 0
+                  ? "bg-blue-500 animate-pulse"
+                  : "bg-emerald-500"
+              }`}
+            ></span>
+            {!isOnline
+              ? "Offline"
+              : pendingSyncCount > 0
+              ? `Sinc. (${pendingSyncCount})`
+              : isSupabaseConfigured
+              ? "Online"
+              : "Local"}
           </span>
         </div>
       </aside>
@@ -1352,6 +1619,122 @@ export default function SistemaCalculoRebtPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            {/* Buscador Global de Obra, Herramienta o ITC */}
+            <div className="relative">
+              <div className="flex items-center rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5">
+                <Search className="h-3.5 w-3.5 text-slate-400" />
+                <input
+                  type="text"
+                  value={globalSearch}
+                  onChange={(e) => setGlobalSearch(e.target.value)}
+                  placeholder="Buscar obra, herramienta, ITC…"
+                  className="ml-1.5 w-36 sm:w-48 bg-transparent text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none"
+                />
+                {globalSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setGlobalSearch("")}
+                    className="ml-1 text-slate-400 hover:text-slate-700"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+
+              {globalSearch.trim() && (
+                <div className="absolute right-0 z-50 mt-1.5 w-72 rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
+                  <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    Herramientas y Secciones
+                  </div>
+                  {globalSearchMatches.sections.length === 0 ? (
+                    <p className="px-2 py-1 text-xs text-slate-400">
+                      Sin herramientas coincidentes
+                    </p>
+                  ) : (
+                    globalSearchMatches.sections.map((sec) => (
+                      <button
+                        key={sec.id}
+                        type="button"
+                        onClick={() => {
+                          setActiveSection(sec.id);
+                          setGlobalSearch("");
+                        }}
+                        className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-slate-700 hover:bg-blue-50 hover:text-[#0f6cbd]"
+                      >
+                        {sec.icon}
+                        <span>{sec.label}</span>
+                      </button>
+                    ))
+                  )}
+
+                  {globalSearchMatches.projects.length > 0 && (
+                    <>
+                      <div className="mt-1.5 border-t border-slate-100 px-2 pt-1.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Mis Obras / Expedientes
+                      </div>
+                      {globalSearchMatches.projects.map((proj) => (
+                        <button
+                          key={proj.id}
+                          type="button"
+                          onClick={() => {
+                            handleLoadProject(proj.id);
+                            setGlobalSearch("");
+                          }}
+                          className="flex w-full flex-col rounded-lg px-2.5 py-1.5 text-left text-xs hover:bg-emerald-50"
+                        >
+                          <span className="font-semibold text-slate-800 truncate">
+                            {proj.name}
+                          </span>
+                          <span className="text-[10px] text-slate-500 truncate">
+                            {proj.client_name} · {proj.location}
+                          </span>
+                        </button>
+                      ))}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {!isOnline ? (
+              <span
+                className="hidden xl:inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-800 ring-1 ring-amber-300/60"
+                title="Trabajando sin conexión: tus cambios quedan en cola local y se sincronizarán al volver internet"
+              >
+                <WifiOff className="h-3 w-3" />
+                Offline{pendingSyncCount > 0 ? ` · ${pendingSyncCount} pend.` : ""}
+              </span>
+            ) : pendingSyncCount > 0 ? (
+              <span className="hidden xl:inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-1 text-[10px] font-semibold text-[#0f6cbd]">
+                <RefreshCw className="h-3 w-3 animate-spin" />
+                Sincronizando ({pendingSyncCount})
+              </span>
+            ) : (
+              lastAutoSavedAt && (
+                <span
+                  className="hidden xl:inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700"
+                  title="Tus datos de oficina, presupuestos y tareas se guardan solos al instante"
+                >
+                  <CheckCircle2 className="h-3 w-3" />
+                  Guardado {lastAutoSavedAt}
+                </span>
+              )
+            )}
+
+            <button
+              type="button"
+              onClick={() => setDarkMode((d) => !d)}
+              className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white p-1.5 text-slate-600 transition hover:bg-slate-100"
+              title={darkMode ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+              aria-label="Cambiar tema claro u oscuro"
+            >
+              {darkMode ? (
+                <Sun className="h-3.5 w-3.5 text-amber-500" />
+              ) : (
+                <Moon className="h-3.5 w-3.5" />
+              )}
+            </button>
+
             {/* Botones de Acción del Expediente */}
             <div className="flex items-center gap-1.5 sm:gap-2">
               <button
@@ -1440,6 +1823,55 @@ export default function SistemaCalculoRebtPage() {
 
         {/* Contenedor de Secciones */}
         <main className="flex-1 p-3 sm:p-6 lg:p-8 pb-20 lg:pb-8">
+          {/* Flujo guiado del expediente (Wizard Progress Bar) */}
+          {activeSection !== "dashboard_tecnico" && (
+            <div className="no-print mb-5 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 shadow-2xs">
+              <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                <span className="mr-1 font-bold text-slate-500">Flujo obra:</span>
+                {EXPEDIENTE_WIZARD_STEPS.map((st, idx) => {
+                  const isStepActive = activeSection === st.id;
+                  const isPassed =
+                    wizardCurrentIdx >= 0 && idx < wizardCurrentIdx;
+                  return (
+                    <React.Fragment key={st.id}>
+                      <button
+                        type="button"
+                        onClick={() => setActiveSection(st.id)}
+                        className={`rounded-lg px-2.5 py-1 font-semibold transition ${
+                          isStepActive
+                            ? "bg-[#0f6cbd] text-white"
+                            : isPassed
+                            ? "bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
+                            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        }`}
+                      >
+                        {st.stepLabel}
+                      </button>
+                      {idx < EXPEDIENTE_WIZARD_STEPS.length - 1 && (
+                        <ChevronRight className="h-3 w-3 text-slate-400" />
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </div>
+              {wizardCurrentIdx >= 0 &&
+                wizardCurrentIdx < EXPEDIENTE_WIZARD_STEPS.length - 1 && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setActiveSection(
+                        EXPEDIENTE_WIZARD_STEPS[wizardCurrentIdx + 1].id
+                      )
+                    }
+                    className="inline-flex items-center gap-1 rounded-lg bg-slate-900 px-3 py-1 text-[11px] font-semibold text-white hover:bg-slate-800"
+                  >
+                    Siguiente paso
+                    <ArrowRight className="h-3 w-3" />
+                  </button>
+                )}
+            </div>
+          )}
+
           {statusBanner && (
             <div
               className={`no-print mb-6 flex items-center justify-between rounded-xl border px-4 py-3 text-xs font-medium shadow-2xs ${
@@ -1462,241 +1894,213 @@ export default function SistemaCalculoRebtPage() {
           )}
 
           {/* =================================================================
-              DASHBOARD OPERATIVO DEL TÉCNICO (KPIs Y MONITOR REBT)
+              DASHBOARD OPERATIVO DEL TÉCNICO (KPIs Y MONITOR REBT + ACCESOS MONPIX)
              ================================================================= */}
           {activeSection === "dashboard_tecnico" && (
-            <TechnicianDashboard
-              currentUser={currentUser}
-              currentTenant={currentTenant}
-              isolatedProjects={isolatedProjects}
-              activeProjectId={activeProjectId}
-              mtdMeta={mtdMeta}
-              calculatedCircuits={calculatedCircuits}
-              cgmpSummary={cgmpSummary}
-              buildingForecast={buildingForecast}
-              earthingResult={earthingResult}
-              itc04Evaluation={itc04Evaluation}
-              onNavigate={(sec) => setActiveSection(sec)}
-              onLoadProject={(id) => handleLoadProject(id)}
-              onNewProject={() =>
-                startNewBlankProjectForUser(currentUser, currentTenant)
-              }
-            />
+            <div className="space-y-6">
+              {/* Cabecera rápida de obra a oficina + Pregunta al REBT */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-xs space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-base sm:text-lg font-bold text-slate-900">
+                      Hola, {currentUser?.full_name.split(" ")[0]} ·{" "}
+                      <span className="font-medium text-slate-500 text-xs sm:text-sm">
+                        {new Date().toLocaleDateString("es-ES", {
+                          weekday: "long",
+                          day: "numeric",
+                          month: "long",
+                        })}
+                      </span>
+                    </h2>
+                    <p className="mt-0.5 text-[11px] text-amber-700 font-medium">
+                      ⚠️ {ORIENTATIVE_DISCLAIMER}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setActiveSection("tareas_equipo")}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 font-semibold text-amber-900 hover:bg-amber-100"
+                    >
+                      <CheckSquare className="h-3.5 w-3.5" />
+                      {
+                        monpixWorkspace.tasks.filter((t) => !t.completed).length
+                      }{" "}
+                      tareas pendientes
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveSection("tareas_equipo")}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 font-semibold text-emerald-800 hover:bg-emerald-100"
+                    >
+                      <Users className="h-3.5 w-3.5" />
+                      {
+                        monpixWorkspace.workers.filter(
+                          (w) => w.statusToday === "trabajando"
+                        ).length
+                      }
+                      /{monpixWorkspace.workers.length} en obra
+                    </button>
+                  </div>
+                </div>
+
+                {/* Accesos directos de un toque (de la obra a la oficina) */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+                  {[
+                    {
+                      id: "calculadoras_obra" as ActiveSection,
+                      title: "Calculadoras",
+                      sub: "Cable, Tubo, R·S·T, VE",
+                      icon: <Calculator className="h-4 w-4 text-[#0f6cbd]" />,
+                    },
+                    {
+                      id: "unifilar_cuadro" as ActiveSection,
+                      title: "Unifilar A3/SVG",
+                      sub: "Foto, Voz o Cuadro DIN",
+                      icon: <GitBranch className="h-4 w-4 text-indigo-600" />,
+                    },
+                    {
+                      id: "presupuestos_plano" as ActiveSection,
+                      title: "Presupuesto",
+                      sub: "Vivienda, Plano, Pedido",
+                      icon: <Tag className="h-4 w-4 text-emerald-600" />,
+                    },
+                    {
+                      id: "tramites_oca" as ActiveSection,
+                      title: "19 CCAA y OCA",
+                      sub: "Industria + Catastro GPS",
+                      icon: <ClipboardCheck className="h-4 w-4 text-amber-600" />,
+                    },
+                    {
+                      id: "oficina_gastos" as ActiveSection,
+                      title: "Oficina VeriFactu",
+                      sub: "Facturas QR y Gastos",
+                      icon: <Briefcase className="h-4 w-4 text-blue-700" />,
+                    },
+                    {
+                      id: "tareas_equipo" as ActiveSection,
+                      title: "Equipo y Fichaje",
+                      sub: "WhatsApp, Jornada, Firma",
+                      icon: <CheckSquare className="h-4 w-4 text-teal-600" />,
+                    },
+                    {
+                      id: "aprender" as ActiveSection,
+                      title: "Simulador DIN",
+                      sub: "Montar cuadro y Test",
+                      icon: <GraduationCap className="h-4 w-4 text-purple-600" />,
+                    },
+                  ].map((card) => (
+                    <button
+                      key={card.id}
+                      type="button"
+                      onClick={() => setActiveSection(card.id)}
+                      className="flex flex-col items-start gap-1 rounded-xl border border-slate-200 bg-slate-50/70 p-2.5 text-left transition hover:border-[#0f6cbd] hover:bg-blue-50/40"
+                    >
+                      <div className="flex items-center gap-1.5 font-bold text-xs text-slate-900">
+                        {card.icon}
+                        <span className="truncate">{card.title}</span>
+                      </div>
+                      <span className="text-[10px] text-slate-500 leading-tight">
+                        {card.sub}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Pregunta rápida al reglamento REBT desde inicio */}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!homeRebtQuery.trim()) return;
+                    setHomeRebtAnswer(answerRebtQuestion(homeRebtQuery));
+                  }}
+                  className="flex flex-col sm:flex-row gap-2 pt-1"
+                >
+                  <div className="relative flex-1">
+                    <MessageSquareText className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-[#0f6cbd]" />
+                    <input
+                      type="text"
+                      value={homeRebtQuery}
+                      onChange={(e) => setHomeRebtQuery(e.target.value)}
+                      placeholder="Pregunta rápida al REBT: ej. ¿Qué sección pongo para un horno de 3,5 kW? o ¿Cómo mido la tierra?"
+                      className="w-full rounded-xl border border-slate-300 bg-white pl-9 pr-3 py-2 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className="rounded-xl bg-[#0f6cbd] px-4 py-2 text-xs font-semibold text-white hover:bg-[#115ea3] shrink-0"
+                  >
+                    Consultar ITC
+                  </button>
+                </form>
+
+                {homeRebtAnswer && (
+                  <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-3.5 text-xs space-y-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="inline-flex items-center rounded-md bg-[#0f6cbd] px-2 py-0.5 text-[10px] font-bold text-white">
+                        {homeRebtAnswer.itcCitation}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setHomeRebtAnswer(null)}
+                        className="text-[11px] font-semibold text-slate-500 hover:text-slate-800"
+                      >
+                        Cerrar
+                      </button>
+                    </div>
+                    <p className="font-semibold text-slate-900">
+                      {homeRebtAnswer.title}
+                    </p>
+                    <p className="text-slate-700">{homeRebtAnswer.answer}</p>
+                    <p className="text-[11px] text-emerald-800 font-medium">
+                      💡 Consejo de obra: {homeRebtAnswer.practicalTip}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <TechnicianDashboard
+                currentUser={currentUser}
+                currentTenant={currentTenant}
+                isolatedProjects={isolatedProjects}
+                activeProjectId={activeProjectId}
+                mtdMeta={mtdMeta}
+                calculatedCircuits={calculatedCircuits}
+                cgmpSummary={cgmpSummary}
+                buildingForecast={buildingForecast}
+                earthingResult={earthingResult}
+                itc04Evaluation={itc04Evaluation}
+                onNavigate={(sec) => setActiveSection(sec)}
+                onLoadProject={(id) => handleLoadProject(id)}
+                onNewProject={() =>
+                  startNewBlankProjectForUser(currentUser, currentTenant)
+                }
+              />
+            </div>
           )}
 
           {/* =================================================================
               APARTADO 0: MIS EXPEDIENTES Y REPORTES (AISLADOS POR USUARIO)
              ================================================================= */}
           {activeSection === "expedientes" && (
-            <div className="space-y-6">
-              <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-xs">
-                <div>
-                  <span className="inline-flex items-center gap-1.5 rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-[#0f6cbd]">
-                    <Lock className="h-3.5 w-3.5" />
-                    Espacio de Trabajo Aislado (Multitenant)
-                  </span>
-                  <h2 className="mt-2 text-lg font-bold text-slate-900">
-                    Reportes y Expedientes de {currentUser?.full_name}
-                  </h2>
-                  <p className="mt-0.5 text-xs text-slate-500">
-                    Los expedientes creados bajo tu usuario quedan asociados exclusivamente a tu identificador (
-                    <code>owner_user_id = {currentUser?.id}</code>) y organización (
-                    <code>{currentTenant?.name}</code>), evitando que se mezclen con los reportes de otros usuarios.
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2.5">
-                  {(currentUser.role === "super_admin" ||
-                    currentUser.role === "admin_empresa") && (
-                    <GoogleSelect
-                      value={isolationScope}
-                      onChange={(e) =>
-                        setIsolationScope(
-                          e.target.value as "strict_user" | "tenant_shared"
-                        )
-                      }
-                      className="min-w-[260px]"
-                    >
-                      <option value="strict_user">
-                        Vista Estricta: Solo mis reportes ({currentUser.full_name})
-                      </option>
-                      <option value="tenant_shared">
-                        Vista Empresa: Todos los de {currentTenant.name}
-                      </option>
-                    </GoogleSelect>
-                  )}
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      startNewBlankProjectForUser(currentUser, currentTenant);
-                      setActiveSection("titular_ubicacion");
-                    }}
-                    className="inline-flex items-center gap-2 rounded-lg bg-[#0f6cbd] px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-[#115ea3]"
-                  >
-                    <Plus className="h-4 w-4" />
-                    Crear Nuevo Expediente REBT
-                  </button>
-                </div>
-              </div>
-
-              {/* Tarjetas de Resumen Rápido del Expediente en Curso */}
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
-                  <span className="text-xs font-medium text-slate-500">
-                    Usuario Activo
-                  </span>
-                  <p className="mt-1 truncate text-base font-bold text-slate-900">
-                    {currentUser?.full_name}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {currentTenant?.name} · {currentTenant?.isla}
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
-                  <span className="text-xs font-medium text-slate-500">
-                    Mis Reportes Guardados
-                  </span>
-                  <p className="mt-1 text-2xl font-bold text-[#0f6cbd]">
-                    {isolatedProjects.length}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Aislados de otros usuarios ({allProjects.length} totales en BD)
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
-                  <span className="text-xs font-medium text-slate-500">
-                    Expediente en Edición
-                  </span>
-                  <p className="mt-1 truncate text-base font-bold text-slate-900">
-                    {mtdMeta.expedienteNum}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {calculatedCircuits.length} circuitos ·{" "}
-                    {cgmpSummary.contractDesignWatts.toLocaleString()} W
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
-                  <span className="text-xs font-medium text-slate-500">
-                    Descarga Ficha M.T.D. (11 Págs)
-                  </span>
-                  <div className="mt-2">
-                    <button
-                      type="button"
-                      onClick={() => setActiveSection("ficha_mtd")}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-800 hover:bg-slate-200"
-                    >
-                      <FileSpreadsheet className="h-3.5 w-3.5 text-[#0f6cbd]" />
-                      Ir a Vista / Descarga Opcional
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Tabla de Expedientes Aislados por Usuario */}
-              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
-                <div className="border-b border-slate-200 px-5 py-3.5 flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-slate-900">
-                    Listado de Reportes de {currentUser?.full_name}
-                  </h3>
-                  <span className="text-xs text-slate-500">
-                    Mostrando {isolatedProjects.length} expediente(s)
-                  </span>
-                </div>
-
-                {isolatedProjects.length === 0 ? (
-                  <div className="p-8 text-center">
-                    <p className="text-sm font-medium text-slate-700">
-                      Este usuario aún no tiene reportes guardados en su espacio aislado.
-                    </p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      Pulsa en &ldquo;Guardar Reporte del Usuario&rdquo; arriba a la derecha o crea un nuevo expediente para registrarlo bajo {currentUser?.full_name}.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs">
-                      <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold uppercase text-slate-500">
-                        <tr>
-                          <th className="px-4 py-3">ID</th>
-                          <th className="px-4 py-3">Expediente / Uso</th>
-                          <th className="px-4 py-3">Titular</th>
-                          <th className="px-4 py-3">Emplazamiento</th>
-                          <th className="px-4 py-3 text-right">Potencia</th>
-                          <th className="px-4 py-3 text-right">IGA</th>
-                          <th className="px-4 py-3">Fecha</th>
-                          <th className="px-4 py-3 text-right">Acciones</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-200">
-                        {isolatedProjects.map((proj) => (
-                          <tr
-                            key={proj.id}
-                            className={`hover:bg-slate-50 ${
-                              activeProjectId === proj.id ? "bg-blue-50/40" : ""
-                            }`}
-                          >
-                            <td className="px-4 py-3 font-mono font-bold text-[#0f6cbd]">
-                              #{proj.id}
-                            </td>
-                            <td className="px-4 py-3 font-semibold text-slate-900">
-                              {proj.name}
-                            </td>
-                            <td className="px-4 py-3 text-slate-700">
-                              {proj.client_name}
-                            </td>
-                            <td className="px-4 py-3 text-slate-600">
-                              {proj.location}
-                            </td>
-                            <td className="px-4 py-3 text-right font-mono font-semibold text-slate-800">
-                              {Number(proj.total_demand_va).toLocaleString()} W
-                            </td>
-                            <td className="px-4 py-3 text-right font-mono text-slate-700">
-                              {proj.iga_amps} A
-                            </td>
-                            <td className="px-4 py-3 text-slate-500">
-                              {new Date(proj.created_at).toLocaleDateString()}
-                            </td>
-                            <td className="px-4 py-3 text-right space-x-2">
-                              <button
-                                type="button"
-                                onClick={() => handleLoadProject(proj.id)}
-                                className="rounded-lg bg-[#e8f0fe] px-3 py-1 text-xs font-semibold text-[#0f6cbd] hover:bg-blue-100"
-                              >
-                                Abrir Cálculos
-                              </button>
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                  await handleLoadProject(proj.id);
-                                  setActiveSection("ficha_mtd");
-                                }}
-                                className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                              >
-                                Ver M.T.D.
-                              </button>
-                              {currentUser.can_delete_projects && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteProject(proj.id)}
-                                  className="rounded-lg p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
-                                  title="Eliminar reporte"
-                                >
-                                  <Trash2 className="inline h-4 w-4" />
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            </div>
+            <ExpedientesSection
+              currentUser={currentUser}
+              currentTenant={currentTenant}
+              isolationScope={isolationScope}
+              setIsolationScope={setIsolationScope}
+              isolatedProjects={isolatedProjects}
+              allProjects={allProjects}
+              activeProjectId={activeProjectId}
+              mtdMeta={mtdMeta}
+              calculatedCircuits={calculatedCircuits}
+              contractDesignWatts={cgmpSummary.contractDesignWatts}
+              onStartNewProject={() =>
+                startNewBlankProjectForUser(currentUser, currentTenant)
+              }
+              onNavigate={setActiveSection}
+              onLoadProject={handleLoadProject}
+              onDeleteProject={handleDeleteProject}
+            />
           )}
 
           {/* =================================================================
@@ -3131,362 +3535,279 @@ export default function SistemaCalculoRebtPage() {
               APARTADO 6: DASHBOARD ADMINISTRATIVO, CREACIÓN DE USUARIOS Y PERMISOLOGÍA
              ================================================================= */}
           {activeSection === "administracion" && (
-            <div className="space-y-6">
-              <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs">
-                <span className="inline-flex items-center gap-1.5 rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-[#0f6cbd]">
-                  <ShieldCheck className="h-3.5 w-3.5" />
-                  Dashboard Administrativo Multi-Tenant y RBAC
-                </span>
-                <h2 className="mt-2 text-lg font-bold text-slate-900">
-                  Métricas Globales, Empresas (Tenants), Creación de Usuarios y Matriz de Permisología
-                </h2>
-                <p className="mt-0.5 text-xs text-slate-500">
-                  Supervisa las métricas de actividad por empresa, la cobertura de permisos RBAC y registra nuevas organizaciones y técnicos con espacios de trabajo aislados.
-                </p>
-              </div>
-
-              {/* Dashboard Ejecutivo de Administración */}
-              <AdminDashboardSummary
-                tenants={tenants}
-                users={users}
-                allProjects={allProjects}
-                currentUser={currentUser}
-                onSwitchUser={(u) => switchActiveUser(u)}
-              />
-
-              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                {/* Formulario 1: Crear Nuevo Usuario */}
-                <form
-                  onSubmit={handleCreateUser}
-                  className="rounded-xl border border-slate-200 bg-white p-6 shadow-xs space-y-4"
-                >
-                  <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-                    <Users className="h-5 w-5 text-[#0f6cbd]" />
-                    <h3 className="text-sm font-bold text-slate-900">
-                      Registrar Nuevo Usuario
-                    </h3>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div className="sm:col-span-2">
-                      <label className="block text-xs font-semibold text-slate-700">
-                        Nombre Completo y Cargo
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={newUserName}
-                        onChange={(e) => setNewUserName(e.target.value)}
-                        placeholder="Ej. Javier Padrón (Instalador PH)"
-                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700">
-                        Correo Electrónico (Usuario)
-                      </label>
-                      <input
-                        type="email"
-                        required
-                        value={newUserEmail}
-                        onChange={(e) => setNewUserEmail(e.target.value)}
-                        placeholder="javier@empresa.es"
-                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700">
-                        PIN / Contraseña de Acceso
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={newUserPin}
-                        onChange={(e) => setNewUserPin(e.target.value)}
-                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-mono text-slate-900"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700">
-                        Empresa / Organización (Tenant)
-                      </label>
-                      <GoogleSelect
-                        value={newUserTenantId}
-                        onChange={(e) =>
-                          setNewUserTenantId(Number(e.target.value))
-                        }
-                        className="mt-1"
-                      >
-                        {tenants.map((t) => (
-                          <option key={t.id} value={t.id}>
-                            {t.name} ({t.isla})
-                          </option>
-                        ))}
-                      </GoogleSelect>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700">
-                        Rol de Permisología (RBAC)
-                      </label>
-                      <GoogleSelect
-                        value={newUserRole}
-                        onChange={(e) =>
-                          setNewUserRole(e.target.value as UserRole)
-                        }
-                        className="mt-1"
-                      >
-                        <option value="ingeniero_instalador">
-                          Ingeniero / Instalador Autorizado PH
-                        </option>
-                        <option value="admin_empresa">
-                          Administrador de Empresa Instaladora
-                        </option>
-                        <option value="visor_auditor">
-                          Visor / Auditor OCA (Solo lectura)
-                        </option>
-                        <option value="super_admin">
-                          Super Administrador Global
-                        </option>
-                      </GoogleSelect>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700">
-                        D.O.I. / N.I.F.
-                      </label>
-                      <input
-                        type="text"
-                        value={newUserDoi}
-                        onChange={(e) => setNewUserDoi(e.target.value)}
-                        placeholder="43.000.000-A"
-                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700">
-                        Nº C.C.I. / Nº Colegiado
-                      </label>
-                      <input
-                        type="text"
-                        value={newUserCci}
-                        onChange={(e) => setNewUserCci(e.target.value)}
-                        placeholder="CCI-TF-6021"
-                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
-                      />
-                    </div>
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="inline-flex items-center gap-2 rounded-lg bg-[#0f6cbd] px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-[#115ea3]"
-                  >
-                    <Plus className="h-4 w-4" />
-                    Crear Usuario con Espacio Aislado
-                  </button>
-                </form>
-
-                {/* Formulario 2: Crear Nueva Empresa / Tenant */}
-                <form
-                  onSubmit={handleCreateTenant}
-                  className="rounded-xl border border-slate-200 bg-white p-6 shadow-xs space-y-4"
-                >
-                  <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-                    <Building className="h-5 w-5 text-[#0f6cbd]" />
-                    <h3 className="text-sm font-bold text-slate-900">
-                      Registrar Nueva Empresa Instaladora / Tenant
-                    </h3>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div className="sm:col-span-2">
-                      <label className="block text-xs font-semibold text-slate-700">
-                        Razón Social de la Empresa / Estudio
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={newTenantName}
-                        onChange={(e) => setNewTenantName(e.target.value)}
-                        placeholder="Ej. Instalaciones Eléctricas Teide S.L."
-                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700">
-                        C.I.F. Empresa
-                      </label>
-                      <input
-                        type="text"
-                        value={newTenantCif}
-                        onChange={(e) => setNewTenantCif(e.target.value)}
-                        placeholder="B-38000000"
-                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700">
-                        Nº Empresa Instaladora Habilitada
-                      </label>
-                      <input
-                        type="text"
-                        value={newTenantNum}
-                        onChange={(e) => setNewTenantNum(e.target.value)}
-                        placeholder="EI-38-04500"
-                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
-                      />
-                    </div>
-
-                    <div className="sm:col-span-2">
-                      <label className="block text-xs font-semibold text-slate-700">
-                        Isla Principal
-                      </label>
-                      <GoogleSelect
-                        value={newTenantIsla}
-                        onChange={(e) => setNewTenantIsla(e.target.value)}
-                        className="mt-1"
-                      >
-                        <option value="Tenerife">Tenerife</option>
-                        <option value="Gran Canaria">Gran Canaria</option>
-                        <option value="Lanzarote">Lanzarote</option>
-                        <option value="Fuerteventura">Fuerteventura</option>
-                        <option value="La Palma">La Palma</option>
-                        <option value="La Gomera">La Gomera</option>
-                        <option value="El Hierro">El Hierro</option>
-                      </GoogleSelect>
-                    </div>
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-slate-800"
-                  >
-                    <Plus className="h-4 w-4" />
-                    Registrar Empresa (Tenant)
-                  </button>
-                </form>
-              </div>
-
-              {/* Matriz de Permisología (RBAC) por Usuario */}
-              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
-                <div className="border-b border-slate-200 px-6 py-4 flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-900">
-                      Matriz de Usuarios, Multitenencia y Permisología (RBAC)
-                    </h3>
-                    <p className="text-xs text-slate-500">
-                      Activa o desactiva permisos granulares para cada usuario o cambia de sesión con un clic para verificar que los reportes están aislados.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold uppercase text-slate-500">
-                      <tr>
-                        <th className="px-4 py-3">Usuario / Correo</th>
-                        <th className="px-4 py-3">Empresa (Tenant)</th>
-                        <th className="px-4 py-3">Rol</th>
-                        <th className="px-3 py-3 text-center">Reportes Propios</th>
-                        <th className="px-3 py-3 text-center">Crear Reportes</th>
-                        <th className="px-3 py-3 text-center">Editar Cálculos</th>
-                        <th className="px-3 py-3 text-center">Descargar M.T.D.</th>
-                        <th className="px-3 py-3 text-center">Borrar Reportes</th>
-                        <th className="px-3 py-3 text-center">Admin Usuarios</th>
-                        <th className="px-4 py-3 text-right">Sesión</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200">
-                      {users.map((u) => {
-                        const t = tenants.find((ten) => ten.id === u.tenant_id);
-                        const userProjectsCount = allProjects.filter(
-                          (p) => p.owner_user_id === u.id
-                        ).length;
-                        const isCurrent = u.id === currentUser?.id;
-
-                        return (
-                          <tr
-                            key={u.id}
-                            className={
-                              isCurrent ? "bg-blue-50/40" : "hover:bg-slate-50"
-                            }
-                          >
-                            <td className="px-4 py-3">
-                              <div className="font-bold text-slate-900">
-                                {u.full_name}
-                              </div>
-                              <div className="text-[11px] text-slate-500">
-                                {u.email} · PIN:{" "}
-                                <code className="font-mono">{u.access_pin}</code>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3">
-                              <span className="font-medium text-slate-800">
-                                {t?.name}
-                              </span>
-                              <div className="text-[10px] text-slate-500">
-                                {t?.empresa_instaladora_num} ({t?.isla})
-                              </div>
-                            </td>
-                            <td className="px-4 py-3">
-                              <span className="inline-flex rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
-                                {u.role}
-                              </span>
-                            </td>
-                            <td className="px-3 py-3 text-center font-mono font-bold text-[#0f6cbd]">
-                              {userProjectsCount}
-                            </td>
-                            {(
-                              [
-                                "can_create_projects",
-                                "can_edit_calculations",
-                                "can_export_mtd",
-                                "can_delete_projects",
-                                "can_manage_users",
-                              ] as const
-                            ).map((perm) => (
-                              <td key={perm} className="px-3 py-3 text-center">
-                                <input
-                                  type="checkbox"
-                                  checked={u[perm]}
-                                  onChange={() =>
-                                    handleTogglePermission(u, perm)
-                                  }
-                                  className="h-4 w-4 rounded border-slate-300 text-[#0f6cbd] focus:ring-[#0f6cbd]"
-                                />
-                              </td>
-                            ))}
-                            <td className="px-4 py-3 text-right">
-                              {isCurrent ? (
-                                <span className="inline-flex items-center gap-1 rounded-md bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-800">
-                                  <UserCheck className="h-3.5 w-3.5" />
-                                  Sesión Activa
-                                </span>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => switchActiveUser(u)}
-                                  className="rounded-lg border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-                                >
-                                  Entrar como este usuario
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
+            <AdminRbacSection
+              tenants={tenants}
+              users={users}
+              allProjects={allProjects}
+              currentUser={currentUser}
+              onSwitchUser={switchActiveUser}
+              onCreateUser={handleCreateUser}
+              onCreateTenant={handleCreateTenant}
+              onTogglePermission={handleTogglePermission}
+              newUserName={newUserName}
+              setNewUserName={setNewUserName}
+              newUserEmail={newUserEmail}
+              setNewUserEmail={setNewUserEmail}
+              newUserPin={newUserPin}
+              setNewUserPin={setNewUserPin}
+              newUserTenantId={newUserTenantId}
+              setNewUserTenantId={setNewUserTenantId}
+              newUserRole={newUserRole}
+              setNewUserRole={setNewUserRole}
+              newUserDoi={newUserDoi}
+              setNewUserDoi={setNewUserDoi}
+              newUserCci={newUserCci}
+              setNewUserCci={setNewUserCci}
+              newTenantName={newTenantName}
+              setNewTenantName={setNewTenantName}
+              newTenantCif={newTenantCif}
+              setNewTenantCif={setNewTenantCif}
+              newTenantNum={newTenantNum}
+              setNewTenantNum={setNewTenantNum}
+              newTenantIsla={newTenantIsla}
+              setNewTenantIsla={setNewTenantIsla}
+            />
           )}
+
+          {/* =================================================================
+              MÓDULOS MONPIX: CALCULADORAS, UNIFILAR, PRESUPUESTO, 19 CCAA, OFICINA, EQUIPO Y APRENDER
+             ================================================================= */}
+          {activeSection === "calculadoras_obra" && (
+            <CalculadorasObraView
+              activeCircuits={circuits}
+              defaultIsCanarias={Boolean(currentTenant?.isla)}
+              onApplyPhaseBalanceToProject={(assignments) => {
+                setSupplyType("trifasico_400v");
+                setCircuits((prev) =>
+                  prev.map((c, idx) =>
+                    assignments[idx]
+                      ? {
+                          ...c,
+                          phaseAssigned: assignments[idx],
+                          voltage:
+                            assignments[idx] === "L1-L2-L3" ? 400 : 230,
+                        }
+                      : c
+                  )
+                );
+                setStatusBanner({
+                  type: "success",
+                  text: "Reparto de fases R·S·T aplicado al cuadro de circuitos activo.",
+                });
+              }}
+              onAddEvCircuitToProject={(evCircuit) => {
+                setCircuits((prev) => [...prev, evCircuit]);
+                setStatusBanner({
+                  type: "success",
+                  text: `Circuito ${evCircuit.code} (ITC-BT-52 Recarga VE) añadido al cuadro del expediente.`,
+                });
+              }}
+            />
+          )}
+
+          {activeSection === "unifilar_cuadro" && (
+            <UnifilarCuadroView
+              meta={mtdMeta}
+              supplyType={supplyType}
+              igaAmps={cgmpSummary.igaAmps}
+              rcdCount={cgmpSummary.rcd30mACount}
+              diSectionMm2={cgmpSummary.diCalculation.sectionMm2}
+              calculatedCircuits={calculatedCircuits}
+              companyLogoDataUrl={monpixWorkspace.companyLogoDataUrl}
+              savedUnifilares={monpixWorkspace.savedUnifilares}
+              savedDinModules={
+                monpixWorkspace.dinPanelsByExpediente?.[mtdMeta.expedienteNum]
+              }
+              savedBoxModules={
+                monpixWorkspace.dinBoxSizesByExpediente?.[mtdMeta.expedienteNum]
+              }
+              onPersistDinPanel={(modules, boxSize) => {
+                updateMonpixWorkspace((prev) => ({
+                  ...prev,
+                  dinPanelsByExpediente: {
+                    ...(prev.dinPanelsByExpediente || {}),
+                    [mtdMeta.expedienteNum]: modules,
+                  },
+                  dinBoxSizesByExpediente: {
+                    ...(prev.dinBoxSizesByExpediente || {}),
+                    [mtdMeta.expedienteNum]: boxSize,
+                  },
+                }));
+              }}
+              onAddToUnifiedOrder={(items) => {
+                updateMonpixWorkspace((prev) => ({
+                  ...prev,
+                  unifiedOrderCart: [...items, ...(prev.unifiedOrderCart || [])],
+                }));
+                setStatusBanner({
+                  type: "success",
+                  text: `${items.length} línea(s) de material del cuadro añadidas al Pedido Unificado de Obra (Oficina).`,
+                });
+              }}
+              onApplyDraftCircuits={(nextCircuits, nextSupply, panelMeta) => {
+                setSupplyType(nextSupply);
+                setCircuits(nextCircuits);
+                if (panelMeta?.electrificationGrade) {
+                  setElectrificationGrade(panelMeta.electrificationGrade);
+                }
+                if (typeof panelMeta?.igaAmps === "number") {
+                  setPanelOverrideIgaAmps(panelMeta.igaAmps);
+                }
+                if (typeof panelMeta?.rcdCount === "number") {
+                  setPanelOverrideRcdCount(panelMeta.rcdCount);
+                }
+                if (panelMeta) {
+                  const circuitsSummary = nextCircuits
+                    .map(
+                      (c) =>
+                        `${c.code} (${c.description}, ${c.fixedPiaAmps || 16} A, ${
+                          c.minSectionMm2 || 2.5
+                        } mm²)`
+                    )
+                    .join("; ");
+                  setMtdMeta((prev) => ({
+                    ...prev,
+                    diferencialCalibreAmps:
+                      panelMeta.diferencialCalibreAmps ?? prev.diferencialCalibreAmps,
+                    diferencialClase:
+                      panelMeta.diferencialClase ?? prev.diferencialClase,
+                    sobretensionesKv: panelMeta.hasSurgeProtection ? "1,5" : "—",
+                    numCuadrosPrincipales: 1,
+                    conductorTierraMm2:
+                      nextSupply === "trifasico_400v" || (panelMeta.igaAmps ?? 25) >= 40
+                        ? 16
+                        : 10,
+                    diCanalizacionDesc:
+                      nextSupply === "trifasico_400v"
+                        ? "4x RZ1-K (AS) 0,6/1kV + TT bajo tubo protector"
+                        : "2x RZ1-K (AS) 0,6/1kV + TT bajo tubo protector",
+                    memoriaDescriptivaTexto: `Instalación interior de baja tensión (${
+                      panelMeta.formatLabel ||
+                      (nextSupply === "trifasico_400v"
+                        ? "Trifásico 400 V"
+                        : "Monofásico 230 V")
+                    }) con CGMP dotado de IGA ${panelMeta.igaAmps ?? 40} A, ${
+                      panelMeta.hasSurgeProtection
+                        ? "protección combinada contra sobretensiones permanentes y transitorias Tipo 2 (Up ≤ 1,5 kV), "
+                        : ""
+                    }${panelMeta.rcdCount ?? 1} interruptor(es) diferencial(es) de ${
+                      panelMeta.diferencialCalibreAmps ?? 40
+                    } A / 30 mA Clase ${
+                      panelMeta.diferencialClase ?? "AC"
+                    } y ${nextCircuits.length} circuitos interiores: ${circuitsSummary}.`,
+                  }));
+                }
+                setStatusBanner({
+                  type: "success",
+                  text: panelMeta?.isAutoFromPhoto
+                    ? `Formato detectado (${panelMeta.formatLabel || "REBT"}): Simulador DIN, Plano Unifilar IEC 60617 y Ficha Técnica M.T.D. generados automáticamente.`
+                    : "Esquema Unifilar, Simulador DIN y Ficha Técnica M.T.D. actualizados automáticamente.",
+                });
+              }}
+              onOpenFichaMtd={() => setActiveSection("ficha_mtd")}
+              onSaveDiagramRecord={(item) => {
+                updateMonpixWorkspace((prev) => ({
+                  ...prev,
+                  savedUnifilares: [item, ...prev.savedUnifilares],
+                }));
+                setStatusBanner({
+                  type: "success",
+                  text: `Esquema unifilar "${item.title}" guardado en tu archivo privado.`,
+                });
+              }}
+            />
+          )}
+
+          {activeSection === "presupuestos_plano" && (
+            <PresupuestosPlanoView
+              projectRef={mtdMeta.expedienteNum}
+              activeProjectId={activeProjectId}
+              defaultClientName={mtdMeta.titularNombre}
+              defaultClientNif={mtdMeta.titularNif}
+              defaultClientAddress={`${mtdMeta.direccionCalle} ${mtdMeta.direccionNum}, ${mtdMeta.terminoMunicipal}`.trim()}
+              defaultIsCanarias={Boolean(currentTenant?.isla)}
+              priceCatalog={monpixWorkspace.priceCatalog}
+              onUpdatePriceCatalog={(nextCatalog) =>
+                updateMonpixWorkspace((prev) => ({
+                  ...prev,
+                  priceCatalog: nextCatalog,
+                }))
+              }
+              onCreateOfficeQuote={(quote) => {
+                updateMonpixWorkspace((prev) => ({
+                  ...prev,
+                  quotes: [quote, ...prev.quotes],
+                }));
+                setStatusBanner({
+                  type: "success",
+                  text: `Presupuesto ${quote.number} guardado en Oficina (listo para imprimir sin costes internos o convertir en factura).`,
+                });
+              }}
+              onNavigateToOffice={() => setActiveSection("oficina_gastos")}
+              onApplyBudgetAndCircuitsToMtd={(totalEuros, generatedCircuits) => {
+                setMtdMeta((prev) => ({
+                  ...prev,
+                  presupuestoTotalEuros: Number(totalEuros.toFixed(2)),
+                }));
+                if (generatedCircuits.length > 0) {
+                  setCircuits(generatedCircuits);
+                }
+                setStatusBanner({
+                  type: "success",
+                  text: `Presupuesto (${totalEuros.toFixed(2)} €) y ${generatedCircuits.length} circuitos sincronizados con el expediente M.T.D.`,
+                });
+              }}
+              onAddToUnifiedOrder={(items) => {
+                updateMonpixWorkspace((prev) => ({
+                  ...prev,
+                  unifiedOrderCart: [...items, ...(prev.unifiedOrderCart || [])],
+                }));
+                setStatusBanner({
+                  type: "success",
+                  text: `${items.length} línea(s) enviadas al Pedido Unificado de Obra (Oficina).`,
+                });
+              }}
+            />
+          )}
+
+          {activeSection === "tramites_oca" && (
+            <TramitesOcaCatastroView
+              defaultIsla={mtdMeta.isla || currentTenant?.isla || "Tenerife"}
+              onApplyLocationToMtd={({ calle, municipio, refCatastralNote }) => {
+                setMtdMeta((prev) => ({
+                  ...prev,
+                  direccionCalle: calle || prev.direccionCalle,
+                  terminoMunicipal: municipio || prev.terminoMunicipal,
+                  memoriaDescriptivaTexto: prev.memoriaDescriptivaTexto
+                    ? `${prev.memoriaDescriptivaTexto}\n${refCatastralNote}`
+                    : refCatastralNote,
+                }));
+                setStatusBanner({
+                  type: "success",
+                  text: "Ubicación y Referencia Catastral aplicadas a los datos del expediente M.T.D.",
+                });
+              }}
+            />
+          )}
+
+          {activeSection === "oficina_gastos" && (
+            <OficinaGastosView
+              tenant={currentTenant}
+              workspace={monpixWorkspace}
+              onUpdateWorkspace={updateMonpixWorkspace}
+            />
+          )}
+
+          {activeSection === "tareas_equipo" && (
+            <TareasEquipoView
+              currentUserName={currentUser?.full_name || "Instalador"}
+              activeProjectRef={mtdMeta.expedienteNum}
+              workspace={monpixWorkspace}
+              onUpdateWorkspace={updateMonpixWorkspace}
+            />
+          )}
+
+          {activeSection === "aprender" && <AprenderSimuladorView />}
         </main>
 
         {/* Barra de Navegación Inferior Fija para Móviles */}
@@ -3494,28 +3815,28 @@ export default function SistemaCalculoRebtPage() {
           {[
             {
               id: "dashboard_tecnico" as ActiveSection,
-              label: "Dashboard",
+              label: "Inicio",
               icon: <LayoutDashboard className="h-4 w-4" />,
             },
             {
-              id: "titular_ubicacion" as ActiveSection,
-              label: "Titular",
-              icon: <MapPin className="h-4 w-4" />,
+              id: "calculadoras_obra" as ActiveSection,
+              label: "Cálculos",
+              icon: <Calculator className="h-4 w-4" />,
             },
             {
-              id: "circuitos" as ActiveSection,
-              label: "Circuitos",
-              icon: <Activity className="h-4 w-4" />,
+              id: "unifilar_cuadro" as ActiveSection,
+              label: "Unifilar",
+              icon: <GitBranch className="h-4 w-4" />,
             },
             {
-              id: "ficha_mtd" as ActiveSection,
-              label: "Ficha M.T.D.",
-              icon: <FileSpreadsheet className="h-4 w-4" />,
+              id: "presupuestos_plano" as ActiveSection,
+              label: "Presup.",
+              icon: <Tag className="h-4 w-4" />,
             },
             {
-              id: "administracion" as ActiveSection,
-              label: "Admin",
-              icon: <ShieldCheck className="h-4 w-4" />,
+              id: "oficina_gastos" as ActiveSection,
+              label: "Oficina",
+              icon: <Briefcase className="h-4 w-4" />,
             },
           ].map((item) => {
             const isActive = activeSection === item.id;
@@ -3537,6 +3858,36 @@ export default function SistemaCalculoRebtPage() {
           })}
         </nav>
       </div>
+
+      {/* Asistente Flotante REBT con Voz, Cita de ITC y Confirmación de Acciones */}
+      <AsistenteMonpixFloating
+        onNavigateSection={(secId) => setActiveSection(secId as ActiveSection)}
+        onQuickCreateTask={(taskTitle) => {
+          updateMonpixWorkspace((prev) => ({
+            ...prev,
+            tasks: [
+              {
+                id: `tsk-${Date.now()}`,
+                title: taskTitle,
+                whenDate: new Date().toISOString().slice(0, 10),
+                assignedTo: currentUser?.full_name || "Instalador",
+                projectRef: mtdMeta.expedienteNum,
+                phone: "",
+                email: "",
+                notes: "Creada desde Asistente REBT tras confirmación",
+                origin: "voz",
+                priority: "normal",
+                completed: false,
+              },
+              ...prev.tasks,
+            ],
+          }));
+          setStatusBanner({
+            type: "success",
+            text: `Tarea "${taskTitle}" guardada en tu lista de trabajo.`,
+          });
+        }}
+      />
 
       {/* =====================================================================
           MODAL DE INICIO DE SESIÓN / CAMBIO DE USUARIO MULTI-TENANT

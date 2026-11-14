@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import {
   Zap,
   ShieldCheck,
@@ -74,14 +75,33 @@ export default function LandingAndAuthView({
   const [confirmPin, setConfirmPin] = useState("");
   const [isResetting, setIsResetting] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError(null);
-    const found = users.find(
+    const cleanEmail = email.toLowerCase().trim();
+    const cleanPin = pin.trim();
+
+    let found = users.find(
       (u) =>
-        u.email.toLowerCase().trim() === email.toLowerCase().trim() &&
-        u.access_pin === pin.trim()
+        u.email.toLowerCase().trim() === cleanEmail &&
+        u.access_pin === cleanPin
     );
+
+    if (!found && isSupabaseConfigured && supabase) {
+      try {
+        const { data } = await supabase.rpc("verify_app_user_pin", {
+          p_email: cleanEmail,
+          p_pin: cleanPin,
+        });
+        const verifiedId = Array.isArray(data) ? data[0]?.id : data?.id;
+        if (verifiedId) {
+          found = users.find((u) => u.id === Number(verifiedId));
+        }
+      } catch {
+        // Fallback silencioso si la RPC aún no se ha aplicado en remoto
+      }
+    }
+
     if (!found) {
       setAuthError(
         "Credenciales incorrectas. Verifica tu correo electrónico y contraseña/PIN."
@@ -199,72 +219,74 @@ export default function LandingAndAuthView({
         <main className="flex-1">
           <section className="relative overflow-hidden py-12 sm:py-20">
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-              <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-12">
-                <div className="space-y-6 lg:col-span-7">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50/80 px-3.5 py-1.5 text-xs font-semibold text-[#0f6cbd]">
-                    <Sparkles className="h-3.5 w-3.5" />
-                    Ingeniería Eléctrica de Baja Tensión y Generación M.T.D. Oficial
-                  </div>
-
-                  <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl lg:text-5xl leading-[1.15]">
-                    Cálculo Reglamentario{" "}
-                    <span className="text-[#0f6cbd]">REBT</span> y Memoria
-                    Técnica de Diseño Automatizada
-                  </h1>
-
-                  <p className="max-w-2xl text-sm sm:text-base leading-relaxed text-slate-600">
-                    Plataforma multi-empresa en la nube para ingenieros e instaladores habilitados. Dimensiona cuadros de circuitos (ITC-BT-19/25), previsión de cargas de edificios (ITC-BT-10/52), puesta a tierra (ITC-BT-18/24) y genera la{" "}
-                    <strong className="text-slate-900">
-                      M.T.D. B.T. del Gobierno de Canarias
-                    </strong>{" "}
-                    lista para firmar e imprimir.
-                  </p>
-
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAuthError(null);
-                        setAuthSuccess(null);
-                        setMode("login");
-                      }}
-                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0f6cbd] px-6 py-3.5 text-sm font-bold text-white shadow-md transition hover:bg-[#115ea3]"
-                    >
-                      Acceder a la Plataforma
-                      <ArrowRight className="h-4 w-4" />
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAuthError(null);
-                        setAuthSuccess(null);
-                        setMode("reset_password");
-                      }}
-                      className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-3.5 text-sm font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50"
-                    >
-                      <KeyRound className="h-4 w-4 text-[#0f6cbd]" />
-                      Recuperar Contraseña
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-4 border-t border-slate-200/80 text-xs text-slate-600">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
-                      <span>ITC-BT-01 a ITC-BT-52</span>
+              <div className="grid grid-cols-1 items-stretch gap-10 lg:grid-cols-12">
+                <div className="flex flex-col justify-between gap-6 lg:col-span-7">
+                  <div className="space-y-6">
+                    <div className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50/80 px-3.5 py-1.5 text-xs font-semibold text-[#0f6cbd]">
+                      <Sparkles className="h-3.5 w-3.5" />
+                      Ingeniería Eléctrica de Baja Tensión y Generación M.T.D. Oficial
                     </div>
-                    <div className="flex items-center gap-2">
-                      <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
-                      <span>Ficha Oficial M.T.D.</span>
+
+                    <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl lg:text-5xl leading-[1.15]">
+                      Cálculo Reglamentario{" "}
+                      <span className="text-[#0f6cbd]">REBT</span> y Memoria
+                      Técnica de Diseño Automatizada
+                    </h1>
+
+                    <p className="max-w-2xl text-sm sm:text-base leading-relaxed text-slate-600">
+                      Plataforma multi-empresa en la nube para ingenieros e instaladores habilitados. Dimensiona cuadros de circuitos (ITC-BT-19/25), previsión de cargas de edificios (ITC-BT-10/52), puesta a tierra (ITC-BT-18/24) y genera la{" "}
+                      <strong className="text-slate-900">
+                        M.T.D. B.T. del Gobierno de Canarias
+                      </strong>{" "}
+                      lista para firmar e imprimir.
+                    </p>
+
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAuthError(null);
+                          setAuthSuccess(null);
+                          setMode("login");
+                        }}
+                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0f6cbd] px-6 py-3.5 text-sm font-bold text-white shadow-md transition hover:bg-[#115ea3]"
+                      >
+                        Acceder a la Plataforma
+                        <ArrowRight className="h-4 w-4" />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAuthError(null);
+                          setAuthSuccess(null);
+                          setMode("reset_password");
+                        }}
+                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-3.5 text-sm font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50"
+                      >
+                        <KeyRound className="h-4 w-4 text-[#0f6cbd]" />
+                        Recuperar Contraseña
+                      </button>
                     </div>
-                    <div className="flex items-center gap-2 col-span-2 sm:col-span-1">
-                      <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
-                      <span>Aislamiento Multi-Tenant</span>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-4 border-t border-slate-200/80 text-xs text-slate-600">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+                        <span>ITC-BT-01 a ITC-BT-52</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+                        <span>Ficha Oficial M.T.D.</span>
+                      </div>
+                      <div className="flex items-center gap-2 col-span-2 sm:col-span-1">
+                        <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+                        <span>Aislamiento Multi-Tenant</span>
+                      </div>
                     </div>
                   </div>
 
                   {/* Sellos y Normas Europeas / ISO / UNE-HD (Unión Europea y España) */}
-                  <div className="rounded-2xl border border-slate-200/90 bg-white/90 p-3.5 shadow-xs backdrop-blur-xs">
+                  <div className="mt-auto rounded-2xl border border-slate-200/90 bg-white/90 p-4 shadow-xs backdrop-blur-xs">
                     <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
                         Estándares y Normativa Técnica en la Unión Europea
@@ -274,9 +296,9 @@ export default function LandingAndAuthView({
                       </span>
                     </div>
 
-                    <div className="mt-2.5 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                    <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2.5 items-stretch">
                       {/* Sello 1: ISO 9001 */}
-                      <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/70 px-2.5 py-2">
+                      <div className="flex h-full items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/70 px-2.5 py-2.5">
                         <div className="flex h-8 w-8 shrink-0 flex-col items-center justify-center rounded-lg border border-blue-200 bg-[#0f6cbd] text-white shadow-2xs">
                           <span className="text-[8px] font-extrabold leading-none tracking-tighter">
                             ISO
@@ -296,7 +318,7 @@ export default function LandingAndAuthView({
                       </div>
 
                       {/* Sello 2: UNE-HD 60364 (IEC 60364 / CENELEC UE) */}
-                      <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/70 px-2.5 py-2">
+                      <div className="flex h-full items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/70 px-2.5 py-2.5">
                         <div className="flex h-8 w-8 shrink-0 flex-col items-center justify-center rounded-lg border border-blue-900 bg-[#003399] text-white shadow-2xs">
                           <span className="text-[7.5px] font-extrabold leading-none text-amber-300">
                             ★ UE ★
@@ -316,7 +338,7 @@ export default function LandingAndAuthView({
                       </div>
 
                       {/* Sello 3: EN / IEC 61082 & 60617 (Esquemas y Documentación Técnica) */}
-                      <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/70 px-2.5 py-2">
+                      <div className="flex h-full items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/70 px-2.5 py-2.5">
                         <div className="flex h-8 w-8 shrink-0 flex-col items-center justify-center rounded-lg border border-slate-300 bg-slate-800 text-white shadow-2xs">
                           <span className="text-[8px] font-extrabold leading-none">
                             EN/IEC
@@ -336,7 +358,7 @@ export default function LandingAndAuthView({
                       </div>
 
                       {/* Sello 4: ISO/IEC 27001 (Seguridad Cloud Multi-Tenant) */}
-                      <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/70 px-2.5 py-2">
+                      <div className="flex h-full items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/70 px-2.5 py-2.5">
                         <div className="flex h-8 w-8 shrink-0 flex-col items-center justify-center rounded-lg border border-emerald-300 bg-emerald-700 text-white shadow-2xs">
                           <span className="text-[8px] font-extrabold leading-none">
                             ISO
@@ -359,10 +381,10 @@ export default function LandingAndAuthView({
                 </div>
 
                 {/* Tarjeta Visual Derecha con Imagen Profesional e Información Técnica REBT */}
-                <div className="lg:col-span-5">
-                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
+                <div className="flex lg:col-span-5">
+                  <div className="flex h-full w-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
                     {/* Imagen Hero de Ingeniería Eléctrica y Cuadro Modular REBT */}
-                    <div className="relative h-56 sm:h-64 w-full overflow-hidden bg-slate-900">
+                    <div className="relative h-52 sm:h-56 w-full shrink-0 overflow-hidden bg-slate-900">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src="/hero-rebt-banner.jpg"
@@ -387,7 +409,7 @@ export default function LandingAndAuthView({
                       </div>
                     </div>
 
-                    <div className="p-5 sm:p-6 space-y-4">
+                    <div className="flex flex-1 flex-col justify-between p-5 sm:p-6 gap-4">
                       <div className="flex items-center justify-between border-b border-slate-100 pb-3.5">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
@@ -415,14 +437,14 @@ export default function LandingAndAuthView({
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3 text-xs">
-                        <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+                      <div className="grid grid-cols-2 items-stretch gap-3 text-xs">
+                        <div className="flex h-full flex-col justify-between rounded-xl border border-slate-200 bg-slate-50/70 p-3">
                           <div className="font-bold text-[#0f6cbd]">Ficha M.T.D.</div>
                           <p className="mt-0.5 text-[11px] text-slate-500">
                             Autocompletado M.T.D. con Unifilar y Croquis SVG
                           </p>
                         </div>
-                        <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+                        <div className="flex h-full flex-col justify-between rounded-xl border border-slate-200 bg-slate-50/70 p-3">
                           <div className="font-bold text-[#0f6cbd]">Multi-Dispositivo</div>
                           <p className="mt-0.5 text-[11px] text-slate-500">
                             Optimizado para móvil, tablet y escritorio
@@ -433,7 +455,7 @@ export default function LandingAndAuthView({
                       <button
                         type="button"
                         onClick={() => setMode("login")}
-                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-xs font-bold text-white transition hover:bg-slate-800"
+                        className="mt-auto flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-xs font-bold text-white transition hover:bg-slate-800"
                       >
                         <Lock className="h-3.5 w-3.5" />
                         Ir al Portal de Inicio de Sesión
@@ -457,8 +479,8 @@ export default function LandingAndAuthView({
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs">
+              <div className="grid grid-cols-1 items-stretch gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs">
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#e8f0fe] text-[#0f6cbd]">
                     <Activity className="h-5 w-5" />
                   </div>
@@ -470,7 +492,7 @@ export default function LandingAndAuthView({
                   </p>
                 </div>
 
-                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs">
+                <div className="flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs">
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#e8f0fe] text-[#0f6cbd]">
                     <Building2 className="h-5 w-5" />
                   </div>
@@ -482,7 +504,7 @@ export default function LandingAndAuthView({
                   </p>
                 </div>
 
-                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs">
+                <div className="flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs">
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#e8f0fe] text-[#0f6cbd]">
                     <FileSpreadsheet className="h-5 w-5" />
                   </div>
@@ -494,7 +516,7 @@ export default function LandingAndAuthView({
                   </p>
                 </div>
 
-                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs">
+                <div className="flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs">
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#e8f0fe] text-[#0f6cbd]">
                     <Layers className="h-5 w-5" />
                   </div>
@@ -506,7 +528,7 @@ export default function LandingAndAuthView({
                   </p>
                 </div>
 
-                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs">
+                <div className="flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs">
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#e8f0fe] text-[#0f6cbd]">
                     <ShieldCheck className="h-5 w-5" />
                   </div>
@@ -518,7 +540,7 @@ export default function LandingAndAuthView({
                   </p>
                 </div>
 
-                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs">
+                <div className="flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs">
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#e8f0fe] text-[#0f6cbd]">
                     <Smartphone className="h-5 w-5" />
                   </div>

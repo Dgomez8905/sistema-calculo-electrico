@@ -4,7 +4,8 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Sistema de Cálculo Eléctrico REBT y Gestión Multi-Tenant M.T.D.",
   description:
-    "Plataforma corporativa multi-tenant para cálculo eléctrico según el REBT (RD 842/2002 - ITC-BT-01 a BT-52), control de usuarios y permisos (RBAC) y generación opcional de la Memoria Técnica de Diseño (M.T.D. B.T.).",
+    "Plataforma corporativa multi-tenant para cálculo eléctrico según el REBT (RD 842/2002 - ITC-BT-01 a BT-52), obra, presupuestos, VeriFactu, fichajes y Memoria Técnica de Diseño (M.T.D. B.T.).",
+  manifest: "/manifest.webmanifest",
 };
 
 export default function RootLayout({

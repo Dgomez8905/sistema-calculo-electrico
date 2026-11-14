@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import "tailwindcss" source("..");
 
 :root {
   --background: #f8fafc;
@@ -210,10 +210,127 @@ select:not(.mtd-raw-select):focus {
   }
 }
 
+/* ============================================================================
+   MODO OSCURO MONPIX CON TOKENS SEMÁNTICOS (SOLO PANTALLA; IMPRESIÓN B/N)
+   ============================================================================ */
+:root {
+  --monpix-surface: #ffffff;
+  --monpix-subtle: #f8fafc;
+  --monpix-border: #e2e8f0;
+  --monpix-text: #0f172a;
+  --monpix-muted: #64748b;
+}
+
+@media screen {
+  html.monpix-dark {
+    --monpix-surface: #111827;
+    --monpix-subtle: #1e293b;
+    --monpix-border: #334155;
+    --monpix-text: #f1f5f9;
+    --monpix-muted: #94a3b8;
+  }
+
+  html.monpix-dark body,
+  html.monpix-dark .bg-\[\#f8fafc\] {
+    background-color: #0b1120 !important;
+    color: var(--monpix-text) !important;
+  }
+
+  html.monpix-dark aside,
+  html.monpix-dark header,
+  html.monpix-dark nav.fixed,
+  html.monpix-dark .bg-white:not(.mtd-print-page):not(.print-a3-sheet) {
+    background-color: var(--monpix-surface) !important;
+    color: var(--monpix-text) !important;
+    border-color: var(--monpix-border) !important;
+  }
+
+  html.monpix-dark .bg-slate-50,
+  html.monpix-dark .bg-slate-50\/70,
+  html.monpix-dark .bg-slate-50\/90,
+  html.monpix-dark .bg-slate-100 {
+    background-color: var(--monpix-subtle) !important;
+    border-color: var(--monpix-border) !important;
+  }
+
+  html.monpix-dark .bg-blue-50,
+  html.monpix-dark .bg-blue-50\/40,
+  html.monpix-dark .bg-blue-50\/60,
+  html.monpix-dark .bg-blue-50\/70 {
+    background-color: rgba(15, 108, 189, 0.2) !important;
+    color: #dbeafe !important;
+  }
+
+  html.monpix-dark .bg-amber-50,
+  html.monpix-dark .bg-amber-50\/70 {
+    background-color: rgba(180, 83, 9, 0.22) !important;
+    color: #fef3c7 !important;
+  }
+
+  html.monpix-dark .bg-emerald-50,
+  html.monpix-dark .bg-emerald-50\/70 {
+    background-color: rgba(5, 150, 105, 0.22) !important;
+    color: #d1fae5 !important;
+  }
+
+  html.monpix-dark .bg-rose-50,
+  html.monpix-dark .bg-rose-50\/70 {
+    background-color: rgba(225, 29, 72, 0.22) !important;
+    color: #ffe4e6 !important;
+  }
+
+  html.monpix-dark .text-slate-900,
+  html.monpix-dark .text-slate-800 {
+    color: var(--monpix-text) !important;
+  }
+
+  html.monpix-dark .text-slate-700,
+  html.monpix-dark .text-slate-600 {
+    color: #cbd5e1 !important;
+  }
+
+  html.monpix-dark .text-slate-500 {
+    color: var(--monpix-muted) !important;
+  }
+
+  html.monpix-dark .border-slate-200,
+  html.monpix-dark .border-slate-300 {
+    border-color: var(--monpix-border) !important;
+  }
+
+  html.monpix-dark input:not([type="checkbox"]):not([type="radio"]),
+  html.monpix-dark textarea,
+  html.monpix-dark select:not(.mtd-raw-select),
+  html.monpix-dark .google-dropdown-trigger,
+  html.monpix-dark .google-dropdown-menu {
+    background-color: #0f172a !important;
+    color: #f8fafc !important;
+    border-color: #334155 !important;
+  }
+
+  html.monpix-dark .google-dropdown-trigger-ghost {
+    color: #f1f5f9 !important;
+  }
+}
+
 @media print {
   @page {
     size: A4 portrait;
     margin: 8mm;
+  }
+
+  @page unifilar-a3 {
+    size: A3 landscape;
+    margin: 6mm;
+  }
+
+  .print-a3-sheet {
+    page: unifilar-a3;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
   }
 
   body {
