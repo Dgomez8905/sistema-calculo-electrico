@@ -28,6 +28,10 @@ import {
   Navigation,
   Trash2,
   Crosshair,
+  Pencil,
+  RotateCcw,
+  Type,
+  Move,
 } from "lucide-react";
 
 const MTD_SHEETS_CATALOG: {
@@ -378,10 +382,109 @@ export default function MtdCanariasOfficialForm({
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
-  const googleMapsEmbedQuery =
-    meta.coordenadasLat?.trim() && meta.coordenadasLng?.trim()
+  const googleMapsEmbedQuery = meta.croquisMapaQuery?.trim()
+    ? meta.croquisMapaQuery.trim()
+    : meta.coordenadasLat?.trim() && meta.coordenadasLng?.trim()
       ? `${meta.coordenadasLat.trim()},${meta.coordenadasLng.trim()}`
       : `${meta.direccionCalle} ${meta.direccionNum}, ${meta.codigoPostal} ${meta.terminoMunicipal}, ${meta.isla}, España`;
+
+  // ============================================================================
+  // Edición Manual del Croquis Parcelario y Punto de Acometida (1B · Hoja 9/11)
+  // ============================================================================
+  type CroquisCustomItem =
+    | {
+        id: string;
+        kind: "stroke";
+        points: Array<{ x: number; y: number }>;
+        color?: string;
+      }
+    | {
+        id: string;
+        kind: "label";
+        x: number;
+        y: number;
+        text: string;
+        color?: string;
+      };
+
+  const [isCroquisManualOpen, setIsCroquisManualOpen] = useState<boolean>(true);
+  const [croquisTool, setCroquisTool] = useState<
+    "cgp" | "red" | "parcela" | "draw" | "label"
+  >("cgp");
+  const [croquisLabelDraft, setCroquisLabelDraft] =
+    useState<string>("Arqueta / Apoyo B.T.");
+  const [activeStroke, setActiveStroke] = useState<Array<{
+    x: number;
+    y: number;
+  }> | null>(null);
+  const croquisFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const croquisItems: CroquisCustomItem[] = (() => {
+    try {
+      const parsed = JSON.parse(meta.croquisDibujoJson || "[]");
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  })();
+
+  const saveCroquisItems = (items: CroquisCustomItem[]) => {
+    updateField("croquisDibujoJson", JSON.stringify(items));
+  };
+
+  const getCroquisSvgPoint = (
+    e: React.MouseEvent<SVGSVGElement> | React.PointerEvent<SVGSVGElement>
+  ) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = Math.max(
+      10,
+      Math.min(670, Math.round(((e.clientX - rect.left) / rect.width) * 680))
+    );
+    const y = Math.max(
+      10,
+      Math.min(375, Math.round(((e.clientY - rect.top) / rect.height) * 385))
+    );
+    return { x, y };
+  };
+
+  const compressAndSaveCroquisImage = (file: File | Blob) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const rawUrl = String(reader.result || "");
+      const img = new window.Image();
+      img.onload = () => {
+        const maxWidth = 960;
+        const scale = img.width > maxWidth ? maxWidth / img.width : 1;
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(img.width * scale));
+        canvas.height = Math.max(1, Math.round(img.height * scale));
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          updateField("croquisImagenDataUrl", canvas.toDataURL("image/jpeg", 0.85));
+        } else {
+          updateField("croquisImagenDataUrl", rawUrl);
+        }
+        setGeoFeedback(
+          "✅ Imagen base del Croquis 1B cargada. Puedes situar encima la CGP, la red B.T., textos o trazos manuales."
+        );
+      };
+      img.onerror = () => updateField("croquisImagenDataUrl", rawUrl);
+      img.src = rawUrl;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const splitParcelNoteLines = (raw: string): [string, string] => {
+    const clean = (raw || "CGP en fachada").trim();
+    if (clean.length <= 26) return [clean, ""];
+    const cutIdx = clean.lastIndexOf(" ", 26);
+    const idx = cutIdx > 10 ? cutIdx : 25;
+    const line1 = clean.slice(0, idx).trim();
+    const rest = clean.slice(idx).trim();
+    const line2 = rest.length > 28 ? `${rest.slice(0, 27).trim()}…` : rest;
+    return [line1, line2];
+  };
 
   // Generación automática de la Memoria Descriptiva (Página 5/11)
   const generatedMemoriaDescriptiva = `1. OBJETO DE LA MEMORIA TÉCNICA DE DISEÑO:
@@ -3087,7 +3190,7 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
                   </span>
                 </div>
 
-                {/* Tabla técnica de Coordenadas y Emplazamiento */}
+                {/* Tabla técnica de Coordenadas y Emplazamiento (100% editable manualmente en hoja) */}
                 <table className="w-full border-collapse border border-black text-[9.5px]">
                   <tbody>
                     <tr>
@@ -3095,9 +3198,57 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
                         DIRECCIÓN EMPLAZAMIENTO:
                       </td>
                       <td className="border border-black px-2 py-1 font-semibold" colSpan={3}>
-                        C/ {meta.direccionCalle}, Nº {meta.direccionNum},{" "}
-                        {meta.portalPlanta} · C.P. {meta.codigoPostal} — T.M.{" "}
-                        {meta.terminoMunicipal} (Isla de {meta.isla})
+                        <div className="flex flex-wrap items-center gap-1">
+                          <span>C/</span>
+                          <input
+                            type="text"
+                            value={meta.direccionCalle}
+                            onChange={(e) => updateField("direccionCalle", e.target.value)}
+                            placeholder="Nombre de vía / calle"
+                            className="min-w-[130px] flex-1 border-b border-dashed border-slate-300 bg-transparent px-1 py-0.5 font-semibold outline-none focus:bg-amber-50 print:border-0"
+                          />
+                          <span>, Nº</span>
+                          <input
+                            type="text"
+                            value={meta.direccionNum}
+                            onChange={(e) => updateField("direccionNum", e.target.value)}
+                            placeholder="S/N"
+                            className="w-12 border-b border-dashed border-slate-300 bg-transparent px-1 py-0.5 text-center font-semibold outline-none focus:bg-amber-50 print:border-0"
+                          />
+                          <span>,</span>
+                          <input
+                            type="text"
+                            value={meta.portalPlanta}
+                            onChange={(e) => updateField("portalPlanta", e.target.value)}
+                            placeholder="Local / Planta"
+                            className="w-24 border-b border-dashed border-slate-300 bg-transparent px-1 py-0.5 font-semibold outline-none focus:bg-amber-50 print:border-0"
+                          />
+                          <span>· C.P.</span>
+                          <input
+                            type="text"
+                            value={meta.codigoPostal}
+                            onChange={(e) => updateField("codigoPostal", e.target.value)}
+                            placeholder="38000"
+                            className="w-14 border-b border-dashed border-slate-300 bg-transparent px-1 py-0.5 text-center font-mono font-semibold outline-none focus:bg-amber-50 print:border-0"
+                          />
+                          <span>— T.M.</span>
+                          <input
+                            type="text"
+                            value={meta.terminoMunicipal}
+                            onChange={(e) => updateField("terminoMunicipal", e.target.value)}
+                            placeholder="Municipio"
+                            className="min-w-[105px] flex-1 border-b border-dashed border-slate-300 bg-transparent px-1 py-0.5 font-semibold outline-none focus:bg-amber-50 print:border-0"
+                          />
+                          <span>(Isla/Prov.:</span>
+                          <input
+                            type="text"
+                            value={meta.isla}
+                            onChange={(e) => updateField("isla", e.target.value)}
+                            placeholder="Isla / Provincia"
+                            className="w-24 border-b border-dashed border-slate-300 bg-transparent px-1 py-0.5 font-semibold outline-none focus:bg-amber-50 print:border-0"
+                          />
+                          <span>)</span>
+                        </div>
                       </td>
                     </tr>
                     <tr>
@@ -3105,15 +3256,48 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
                         COORD. WGS84 (LAT / LON):
                       </td>
                       <td className="border border-black px-2 py-1 font-mono font-bold">
-                        {meta.coordenadasLat && meta.coordenadasLng
-                          ? `${meta.coordenadasLat}°, ${meta.coordenadasLng}°`
-                          : "Pendiente de georreferenciar"}
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="text"
+                            value={meta.coordenadasLat || ""}
+                            onChange={(e) =>
+                              applyLatLonWithUtm(
+                                e.target.value,
+                                meta.coordenadasLng || ""
+                              )
+                            }
+                            placeholder="Latitud"
+                            className="w-[46%] border-b border-dashed border-slate-300 bg-transparent px-1 py-0.5 font-mono font-bold outline-none focus:bg-amber-50 print:border-0"
+                          />
+                          <span>°,</span>
+                          <input
+                            type="text"
+                            value={meta.coordenadasLng || ""}
+                            onChange={(e) =>
+                              applyLatLonWithUtm(
+                                meta.coordenadasLat || "",
+                                e.target.value
+                              )
+                            }
+                            placeholder="Longitud"
+                            className="w-[46%] border-b border-dashed border-slate-300 bg-transparent px-1 py-0.5 font-mono font-bold outline-none focus:bg-amber-50 print:border-0"
+                          />
+                          <span>°</span>
+                        </div>
                       </td>
                       <td className="border border-black bg-slate-100 px-2 py-1 font-bold w-[20%]">
                         COORDENADAS UTM:
                       </td>
                       <td className="border border-black px-2 py-1 font-mono font-bold">
-                        {meta.coordenadasUtm || "Huso 28R / 30T (según provincia)"}
+                        <input
+                          type="text"
+                          value={meta.coordenadasUtm || ""}
+                          onChange={(e) =>
+                            updateField("coordenadasUtm", e.target.value)
+                          }
+                          placeholder="Huso 28R / 30T · X / Y"
+                          className="w-full border-b border-dashed border-slate-300 bg-transparent px-1 py-0.5 font-mono font-bold outline-none focus:bg-amber-50 print:border-0"
+                        />
                       </td>
                     </tr>
                     <tr>
@@ -3121,172 +3305,858 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
                         REFERENCIA CATASTRAL:
                       </td>
                       <td className="border border-black px-2 py-1 font-mono">
-                        {meta.referenciaCatastral || "—"}
+                        <input
+                          type="text"
+                          value={meta.referenciaCatastral || ""}
+                          onChange={(e) =>
+                            updateField(
+                              "referenciaCatastral",
+                              e.target.value.toUpperCase()
+                            )
+                          }
+                          placeholder="Referencia Catastral (20 díg.)"
+                          className="w-full border-b border-dashed border-slate-300 bg-transparent px-1 py-0.5 font-mono outline-none focus:bg-amber-50 print:border-0"
+                        />
                       </td>
                       <td className="border border-black bg-slate-100 px-2 py-1 font-bold">
                         PUNTO DE SUMINISTRO:
                       </td>
                       <td className="border border-black px-2 py-1 font-semibold">
-                        {meta.fachadaNotaPuntoSuministro ||
-                          "CGP / Punto de Suministro en fachada principal"}
+                        <input
+                          type="text"
+                          value={meta.fachadaNotaPuntoSuministro || ""}
+                          onChange={(e) =>
+                            updateField(
+                              "fachadaNotaPuntoSuministro",
+                              e.target.value
+                            )
+                          }
+                          placeholder="CGP / Punto de Suministro en fachada principal"
+                          className="w-full border-b border-dashed border-slate-300 bg-transparent px-1 py-0.5 font-semibold outline-none focus:bg-amber-50 print:border-0"
+                        />
                       </td>
                     </tr>
                   </tbody>
                 </table>
 
-                {/* BLOQUE 1: PLANO DE SITUACIÓN (GOOGLE MAPS SATÉLITE + CROQUIS PARCELARIO CON COORDENADAS) */}
+                {/* BLOQUE 1: PLANO DE SITUACIÓN (GOOGLE MAPS SATÉLITE + CROQUIS PARCELARIO EDITABLE MANUALMENTE) */}
                 <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
                   {/* Mapa Google Maps Satélite / Callejero de las Coordenadas */}
                   <div className="border border-black bg-slate-50 flex flex-col">
-                    <div className="border-b border-black bg-slate-100 px-2 py-1 text-[9px] font-bold flex items-center justify-between">
+                    <div className="border-b border-black bg-slate-100 px-2 py-1 text-[9px] font-bold flex items-center justify-between gap-1">
                       <span>1A. PLANO DE LOCALIZACIÓN GOOGLE MAPS</span>
-                      <span className="font-mono text-[8.5px]">
+                      <span className="font-mono text-[8.5px] truncate">
                         {meta.coordenadasLat && meta.coordenadasLng
                           ? `${meta.coordenadasLat}, ${meta.coordenadasLng}`
                           : meta.terminoMunicipal}
                       </span>
                     </div>
-                    <div className="relative h-[205px] w-full overflow-hidden bg-slate-100">
+                    <div className="no-print border-b border-slate-200 bg-white px-2 py-1 flex items-center gap-1.5 text-[9px]">
+                      <span className="font-semibold text-slate-600 whitespace-nowrap">
+                        Ubicación mapa:
+                      </span>
+                      <input
+                        type="text"
+                        value={meta.croquisMapaQuery || ""}
+                        onChange={(e) =>
+                          updateField("croquisMapaQuery", e.target.value)
+                        }
+                        placeholder="Automático (coordenadas/dirección) o escribe dirección manual..."
+                        className="w-full rounded border border-slate-200 px-1.5 py-0.5 text-[9.5px] outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <div className="relative min-h-[205px] flex-1 w-full overflow-hidden bg-slate-100">
                       <iframe
                         title="Plano Google Maps Emplazamiento"
                         src={`https://maps.google.com/maps?q=${encodeURIComponent(
                           googleMapsEmbedQuery
                         )}&t=h&z=19&output=embed`}
-                        className="h-full w-full border-0"
+                        className="h-full min-h-[205px] w-full border-0"
                         loading="lazy"
                         referrerPolicy="no-referrer-when-downgrade"
                       />
                     </div>
                   </div>
 
-                  {/* Croquis Esquemático Vectorial Oficial (garantiza nitidez total en impresión PDF) */}
+                  {/* Croquis Esquemático Vectorial Oficial con Edición Manual Completa */}
                   <div className="border border-black bg-white flex flex-col">
-                    <div className="border-b border-black bg-slate-100 px-2 py-1 text-[9px] font-bold flex items-center justify-between">
+                    <div className="border-b border-black bg-slate-100 px-2 py-1 text-[9px] font-bold flex items-center justify-between gap-1">
                       <span>1B. CROQUIS PARCELARIO Y PUNTO DE ACOMETIDA</span>
-                      <span>ESCALA S/E · NORTE ↑</span>
-                    </div>
-                    <div className="flex-1 flex items-center justify-center p-1">
-                      <svg
-                        viewBox="0 0 680 385"
-                        className="h-[197px] w-full bg-slate-50"
-                      >
-                        <rect
-                          x="30"
-                          y="28"
-                          width="230"
-                          height="120"
-                          fill="#e2e8f0"
-                          stroke="#475569"
-                          strokeWidth="1.5"
-                        />
-                        <rect
-                          x="330"
-                          y="28"
-                          width="310"
-                          height="120"
-                          fill="#e2e8f0"
-                          stroke="#475569"
-                          strokeWidth="1.5"
-                        />
-                        <rect
-                          x="30"
-                          y="218"
-                          width="230"
-                          height="135"
-                          fill="#e2e8f0"
-                          stroke="#475569"
-                          strokeWidth="1.5"
-                        />
-                        <rect
-                          x="330"
-                          y="218"
-                          width="310"
-                          height="135"
-                          fill="#e2e8f0"
-                          stroke="#475569"
-                          strokeWidth="1.5"
-                        />
-
-                        {/* Parcela Objeto */}
-                        <rect
-                          x="345"
-                          y="218"
-                          width="175"
-                          height="105"
-                          fill="#fde68a"
-                          stroke="#000"
-                          strokeWidth="2.5"
-                        />
-                        <text x="356" y="244" fontSize="11" fontWeight="bold">
-                          EMPLAZAMIENTO B.T.
-                        </text>
-                        <text x="356" y="262" fontSize="10">
-                          Nº {meta.direccionNum} {meta.portalPlanta} · {meta.superficieUtilM2} m²
-                        </text>
-                        <text x="356" y="280" fontSize="9.5" fontWeight="bold" fill="#b91c1c">
-                          ⚡ {meta.fachadaNotaPuntoSuministro || "CGP en fachada"}
-                        </text>
-                        <text x="356" y="298" fontSize="8.5" fontFamily="monospace">
-                          {meta.coordenadasLat && meta.coordenadasLng
-                            ? `GPS: ${meta.coordenadasLat}, ${meta.coordenadasLng}`
-                            : meta.coordenadasUtm || "Punto georreferenciado"}
-                        </text>
-
-                        {/* Diana de coordenadas en fachada */}
-                        <circle
-                          cx="430"
-                          cy="218"
-                          r="9"
-                          fill="#dc2626"
-                          stroke="#fff"
-                          strokeWidth="2"
-                        />
-                        <line
-                          x1="430"
-                          y1="203"
-                          x2="430"
-                          y2="233"
-                          stroke="#dc2626"
-                          strokeWidth="1.8"
-                        />
-                        <line
-                          x1="415"
-                          y1="218"
-                          x2="445"
-                          y2="218"
-                          stroke="#dc2626"
-                          strokeWidth="1.8"
-                        />
-
-                        {/* Vía Principal */}
-                        <text
-                          x="110"
-                          y="188"
-                          fontSize="13"
-                          fontWeight="bold"
-                          fill="#0f172a"
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setIsCroquisManualOpen((v) => !v)}
+                          className={`no-print inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[8.5px] font-bold transition ${
+                            isCroquisManualOpen
+                              ? "bg-[#0f6cbd] text-white"
+                              : "border border-slate-400 bg-white text-slate-800 hover:bg-slate-200"
+                          }`}
                         >
-                          C/ {meta.direccionCalle.toUpperCase()} —{" "}
-                          {meta.terminoMunicipal.toUpperCase()}
-                        </text>
-
-                        {/* Norte */}
-                        <g transform="translate(605, 68)">
-                          <circle
-                            cx="0"
-                            cy="0"
-                            r="22"
-                            fill="#fff"
-                            stroke="#000"
-                            strokeWidth="1.5"
-                          />
-                          <polygon points="0,-18 -6,6 0,2 6,6" fill="#000" />
-                          <text x="-4" y="-24" fontSize="10" fontWeight="bold">
-                            N
-                          </text>
-                        </g>
-                      </svg>
+                          <Pencil className="h-2.5 w-2.5" />
+                          {isCroquisManualOpen
+                            ? "Edición manual activa"
+                            : "Edición manual"}
+                        </button>
+                        <span>ESCALA S/E · NORTE ↑</span>
+                      </div>
                     </div>
+
+                    {/* Barra de herramientas interactivas sobre el Croquis 1B (oculta al imprimir) */}
+                    {isCroquisManualOpen && (
+                      <div className="no-print border-b border-slate-200 bg-amber-50/70 px-2 py-1.5 space-y-1.5 text-[9px]">
+                        <input
+                          ref={croquisFileInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) compressAndSaveCroquisImage(f);
+                            e.target.value = "";
+                          }}
+                        />
+                        <div className="flex flex-wrap items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setCroquisTool("cgp")}
+                            className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-bold ${
+                              croquisTool === "cgp"
+                                ? "bg-rose-600 text-white"
+                                : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
+                            }`}
+                            title="Haz clic en el croquis para colocar la diana de CGP / Punto de Suministro"
+                          >
+                            <Crosshair className="h-2.5 w-2.5" />
+                            Situar CGP
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setCroquisTool("red")}
+                            className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-bold ${
+                              croquisTool === "red"
+                                ? "bg-emerald-700 text-white"
+                                : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
+                            }`}
+                            title="Haz clic en el croquis para situar la arqueta/apoyo de Red B.T. de acometida"
+                          >
+                            <Zap className="h-2.5 w-2.5" />
+                            Origen Red B.T.
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setCroquisTool("parcela")}
+                            className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-bold ${
+                              croquisTool === "parcela"
+                                ? "bg-amber-600 text-white"
+                                : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
+                            }`}
+                            title="Haz clic en el croquis para mover el recuadro amarillo de la parcela"
+                          >
+                            <Move className="h-2.5 w-2.5" />
+                            Mover Parcela
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setCroquisTool("draw")}
+                            className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-bold ${
+                              croquisTool === "draw"
+                                ? "bg-slate-900 text-white"
+                                : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
+                            }`}
+                            title="Arrastra sobre el croquis para dibujar calles, líneas o canalizaciones"
+                          >
+                            <Pencil className="h-2.5 w-2.5" />
+                            Dibujar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setCroquisTool("label")}
+                            className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-bold ${
+                              croquisTool === "label"
+                                ? "bg-indigo-600 text-white"
+                                : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
+                            }`}
+                            title="Escribe una etiqueta y haz clic en el croquis para añadirla"
+                          >
+                            <Type className="h-2.5 w-2.5" />
+                            Texto
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => croquisFileInputRef.current?.click()}
+                            className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white px-1.5 py-0.5 font-semibold text-slate-700 hover:bg-slate-100"
+                            title="Subir plano de Catastro o croquis propio como fondo de 1B"
+                          >
+                            <Upload className="h-2.5 w-2.5" />
+                            Fondo Catastro
+                          </button>
+                          {meta.croquisImagenDataUrl && (
+                            <button
+                              type="button"
+                              onClick={() => updateField("croquisImagenDataUrl", "")}
+                              className="rounded border border-rose-300 bg-white px-1.5 py-0.5 font-semibold text-rose-700 hover:bg-rose-50"
+                            >
+                              Quitar fondo
+                            </button>
+                          )}
+                          {croquisItems.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                saveCroquisItems(croquisItems.slice(0, -1))
+                              }
+                              className="inline-flex items-center gap-0.5 rounded border border-slate-300 bg-white px-1.5 py-0.5 font-semibold text-slate-700 hover:bg-slate-100"
+                              title="Deshacer último trazo o etiqueta"
+                            >
+                              <RotateCcw className="h-2.5 w-2.5" />
+                              Deshacer
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMeta((prev) => ({
+                                ...prev,
+                                croquisParcelaX: 345,
+                                croquisParcelaY: 218,
+                                croquisPinX: 430,
+                                croquisPinY: 218,
+                                croquisRedX: 295,
+                                croquisRedY: 185,
+                                croquisNorteGrados: 0,
+                                croquisDibujoJson: "[]",
+                              }));
+                            }}
+                            className="rounded border border-slate-300 bg-white px-1.5 py-0.5 text-slate-600 hover:bg-slate-100"
+                            title="Restablecer posiciones y limpiar trazos manuales"
+                          >
+                            Reiniciar
+                          </button>
+                        </div>
+
+                        {croquisTool === "label" && (
+                          <div className="flex items-center gap-1">
+                            <span className="font-semibold text-indigo-800">
+                              Etiqueta a colocar al hacer clic:
+                            </span>
+                            <input
+                              type="text"
+                              value={croquisLabelDraft}
+                              onChange={(e) => setCroquisLabelDraft(e.target.value)}
+                              placeholder="Ej: Arqueta Endesa / C.T. / Nº 40"
+                              className="flex-1 rounded border border-indigo-300 bg-white px-1.5 py-0.5 text-[9.5px] outline-none"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="flex-1 flex items-center justify-center p-1">
+                      {(() => {
+                        const parcelaX = meta.croquisParcelaX ?? 345;
+                        const parcelaY = meta.croquisParcelaY ?? 218;
+                        const pinX = meta.croquisPinX ?? 430;
+                        const pinY = meta.croquisPinY ?? 218;
+                        const redX = meta.croquisRedX ?? 295;
+                        const redY = meta.croquisRedY ?? 185;
+                        const showAcometida =
+                          meta.croquisMostrarAcometida !== false;
+                        const norteDeg = meta.croquisNorteGrados ?? 0;
+                        const [notaLine1, notaLine2] = splitParcelNoteLines(
+                          meta.fachadaNotaPuntoSuministro || "CGP en fachada"
+                        );
+                        const mainStreetText = meta.croquisCallePrincipal?.trim()
+                          ? meta.croquisCallePrincipal.trim().toUpperCase()
+                          : meta.direccionCalle?.trim()
+                            ? `C/ ${meta.direccionCalle.trim().toUpperCase()}${
+                                meta.terminoMunicipal?.trim()
+                                  ? ` — ${meta.terminoMunicipal.trim().toUpperCase()}`
+                                  : ""
+                              }`
+                            : meta.terminoMunicipal?.trim()
+                              ? `VÍA PÚBLICA — ${meta.terminoMunicipal.trim().toUpperCase()}`
+                              : "VÍA PÚBLICA PRINCIPAL";
+                        const parcelSubText = meta.croquisParcelaSubtitulo?.trim()
+                          ? meta.croquisParcelaSubtitulo.trim()
+                          : `Nº ${meta.direccionNum || "S/N"} ${meta.portalPlanta || ""} · ${meta.superficieUtilM2} m²`
+                              .replace(/\s+/g, " ")
+                              .trim();
+
+                        return (
+                          <svg
+                            viewBox="0 0 680 385"
+                            onPointerDown={(e) => {
+                              if (croquisTool === "draw") {
+                                e.currentTarget.setPointerCapture(e.pointerId);
+                                const pt = getCroquisSvgPoint(e);
+                                setActiveStroke([pt]);
+                              }
+                            }}
+                            onPointerMove={(e) => {
+                              if (croquisTool === "draw" && activeStroke) {
+                                const pt = getCroquisSvgPoint(e);
+                                const last =
+                                  activeStroke[activeStroke.length - 1];
+                                if (
+                                  !last ||
+                                  Math.hypot(pt.x - last.x, pt.y - last.y) >= 4
+                                ) {
+                                  setActiveStroke([...activeStroke, pt]);
+                                }
+                              }
+                            }}
+                            onPointerUp={() => {
+                              if (
+                                croquisTool === "draw" &&
+                                activeStroke &&
+                                activeStroke.length >= 2
+                              ) {
+                                saveCroquisItems([
+                                  ...croquisItems,
+                                  {
+                                    id: `st-${Date.now()}`,
+                                    kind: "stroke",
+                                    points: activeStroke,
+                                    color: "#0f172a",
+                                  },
+                                ]);
+                              }
+                              setActiveStroke(null);
+                            }}
+                            onClick={(e) => {
+                              if (croquisTool === "draw") return;
+                              const { x, y } = getCroquisSvgPoint(e);
+                              if (croquisTool === "cgp") {
+                                setMeta((prev) => ({
+                                  ...prev,
+                                  croquisPinX: x,
+                                  croquisPinY: y,
+                                }));
+                              } else if (croquisTool === "red") {
+                                setMeta((prev) => ({
+                                  ...prev,
+                                  croquisRedX: x,
+                                  croquisRedY: y,
+                                  croquisMostrarAcometida: true,
+                                }));
+                              } else if (croquisTool === "parcela") {
+                                setMeta((prev) => ({
+                                  ...prev,
+                                  croquisParcelaX: Math.max(
+                                    12,
+                                    Math.min(492, x - 87)
+                                  ),
+                                  croquisParcelaY: Math.max(
+                                    12,
+                                    Math.min(268, y - 52)
+                                  ),
+                                }));
+                              } else if (croquisTool === "label") {
+                                const txt = croquisLabelDraft.trim();
+                                if (txt) {
+                                  saveCroquisItems([
+                                    ...croquisItems,
+                                    {
+                                      id: `lb-${Date.now()}`,
+                                      kind: "label",
+                                      x,
+                                      y,
+                                      text: txt,
+                                      color: "#0f172a",
+                                    },
+                                  ]);
+                                }
+                              }
+                            }}
+                            className="h-[197px] w-full cursor-crosshair select-none bg-slate-50 touch-none"
+                          >
+                            <defs>
+                              <clipPath id="croquis-parcela-clip">
+                                <rect
+                                  x={parcelaX + 3}
+                                  y={parcelaY + 3}
+                                  width="169"
+                                  height="99"
+                                  rx="2"
+                                />
+                              </clipPath>
+                            </defs>
+
+                            {meta.croquisImagenDataUrl ? (
+                              <image
+                                href={meta.croquisImagenDataUrl}
+                                x="0"
+                                y="0"
+                                width="680"
+                                height="385"
+                                preserveAspectRatio="xMidYMid slice"
+                              />
+                            ) : (
+                              <>
+                                <rect
+                                  x="30"
+                                  y="28"
+                                  width="230"
+                                  height="120"
+                                  fill="#e2e8f0"
+                                  stroke="#475569"
+                                  strokeWidth="1.5"
+                                />
+                                {meta.croquisRefNoroeste?.trim() && (
+                                  <text
+                                    x="145"
+                                    y="92"
+                                    textAnchor="middle"
+                                    fontSize="10.5"
+                                    fontWeight="600"
+                                    fill="#334155"
+                                  >
+                                    {meta.croquisRefNoroeste.trim()}
+                                  </text>
+                                )}
+
+                                <rect
+                                  x="330"
+                                  y="28"
+                                  width="310"
+                                  height="120"
+                                  fill="#e2e8f0"
+                                  stroke="#475569"
+                                  strokeWidth="1.5"
+                                />
+                                {meta.croquisRefNoreste?.trim() && (
+                                  <text
+                                    x="460"
+                                    y="92"
+                                    textAnchor="middle"
+                                    fontSize="10.5"
+                                    fontWeight="600"
+                                    fill="#334155"
+                                  >
+                                    {meta.croquisRefNoreste.trim()}
+                                  </text>
+                                )}
+
+                                <rect
+                                  x="30"
+                                  y="218"
+                                  width="230"
+                                  height="135"
+                                  fill="#e2e8f0"
+                                  stroke="#475569"
+                                  strokeWidth="1.5"
+                                />
+                                {meta.croquisRefSuroeste?.trim() && (
+                                  <text
+                                    x="145"
+                                    y="290"
+                                    textAnchor="middle"
+                                    fontSize="10.5"
+                                    fontWeight="600"
+                                    fill="#334155"
+                                  >
+                                    {meta.croquisRefSuroeste.trim()}
+                                  </text>
+                                )}
+
+                                <rect
+                                  x="330"
+                                  y="218"
+                                  width="310"
+                                  height="135"
+                                  fill="#e2e8f0"
+                                  stroke="#475569"
+                                  strokeWidth="1.5"
+                                />
+                              </>
+                            )}
+
+                            {/* Calle perpendicular / cruce si el usuario la define */}
+                            {meta.croquisCalleCruce?.trim() && (
+                              <text
+                                x="296"
+                                y="192"
+                                textAnchor="middle"
+                                fontSize="11"
+                                fontWeight="bold"
+                                fill="#1e293b"
+                                transform="rotate(-90 296 192)"
+                              >
+                                {meta.croquisCalleCruce.trim().toUpperCase()}
+                              </text>
+                            )}
+
+                            {/* Vía Principal */}
+                            <text
+                              x="340"
+                              y="188"
+                              textAnchor="middle"
+                              fontSize="12.5"
+                              fontWeight="bold"
+                              fill="#0f172a"
+                              stroke="#ffffff"
+                              strokeWidth="3"
+                              paintOrder="stroke"
+                            >
+                              {mainStreetText}
+                            </text>
+
+                            {/* Parcela Objeto (con recorte estricto para evitar desbordamientos) */}
+                            <rect
+                              x={parcelaX}
+                              y={parcelaY}
+                              width="175"
+                              height="105"
+                              fill="#fde68a"
+                              fillOpacity={meta.croquisImagenDataUrl ? "0.9" : "1"}
+                              stroke="#000"
+                              strokeWidth="2.5"
+                            />
+                            <g clipPath="url(#croquis-parcela-clip)">
+                              <text
+                                x={parcelaX + 10}
+                                y={parcelaY + 21}
+                                fontSize="10.5"
+                                fontWeight="bold"
+                                fill="#000"
+                              >
+                                {meta.croquisParcelaTitulo?.trim() ||
+                                  "EMPLAZAMIENTO B.T."}
+                              </text>
+                              <text
+                                x={parcelaX + 10}
+                                y={parcelaY + 37}
+                                fontSize="9.2"
+                                fill="#1e293b"
+                              >
+                                {parcelSubText}
+                              </text>
+                              <text
+                                x={parcelaX + 10}
+                                y={parcelaY + 54}
+                                fontSize="8.8"
+                                fontWeight="bold"
+                                fill="#b91c1c"
+                              >
+                                ⚡ {notaLine1}
+                              </text>
+                              {notaLine2 && (
+                                <text
+                                  x={parcelaX + 20}
+                                  y={parcelaY + 66}
+                                  fontSize="8.5"
+                                  fontWeight="bold"
+                                  fill="#b91c1c"
+                                >
+                                  {notaLine2}
+                                </text>
+                              )}
+                              <text
+                                x={parcelaX + 10}
+                                y={parcelaY + 86}
+                                fontSize="8"
+                                fontFamily="monospace"
+                                fill="#0f172a"
+                              >
+                                {meta.coordenadasLat && meta.coordenadasLng
+                                  ? `GPS: ${meta.coordenadasLat}, ${meta.coordenadasLng}`
+                                  : meta.coordenadasUtm || "Punto georreferenciado"}
+                              </text>
+                            </g>
+
+                            {/* Línea de Acometida desde Red B.T. hasta CGP */}
+                            {showAcometida && (
+                              <g>
+                                <line
+                                  x1={redX}
+                                  y1={redY}
+                                  x2={pinX}
+                                  y2={pinY}
+                                  stroke="#dc2626"
+                                  strokeWidth="2.2"
+                                  strokeDasharray="6 4"
+                                />
+                                <rect
+                                  x={redX - 7}
+                                  y={redY - 7}
+                                  width="14"
+                                  height="14"
+                                  rx="2"
+                                  fill="#047857"
+                                  stroke="#fff"
+                                  strokeWidth="1.5"
+                                />
+                                <text
+                                  x={redX}
+                                  y={redY - 11}
+                                  textAnchor="middle"
+                                  fontSize="8.5"
+                                  fontWeight="bold"
+                                  fill="#065f46"
+                                  stroke="#fff"
+                                  strokeWidth="2.5"
+                                  paintOrder="stroke"
+                                >
+                                  {meta.croquisNotaAcometida?.trim() ||
+                                    "Red B.T. → CGP"}
+                                </text>
+                              </g>
+                            )}
+
+                            {/* Trazos y etiquetas manuales añadidos por el instalador */}
+                            {croquisItems.map((item) =>
+                              item.kind === "stroke" ? (
+                                <polyline
+                                  key={item.id}
+                                  fill="none"
+                                  stroke={item.color || "#0f172a"}
+                                  strokeWidth="2.4"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  points={item.points
+                                    .map((p) => `${p.x},${p.y}`)
+                                    .join(" ")}
+                                />
+                              ) : (
+                                <text
+                                  key={item.id}
+                                  x={item.x}
+                                  y={item.y}
+                                  fontSize="10.5"
+                                  fontWeight="bold"
+                                  fill={item.color || "#1e1b4b"}
+                                  stroke="#ffffff"
+                                  strokeWidth="3"
+                                  paintOrder="stroke"
+                                >
+                                  {item.text}
+                                </text>
+                              )
+                            )}
+
+                            {activeStroke && activeStroke.length >= 2 && (
+                              <polyline
+                                fill="none"
+                                stroke="#2563eb"
+                                strokeWidth="2.4"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                points={activeStroke
+                                  .map((p) => `${p.x},${p.y}`)
+                                  .join(" ")}
+                              />
+                            )}
+
+                            {/* Diana de coordenadas CGP en fachada */}
+                            <g>
+                              <circle
+                                cx={pinX}
+                                cy={pinY}
+                                r="9"
+                                fill="#dc2626"
+                                stroke="#fff"
+                                strokeWidth="2"
+                              />
+                              <line
+                                x1={pinX}
+                                y1={pinY - 14}
+                                x2={pinX}
+                                y2={pinY + 14}
+                                stroke="#dc2626"
+                                strokeWidth="1.8"
+                              />
+                              <line
+                                x1={pinX - 14}
+                                y1={pinY}
+                                x2={pinX + 14}
+                                y2={pinY}
+                                stroke="#dc2626"
+                                strokeWidth="1.8"
+                              />
+                            </g>
+
+                            {/* Rosa de orientación Norte orientable */}
+                            <g
+                              transform={`translate(605, 68) rotate(${norteDeg})`}
+                            >
+                              <circle
+                                cx="0"
+                                cy="0"
+                                r="22"
+                                fill="#fff"
+                                stroke="#000"
+                                strokeWidth="1.5"
+                              />
+                              <polygon points="0,-18 -6,6 0,2 6,6" fill="#000" />
+                              <text
+                                x="-4"
+                                y="-24"
+                                fontSize="10"
+                                fontWeight="bold"
+                              >
+                                N
+                              </text>
+                            </g>
+                          </svg>
+                        );
+                      })()}
+                    </div>
+
+                    {/* Campos manuales de textos, calles y colindantes del Croquis 1B (oculto en PDF) */}
+                    {isCroquisManualOpen && (
+                      <div className="no-print border-t border-slate-200 bg-slate-50 p-2 grid grid-cols-2 gap-1.5 text-[9px]">
+                        <div>
+                          <label className="block font-bold text-slate-600">
+                            Calle principal (horizontal)
+                          </label>
+                          <input
+                            type="text"
+                            value={meta.croquisCallePrincipal || ""}
+                            onChange={(e) =>
+                              updateField(
+                                "croquisCallePrincipal",
+                                e.target.value
+                              )
+                            }
+                            placeholder={`C/ ${meta.direccionCalle || "Principal"}`}
+                            className="w-full rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[9.5px]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block font-bold text-slate-600">
+                            Calle cruce / perpendicular
+                          </label>
+                          <input
+                            type="text"
+                            value={meta.croquisCalleCruce || ""}
+                            onChange={(e) =>
+                              updateField("croquisCalleCruce", e.target.value)
+                            }
+                            placeholder="Ej: C/ Transversal / Esquina"
+                            className="w-full rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[9.5px]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block font-bold text-slate-600">
+                            Título parcela amarilla
+                          </label>
+                          <input
+                            type="text"
+                            value={meta.croquisParcelaTitulo ?? "EMPLAZAMIENTO B.T."}
+                            onChange={(e) =>
+                              updateField(
+                                "croquisParcelaTitulo",
+                                e.target.value
+                              )
+                            }
+                            className="w-full rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[9.5px]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block font-bold text-slate-600">
+                            Subtítulo parcela (Nº / m²)
+                          </label>
+                          <input
+                            type="text"
+                            value={meta.croquisParcelaSubtitulo || ""}
+                            onChange={(e) =>
+                              updateField(
+                                "croquisParcelaSubtitulo",
+                                e.target.value
+                              )
+                            }
+                            placeholder={`Nº ${meta.direccionNum || "S/N"} · ${meta.superficieUtilM2} m²`}
+                            className="w-full rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[9.5px]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block font-bold text-slate-600">
+                            Manzana Sup. Izq. / Der.
+                          </label>
+                          <div className="flex gap-1">
+                            <input
+                              type="text"
+                              value={meta.croquisRefNoroeste || ""}
+                              onChange={(e) =>
+                                updateField(
+                                  "croquisRefNoroeste",
+                                  e.target.value
+                                )
+                              }
+                              placeholder="Sup. Izq."
+                              className="w-1/2 rounded border border-slate-300 bg-white px-1 py-0.5 text-[9.5px]"
+                            />
+                            <input
+                              type="text"
+                              value={meta.croquisRefNoreste || ""}
+                              onChange={(e) =>
+                                updateField("croquisRefNoreste", e.target.value)
+                              }
+                              placeholder="Sup. Der."
+                              className="w-1/2 rounded border border-slate-300 bg-white px-1 py-0.5 text-[9.5px]"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block font-bold text-slate-600">
+                            Manzana Colindante Izq.
+                          </label>
+                          <input
+                            type="text"
+                            value={meta.croquisRefSuroeste || ""}
+                            onChange={(e) =>
+                              updateField("croquisRefSuroeste", e.target.value)
+                            }
+                            placeholder="Ej: Edif. Nº 40 / Plaza"
+                            className="w-full rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[9.5px]"
+                          />
+                        </div>
+                        <div className="col-span-2 flex flex-wrap items-center justify-between gap-2 pt-0.5">
+                          <label className="inline-flex items-center gap-1 font-semibold text-slate-700">
+                            <input
+                              type="checkbox"
+                              checked={meta.croquisMostrarAcometida !== false}
+                              onChange={(e) =>
+                                updateField(
+                                  "croquisMostrarAcometida",
+                                  e.target.checked
+                                )
+                              }
+                            />
+                            Trazar acometida:
+                          </label>
+                          <input
+                            type="text"
+                            value={meta.croquisNotaAcometida ?? "Red B.T. → CGP"}
+                            onChange={(e) =>
+                              updateField(
+                                "croquisNotaAcometida",
+                                e.target.value
+                              )
+                            }
+                            placeholder="Red B.T. → CGP"
+                            className="flex-1 rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[9.5px]"
+                          />
+                          <label className="inline-flex items-center gap-1 font-semibold text-slate-700">
+                            Norte (°):
+                            <input
+                              type="number"
+                              min={0}
+                              max={359}
+                              step={15}
+                              value={meta.croquisNorteGrados ?? 0}
+                              onChange={(e) =>
+                                updateField(
+                                  "croquisNorteGrados",
+                                  Number(e.target.value) || 0
+                                )
+                              }
+                              className="w-12 rounded border border-slate-300 bg-white px-1 py-0.5 text-center font-mono text-[9.5px]"
+                            />
+                          </label>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 

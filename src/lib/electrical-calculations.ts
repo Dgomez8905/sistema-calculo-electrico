@@ -230,9 +230,9 @@ export const REBT_SPAIN_IGA_TRI_STEPS: RebtSpainIgaStep[] = [
     maxPowerKw: 17.32,
     accessTariff: "3.0TD",
     electrificationGrade: "elevada",
-    shortLabel: "IGA 25 A (4P) · 17,32 kW (3.0TD)",
-    label: "IGA 25 A (4P) — 17.321 W (17,32 kW) · Trifásico · Tarifa 3.0TD (> 15 kW)",
-    rebtCitation: "ITC-BT-17 · Circular 3/2020 CNMC Tarifa 3.0TD (> 15 kW · 6 periodos)",
+    shortLabel: "IGA 25 A (4P) · 17,32 kW · Combi DIN (3.0TD)",
+    label: "IGA 25 A (4P) — 17.321 W (17,32 kW) · Comercio Estándar (Combi DIN) · Tarifa 3.0TD",
+    rebtCitation: "ITC-BT-17 · Comercio estándar ≤ 43 kW (Combi DIN) · Tarifa 3.0TD",
   },
   {
     igaAmps: 32,
@@ -242,9 +242,9 @@ export const REBT_SPAIN_IGA_TRI_STEPS: RebtSpainIgaStep[] = [
     maxPowerKw: 22.17,
     accessTariff: "3.0TD",
     electrificationGrade: "elevada",
-    shortLabel: "IGA 32 A (4P) · 22,17 kW (3.0TD)",
-    label: "IGA 32 A (4P) — 22.170 W (22,17 kW) · Trifásico · Tarifa 3.0TD (> 15 kW)",
-    rebtCitation: "ITC-BT-17 · Circular 3/2020 CNMC Tarifa 3.0TD (> 15 kW)",
+    shortLabel: "IGA 32 A (4P) · 22,17 kW · Combi DIN (3.0TD)",
+    label: "IGA 32 A (4P) — 22.170 W (22,17 kW) · Comercio Estándar (Combi DIN) · Tarifa 3.0TD",
+    rebtCitation: "ITC-BT-17 · Comercio estándar ≤ 43 kW (Combi DIN) · Tarifa 3.0TD",
   },
   {
     igaAmps: 40,
@@ -254,9 +254,9 @@ export const REBT_SPAIN_IGA_TRI_STEPS: RebtSpainIgaStep[] = [
     maxPowerKw: 27.71,
     accessTariff: "3.0TD",
     electrificationGrade: "elevada",
-    shortLabel: "IGA 40 A (4P) · 27,71 kW (3.0TD)",
-    label: "IGA 40 A (4P) — 27.713 W (27,71 kW) · Trifásico · Tarifa 3.0TD (> 15 kW)",
-    rebtCitation: "ITC-BT-17 · Circular 3/2020 CNMC Tarifa 3.0TD (> 15 kW)",
+    shortLabel: "IGA 40 A (4P) · 27,71 kW · Combi DIN (3.0TD)",
+    label: "IGA 40 A (4P) — 27.713 W (27,71 kW) · Comercio Estándar (Combi DIN) · Tarifa 3.0TD",
+    rebtCitation: "ITC-BT-17 · Comercio estándar ≤ 43 kW (Combi DIN) · Tarifa 3.0TD",
   },
   {
     igaAmps: 50,
@@ -266,9 +266,9 @@ export const REBT_SPAIN_IGA_TRI_STEPS: RebtSpainIgaStep[] = [
     maxPowerKw: 34.64,
     accessTariff: "3.0TD",
     electrificationGrade: "elevada",
-    shortLabel: "IGA 50 A (4P) · 34,64 kW (3.0TD)",
-    label: "IGA 50 A (4P) — 34.641 W (34,64 kW) · Trifásico · Tarifa 3.0TD (> 15 kW)",
-    rebtCitation: "ITC-BT-17 · Circular 3/2020 CNMC Tarifa 3.0TD (> 15 kW)",
+    shortLabel: "IGA 50 A (4P) · 34,64 kW · Combi DIN (3.0TD)",
+    label: "IGA 50 A (4P) — 34.641 W (34,64 kW) · Comercio Estándar (Combi DIN) · Tarifa 3.0TD",
+    rebtCitation: "ITC-BT-17 · Comercio estándar ≤ 43 kW (Combi DIN) · Tarifa 3.0TD",
   },
   {
     igaAmps: 63,
@@ -278,9 +278,9 @@ export const REBT_SPAIN_IGA_TRI_STEPS: RebtSpainIgaStep[] = [
     maxPowerKw: 43.65,
     accessTariff: "3.0TD",
     electrificationGrade: "elevada",
-    shortLabel: "IGA 63 A (4P) · 43,65 kW · Máx. Med. Directa (3.0TD)",
-    label: "IGA 63 A (4P) — 43.648 W (43,65 kW) · Máx. Medida Directa · Tarifa 3.0TD",
-    rebtCitation: "ITC-BT-16 (Medida directa ≤ 63 A) · Tarifa 3.0TD (> 15 kW)",
+    shortLabel: "IGA 63 A (4P) · 43,65 kW · Máx. Combi DIN (3.0TD)",
+    label: "IGA 63 A (4P) — 43.648 W (43,65 kW) · Tope Comercio Estándar (Combi DIN) · Tarifa 3.0TD",
+    rebtCitation: "ITC-BT-16 / BT-17 (Medida directa y Combi DIN ≤ 63 A) · Tarifa 3.0TD",
   },
   {
     igaAmps: 80,
@@ -290,9 +290,9 @@ export const REBT_SPAIN_IGA_TRI_STEPS: RebtSpainIgaStep[] = [
     maxPowerKw: 55.43,
     accessTariff: "3.0TD",
     electrificationGrade: "elevada",
-    shortLabel: "IGA 80 A (4P) · 55,43 kW · Med. Indirecta (3.0TD)",
-    label: "IGA 80 A (4P) — 55.426 W (55,43 kW) · Medida Indirecta TI · Tarifa 3.0TD",
-    rebtCitation: "ITC-BT-16 (Transformadores de intensidad) · Tarifa 3.0TD",
+    shortLabel: "IGA 80 A (4P) · 55,43 kW · Caja Moldeada + Bobina (3.0TD)",
+    label: "IGA 80 A (4P) — 55.426 W (55,43 kW) · Gran Comercio (MCCB + Bobina Disparo) · Tarifa 3.0TD",
+    rebtCitation: "ITC-BT-16 / BT-17 (> 63 A: Caja Moldeada + Bobina Disparo + DPS/POP indep.) · 3.0TD",
   },
   {
     igaAmps: 100,
@@ -302,9 +302,9 @@ export const REBT_SPAIN_IGA_TRI_STEPS: RebtSpainIgaStep[] = [
     maxPowerKw: 69.28,
     accessTariff: "3.0TD",
     electrificationGrade: "elevada",
-    shortLabel: "IGA 100 A (4P) · 69,28 kW (3.0TD)",
-    label: "IGA 100 A (4P) — 69.282 W (69,28 kW) · Terciario / Industrial · Tarifa 3.0TD",
-    rebtCitation: "ITC-BT-16 / BT-17 · Tarifa 3.0TD (> 15 kW)",
+    shortLabel: "IGA 100 A (4P) · 69,28 kW · Caja Moldeada + Bobina (3.0TD)",
+    label: "IGA 100 A (4P) — 69.282 W (69,28 kW) · Gran Comercio / Industria (MCCB + Bobina) · 3.0TD",
+    rebtCitation: "ITC-BT-16 / BT-17 (> 63 A: Caja Moldeada + Bobina Disparo + DPS/POP indep.) · 3.0TD",
   },
   {
     igaAmps: 125,
@@ -314,9 +314,9 @@ export const REBT_SPAIN_IGA_TRI_STEPS: RebtSpainIgaStep[] = [
     maxPowerKw: 86.6,
     accessTariff: "3.0TD",
     electrificationGrade: "elevada",
-    shortLabel: "IGA 125 A (4P) · 86,60 kW (3.0TD)",
-    label: "IGA 125 A (4P) — 86.603 W (86,60 kW) · Industrial · Tarifa 3.0TD",
-    rebtCitation: "ITC-BT-16 / BT-17 · Tarifa 3.0TD (> 15 kW)",
+    shortLabel: "IGA 125 A (4P) · 86,60 kW · Caja Moldeada + Bobina (3.0TD)",
+    label: "IGA 125 A (4P) — 86.603 W (86,60 kW) · Mediana Industria (MCCB + Bobina) · Tarifa 3.0TD",
+    rebtCitation: "ITC-BT-16 / BT-17 (> 63 A: Caja Moldeada + Bobina Disparo + DPS/POP indep.) · 3.0TD",
   },
   {
     igaAmps: 160,
@@ -326,9 +326,33 @@ export const REBT_SPAIN_IGA_TRI_STEPS: RebtSpainIgaStep[] = [
     maxPowerKw: 110.85,
     accessTariff: "3.0TD",
     electrificationGrade: "elevada",
-    shortLabel: "IGA 160 A (4P) · 110,85 kW (3.0TD)",
-    label: "IGA 160 A (4P) — 110.851 W (110,85 kW) · Gran Potencia > 100 kW · Tarifa 3.0TD",
-    rebtCitation: "ITC-BT-04 (> 100 kW Proyecto) · Tarifa 3.0TD",
+    shortLabel: "IGA 160 A (4P) · 110,85 kW · Caja Moldeada + Bobina (3.0TD)",
+    label: "IGA 160 A (4P) — 110.851 W (110,85 kW) · Industria > 100 kW (MCCB + Bobina) · Tarifa 3.0TD",
+    rebtCitation: "ITC-BT-04 (> 100 kW Proyecto) · Caja Moldeada + Bobina Disparo · 3.0TD",
+  },
+  {
+    igaAmps: 200,
+    poles: 4,
+    supplyType: "trifasico_400v",
+    maxPowerWatts: 138564,
+    maxPowerKw: 138.56,
+    accessTariff: "3.0TD",
+    electrificationGrade: "elevada",
+    shortLabel: "IGA 200 A (4P) · 138,56 kW · Caja Moldeada + Bobina (3.0TD)",
+    label: "IGA 200 A (4P) — 138.564 W (138,56 kW) · Industria (MCCB + Bobina) · Tarifa 3.0TD",
+    rebtCitation: "ITC-BT-04 (> 100 kW Proyecto) · Caja Moldeada + Bobina Disparo · 3.0TD",
+  },
+  {
+    igaAmps: 250,
+    poles: 4,
+    supplyType: "trifasico_400v",
+    maxPowerWatts: 173205,
+    maxPowerKw: 173.21,
+    accessTariff: "3.0TD",
+    electrificationGrade: "elevada",
+    shortLabel: "IGA 250 A (4P) · 173,21 kW · Caja Moldeada + Bobina (3.0TD)",
+    label: "IGA 250 A (4P) — 173.205 W (173,21 kW) · Gran Industria (MCCB + Bobina) · Tarifa 3.0TD",
+    rebtCitation: "ITC-BT-04 (> 100 kW Proyecto) · Caja Moldeada + Bobina Disparo · 3.0TD",
   },
 ];
 
@@ -354,18 +378,33 @@ export function sanitizeSpanishIgaAmps(
   return nextUp ? nextUp.igaAmps : steps[steps.length - 1].igaAmps;
 }
 
+export type CommercialPowerTier =
+  | "vivienda_comercio_mono"
+  | "comercio_estandar_din"
+  | "gran_comercio_mccb";
+
+export type HeaderSurgeArchitecture =
+  | "combi_din_compacto"
+  | "mccb_bobina_independiente";
+
 export interface SpanishRebtIgaResolution {
   igaAmps: number;
   autoIgaAmps: number;
   poles: 2 | 4;
   maxAdmissibleWatts: number;
   maxAdmissibleKw: number;
+  effectiveDesignWatts: number;
+  effectiveDesignKw: number;
   simultaneousDemandWatts: number;
   accessTariff: SpanishAccessTariff;
   tariffBadgeLabel: string;
   tariffDetail: string;
   effectiveElectrificationGrade: "basica" | "elevada";
   electrificationLabel: string;
+  commercialTier: CommercialPowerTier;
+  commercialTierLabel: string;
+  headerArchitecture: HeaderSurgeArchitecture;
+  headerProtectionSummary: string;
   rebtCitation: string;
   exceedsSinglePhaseLimit: boolean;
   step: RebtSpainIgaStep;
@@ -373,14 +412,11 @@ export interface SpanishRebtIgaResolution {
 
 /**
  * Determina el calibre oficial del IGA, la Potencia Máxima Admisible (PMA),
- * el Grado de Electrificación REBT (ITC-BT-10 / ITC-BT-25) y la Tarifa de Acceso
- * en España (2.0TD ≤ 15 kW / 3.0TD > 15 kW, Circular 3/2020 CNMC).
- *
- * En viviendas evita el error de sumar aritméticamente los circuitos nominales
- * (C1..C5 = 18.050 W → 80 A), aplicando los escalones reglamentarios españoles:
- * - Básica (C1..C5, ≤ 160 m²): 5.750 W → IGA 25 A (o 7.360 W → IGA 32 A)
- * - Elevada (> 5 circuitos, > 160 m², C8/C9/C10/C11/C13): 9.200 W → IGA 40 A
- *   (o 11.500 W → IGA 50 A / 14.490 W → IGA 63 A máx. monofásico con recarga VE).
+ * el Grado de Electrificación REBT (ITC-BT-10 / ITC-BT-25), la Tarifa de Acceso
+ * en España (2.0TD ≤ 15 kW / 3.0TD > 15 kW) y la arquitectura de cabecera comercial:
+ * - ≤ 63 A (hasta ~43,65 kW en 3F): Equipo compacto combinado en carril DIN (IGA + POP + DPS T2).
+ * - > 63 A (80 A, 100 A, 125 A+, > 43,65 kW): IGA de Caja Moldeada (MCCB) + Bobina de disparo
+ *   acoplada a protector independiente de sobretensiones permanentes y transitorias.
  */
 export function resolveSpanishRebtIgaAndTariff(params: {
   supplyType: SystemSupplyType;
@@ -388,8 +424,16 @@ export function resolveSpanishRebtIgaAndTariff(params: {
   circuits: RebtCalculatedCircuit[];
   areaM2?: number;
   overrideIgaAmps?: number | null;
+  customDesignPowerWatts?: number | null;
 }): SpanishRebtIgaResolution {
-  const { supplyType, electrificationGrade, circuits, areaM2 = 0, overrideIgaAmps } = params;
+  const {
+    supplyType,
+    electrificationGrade,
+    circuits,
+    areaM2 = 0,
+    overrideIgaAmps,
+    customDesignPowerWatts,
+  } = params;
   const steps = getSpanishIgaStepsForSupply(supplyType);
 
   const isHousingProfile =
@@ -425,7 +469,14 @@ export function resolveSpanishRebtIgaAndTariff(params: {
   let simultaneousDemandWatts = 5750;
   let exceedsSinglePhaseLimit = false;
 
-  if (isHousingProfile) {
+  const hasCustomPower =
+    typeof customDesignPowerWatts === "number" &&
+    Number.isFinite(customDesignPowerWatts) &&
+    customDesignPowerWatts > 0;
+
+  if (hasCustomPower) {
+    simultaneousDemandWatts = Math.round(customDesignPowerWatts);
+  } else if (isHousingProfile) {
     if (effectiveGrade === "basica") {
       // ITC-BT-10 §2.1 / ITC-BT-25 §2.2: Electrificación Básica = 5.750 W (IGA 25 A)
       // Si el usuario elevó manualmente algún PIA a 32 A, sube al escalón de 32 A (7.360 W)
@@ -452,19 +503,20 @@ export function resolveSpanishRebtIgaAndTariff(params: {
     exceedsSinglePhaseLimit = true;
   }
 
-  const minIgaForGrade =
-    supplyType === "monofasico_230v"
-      ? effectiveGrade === "elevada"
-        ? 40
-        : 25
-      : 16;
+  const minIgaForGrade = hasCustomPower
+    ? 10
+    : supplyType === "monofasico_230v"
+    ? effectiveGrade === "elevada"
+      ? 40
+      : 25
+    : 16;
 
   const autoStep =
     steps.find(
       (s) =>
         s.maxPowerWatts >= simultaneousDemandWatts &&
         s.igaAmps >= minIgaForGrade &&
-        s.igaAmps >= Math.min(maxSinglePiaAmps, supplyType === "monofasico_230v" ? 63 : 160)
+        s.igaAmps >= Math.min(maxSinglePiaAmps, supplyType === "monofasico_230v" ? 63 : 250)
     ) || steps[steps.length - 1];
 
   // Validar override manual: en monofásico 230 V nunca se admite IGA > 63 A (ej. 80 A heredado)
@@ -474,10 +526,39 @@ export function resolveSpanishRebtIgaAndTariff(params: {
       : null;
 
   const chosenStep = validOverrideStep || autoStep;
+  const effectiveDesignWatts =
+    hasCustomPower && !validOverrideStep
+      ? supplyType === "monofasico_230v"
+        ? Math.min(14490, Math.round(customDesignPowerWatts))
+        : Math.round(customDesignPowerWatts)
+      : chosenStep.maxPowerWatts;
+  const effectiveDesignKw = Number((effectiveDesignWatts / 1000).toFixed(2));
+
   const resolvedGrade: "basica" | "elevada" =
     chosenStep.electrificationGrade === "elevada" || effectiveGrade === "elevada"
       ? "elevada"
       : "basica";
+
+  const isMccbOver63 = chosenStep.igaAmps > 63;
+  const headerArchitecture: HeaderSurgeArchitecture = isMccbOver63
+    ? "mccb_bobina_independiente"
+    : "combi_din_compacto";
+  const commercialTier: CommercialPowerTier = isMccbOver63
+    ? "gran_comercio_mccb"
+    : supplyType === "trifasico_400v"
+    ? "comercio_estandar_din"
+    : "vivienda_comercio_mono";
+
+  const commercialTierLabel =
+    commercialTier === "gran_comercio_mccb"
+      ? "Gran Comercio / Mediana Industria (> 43 kW · 80–250 A)"
+      : commercialTier === "comercio_estandar_din"
+      ? "Comercio Estándar Trifásico (≤ 43,65 kW · 25–63 A)"
+      : "Vivienda / Local Monofásico (≤ 14,49 kW · ≤ 63 A)";
+
+  const headerProtectionSummary = isMccbOver63
+    ? "Caja Moldeada (MCCB) + Bobina de Disparo MX + Protector DPS/POP independiente"
+    : "Equipo compacto combinado Combi en carril DIN (IGA + POP + DPS T2)";
 
   const tariffBadgeLabel =
     chosenStep.accessTariff === "2.0TD"
@@ -494,6 +575,8 @@ export function resolveSpanishRebtIgaAndTariff(params: {
     poles: chosenStep.poles,
     maxAdmissibleWatts: chosenStep.maxPowerWatts,
     maxAdmissibleKw: chosenStep.maxPowerKw,
+    effectiveDesignWatts,
+    effectiveDesignKw,
     simultaneousDemandWatts: Math.round(simultaneousDemandWatts),
     accessTariff: chosenStep.accessTariff,
     tariffBadgeLabel,
@@ -503,6 +586,10 @@ export function resolveSpanishRebtIgaAndTariff(params: {
       resolvedGrade === "elevada"
         ? "Electrificación Elevada (ITC-BT-10 / BT-25)"
         : "Electrificación Básica (ITC-BT-10 / BT-25)",
+    commercialTier,
+    commercialTierLabel,
+    headerArchitecture,
+    headerProtectionSummary,
     rebtCitation: chosenStep.rebtCitation,
     exceedsSinglePhaseLimit,
     step: chosenStep,
@@ -1330,7 +1417,7 @@ export interface MtdFormMetadata {
   // Página 5: Memoria Descriptiva (si está vacío se autogenera)
   memoriaDescriptivaTexto: string;
 
-  // Página 9: Coordenadas Geográficas / UTM, Catastro y Fotografía de Fachada (Google Street View / Obra)
+  // Página 9: Coordenadas Geográficas / UTM, Catastro, Croquis 1B Manual y Fotografía de Fachada
   coordenadasLat?: string;
   coordenadasLng?: string;
   coordenadasUtm?: string;
@@ -1339,6 +1426,25 @@ export interface MtdFormMetadata {
   fachadaNotaPuntoSuministro?: string;
   fachadaPinX?: number;
   fachadaPinY?: number;
+  croquisMapaQuery?: string;
+  croquisCallePrincipal?: string;
+  croquisCalleCruce?: string;
+  croquisRefNoroeste?: string;
+  croquisRefNoreste?: string;
+  croquisRefSuroeste?: string;
+  croquisParcelaTitulo?: string;
+  croquisParcelaSubtitulo?: string;
+  croquisNotaAcometida?: string;
+  croquisMostrarAcometida?: boolean;
+  croquisParcelaX?: number;
+  croquisParcelaY?: number;
+  croquisPinX?: number;
+  croquisPinY?: number;
+  croquisRedX?: number;
+  croquisRedY?: number;
+  croquisNorteGrados?: number;
+  croquisDibujoJson?: string;
+  croquisImagenDataUrl?: string;
 
   // Página 11: Autor de la M.T.D. (Instalador Autorizado PH / Técnico Competente)
   autorTipo: "instalador_ph" | "tecnico_competente";
@@ -1457,6 +1563,25 @@ export const DEFAULT_MTD_METADATA: MtdFormMetadata = {
   fachadaNotaPuntoSuministro: "CGP / CPM en fachada principal accesible desde vía pública",
   fachadaPinX: 50,
   fachadaPinY: 62,
+  croquisMapaQuery: "",
+  croquisCallePrincipal: "",
+  croquisCalleCruce: "",
+  croquisRefNoroeste: "",
+  croquisRefNoreste: "",
+  croquisRefSuroeste: "",
+  croquisParcelaTitulo: "EMPLAZAMIENTO B.T.",
+  croquisParcelaSubtitulo: "",
+  croquisNotaAcometida: "Red B.T. → CGP",
+  croquisMostrarAcometida: true,
+  croquisParcelaX: 345,
+  croquisParcelaY: 218,
+  croquisPinX: 430,
+  croquisPinY: 218,
+  croquisRedX: 295,
+  croquisRedY: 185,
+  croquisNorteGrados: 0,
+  croquisDibujoJson: "[]",
+  croquisImagenDataUrl: "",
 
   autorTipo: "instalador_ph",
   instaladorNombrePh: "Daniel Gómez Rojas",

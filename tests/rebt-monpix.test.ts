@@ -493,3 +493,59 @@ test("Combi sustituye al IGA + Georreferenciación UTM España para Fachada Goog
   assert.equal(madridUtm.zone, 30);
   assert.equal(madridUtm.band, "T");
 });
+
+test("Rangos comerciales de potencia e IGA: ≤ 63 A Combi DIN compacto vs > 63 A Caja Moldeada (MCCB) + Bobina Disparo", () => {
+  const circuits = ITC_BT_25_TEMPLATES.slice(0, 5).map((c) => calculateRebtCircuit(c));
+
+  // 1. Comercio estándar trifásico (ej. 30 kW -> IGA 50 A 4P · ≤ 43,65 kW -> Combi DIN compacto)
+  const stdComm = resolveSpanishRebtIgaAndTariff({
+    supplyType: "trifasico_400v",
+    electrificationGrade: "elevada",
+    circuits,
+    customDesignPowerWatts: 30000,
+  });
+  assert.equal(stdComm.igaAmps, 50);
+  assert.equal(stdComm.effectiveDesignWatts, 30000);
+  assert.equal(stdComm.commercialTier, "comercio_estandar_din");
+  assert.equal(stdComm.headerArchitecture, "combi_din_compacto");
+
+  const stdMods = buildDinModulesFromProject({
+    supplyType: "trifasico_400v",
+    igaAmps: stdComm.igaAmps,
+    rcdCount: 2,
+    hasCombiSurge: true,
+    meta: DEFAULT_MTD_METADATA,
+    circuits,
+  });
+  assert.equal(stdMods[0].kind, "COMBI");
+  assert.equal(stdMods[0].ratingAmps, 50);
+
+  // 2. Gran comercio o mediana industria (> 43 kW, ej. 60 kW -> IGA 100 A 4P -> MCCB + Bobina MX + DPS independiente)
+  const largeComm = resolveSpanishRebtIgaAndTariff({
+    supplyType: "trifasico_400v",
+    electrificationGrade: "elevada",
+    circuits,
+    customDesignPowerWatts: 60000,
+  });
+  assert.equal(largeComm.igaAmps, 100);
+  assert.equal(largeComm.commercialTier, "gran_comercio_mccb");
+  assert.equal(largeComm.headerArchitecture, "mccb_bobina_independiente");
+
+  const mccbMods = buildDinModulesFromProject({
+    supplyType: "trifasico_400v",
+    igaAmps: largeComm.igaAmps,
+    rcdCount: 2,
+    hasCombiSurge: true,
+    meta: DEFAULT_MTD_METADATA,
+    circuits,
+  });
+  assert.equal(mccbMods[0].kind, "IGA");
+  assert.equal(mccbMods[0].label, "IGA MCCB");
+  assert.equal(mccbMods[0].ratingAmps, 100);
+  assert.equal(mccbMods.some((m) => m.kind === "COMBI"), false);
+  assert.equal(mccbMods.some((m) => m.kind === "POP" && m.label === "POP+MX"), true);
+  assert.equal(mccbMods.some((m) => m.kind === "DPS"), true);
+
+  const mccbDiag = validateDinPanelInstallation(mccbMods, 36);
+  assert.equal(mccbDiag[0].severity, "ok");
+});

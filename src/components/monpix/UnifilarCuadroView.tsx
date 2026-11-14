@@ -903,6 +903,53 @@ export default function UnifilarCuadroView({
         };
         return [...prev, newRcd];
       }
+      if (autoFixType === "convert_combi_to_mccb" && moduleId) {
+        const target = prev.find((m) => m.id === moduleId);
+        const amps = target?.ratingAmps || 80;
+        const mccbMods: DinModule[] = [
+          {
+            id: `mod-mccb-${Date.now()}`,
+            kind: "IGA",
+            label: "IGA MCCB",
+            sublabel: "Caja Moldeada+MX",
+            ratingAmps: amps,
+            curve: "C",
+            poles: 4,
+            modulesWidth: 4,
+            isOn: true,
+          },
+          {
+            id: `mod-pop-mx-${Date.now() + 1}`,
+            kind: "POP",
+            label: "POP+MX",
+            sublabel: "Bobina Disparo",
+            ratingAmps: amps,
+            poles: 4,
+            modulesWidth: 2,
+            isOn: true,
+          },
+          {
+            id: `mod-dps-ind-${Date.now() + 2}`,
+            kind: "DPS",
+            label: "DPS T1+T2",
+            sublabel: "Descargador Ind.",
+            ratingAmps: 25,
+            poles: 4,
+            modulesWidth: 2,
+            isOn: true,
+          },
+        ];
+        return [
+          ...mccbMods,
+          ...prev.filter(
+            (m) =>
+              m.id !== moduleId &&
+              m.kind !== "IGA" &&
+              m.kind !== "DPS" &&
+              m.kind !== "POP"
+          ),
+        ];
+      }
       if (autoFixType === "remove_redundant_iga" && moduleId) {
         return prev.filter((m) => m.id !== moduleId);
       }
@@ -1041,13 +1088,19 @@ export default function UnifilarCuadroView({
         counts.set(key, {
           item:
             m.kind === "COMBI"
-              ? `Combinado IGA + Sobretensiones Permanentes y Transitorias T2 (${m.poles}P ${m.ratingAmps} A)`
+              ? `Combinado compacto carril DIN (IGA + POP + DPS T2) ${m.poles}P ${m.ratingAmps} A`
               : m.kind === "IGA"
-              ? `Interruptor General Automático (IGA) ${m.poles}P ${m.ratingAmps} A`
+              ? m.ratingAmps > 63
+                ? `Interruptor Automático Caja Moldeada (MCCB) ${m.poles}P ${m.ratingAmps} A + Bobina de Disparo MX`
+                : `Interruptor General Automático (IGA) ${m.poles}P ${m.ratingAmps} A`
               : m.kind === "DPS"
-              ? `Descargador Sobretensiones Transitorias DPS Tipo 2 (${m.poles}P)`
+              ? m.poles === 4 && igaAmps > 63
+                ? `Descargador Independiente Sobretensiones Tipo 1+2 (${m.poles}P)`
+                : `Descargador Sobretensiones Transitorias DPS Tipo 2 (${m.poles}P)`
               : m.kind === "POP"
-              ? `Protector Sobretensiones Permanentes POP 230/400V (${m.ratingAmps} A)`
+              ? m.ratingAmps > 63
+                ? `Protector Permanente POP Independiente acoplado a Bobina de Disparo (${m.ratingAmps} A)`
+                : `Protector Sobretensiones Permanentes POP 230/400V (${m.ratingAmps} A)`
               : m.kind === "DIF"
               ? `Interruptor Diferencial ${m.poles}P ${m.ratingAmps} A / ${m.sensitivityMa || 30} mA Clase ${m.rcdClass || "AC"}`
               : m.kind === "PIA"

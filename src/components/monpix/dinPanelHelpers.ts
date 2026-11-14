@@ -63,7 +63,8 @@ export interface PanelDiagnostic {
     | "fix_pe"
     | "upsize_iga"
     | "normalize_iga"
-    | "remove_redundant_iga";
+    | "remove_redundant_iga"
+    | "convert_combi_to_mccb";
 }
 
 export interface FaultChallengeScenario {
@@ -150,8 +151,46 @@ export function buildDinModulesFromProject(params: {
   const isThreePhase = supplyType === "trifasico_400v";
   const modules: DinModule[] = [];
 
-  if (hasCombiSurge) {
-    // El bloque Combi integra IGA + Sobretensiones Permanentes (POP) + Transitorias (DPS T2), sustituyendo al IGA suelto
+  if (igaAmps > 63) {
+    // Gran comercio o mediana industria (> 43 kW / > 63 A: 80 A, 100 A, 125 A+):
+    // Se emplea Interruptor Automático de Caja Moldeada (MCCB) + Bobina de Disparo MX
+    // acoplada a un protector independiente de sobretensiones permanentes y transitorias.
+    modules.push({
+      id: "mod-mccb-iga",
+      kind: "IGA",
+      label: "IGA MCCB",
+      sublabel: "Caja Moldeada+MX",
+      ratingAmps: igaAmps,
+      curve: "C",
+      poles: 4,
+      modulesWidth: 4,
+      isOn: true,
+    });
+    if (hasCombiSurge) {
+      modules.push({
+        id: "mod-pop-coil",
+        kind: "POP",
+        label: "POP+MX",
+        sublabel: "Bobina Disparo",
+        ratingAmps: igaAmps,
+        poles: 4,
+        modulesWidth: 2,
+        isOn: true,
+      });
+      modules.push({
+        id: "mod-dps-ind",
+        kind: "DPS",
+        label: "DPS T1+T2",
+        sublabel: "Descargador Ind.",
+        ratingAmps: 25,
+        poles: 4,
+        modulesWidth: 2,
+        isOn: true,
+      });
+    }
+  } else if (hasCombiSurge) {
+    // Comercio estándar (≤ 43 kW: 25 A, 32 A, 40 A, 50 A y 63 A) y Vivienda:
+    // Equipo compacto combinado en carril DIN (IGA + POP + DPS T2), sustituyendo al IGA suelto.
     modules.push({
       id: "mod-combi-iga",
       kind: "COMBI",
@@ -188,7 +227,7 @@ export function buildDinModulesFromProject(params: {
       kind: "DIF",
       label: `DIF #${g + 1}`,
       sublabel: `30mA · ${meta.diferencialClase}`,
-      ratingAmps: Math.max(40, igaAmps),
+      ratingAmps: igaAmps > 63 && totalRcds >= 2 ? 63 : Math.max(40, igaAmps),
       sensitivityMa: 30,
       rcdClass: meta.diferencialClase,
       poles: isThreePhase ? 4 : 2,
@@ -299,6 +338,21 @@ export function validateDinPanelInstallation(
           "Retira el IGA suelto y conserva únicamente el bloque Combi en la primera posición del carril DIN.",
         moduleId: standaloneIga.id,
         autoFixType: "remove_redundant_iga",
+      });
+    }
+    if (combiBlock && combiBlock.poles === 4 && combiBlock.ratingAmps > 63) {
+      issues.push({
+        id: "warn-combi-over-63a",
+        severity: "warning",
+        code: "COMBI-MAYOR-63A",
+        title: `Calibre ${combiBlock.ratingAmps} A (> 63 A / > 43 kW): usar Caja Moldeada (MCCB) + Bobina + Protector independiente`,
+        detail:
+          "Los bloques compactos combinados (IGA + POP + DPS) en carril DIN se emplean hasta 63 A (~43 kW). Para 80 A, 100 A, 125 A o superiores se instala interruptor automático de caja moldeada con bobina de disparo acoplada a un protector independiente.",
+        itc: "ITC-BT-17 / ITC-BT-23 / UNE-EN 60947-2",
+        solution:
+          "Convierte la cabecera en IGA de Caja Moldeada (MCCB) + relé POP con bobina de disparo MX + descargador DPS independiente.",
+        moduleId: combiBlock.id,
+        autoFixType: "convert_combi_to_mccb",
       });
     }
     const iga = combiBlock || igas[0];

@@ -191,21 +191,39 @@ export function buildUnifilarIec60617Svg(input: UnifilarSvgInput): string {
   <line x1="${centerX}" y1="170" x2="${centerX}" y2="205" stroke="#0f172a" stroke-width="2.2"/>
 
   ${renderIecBreakerGlyph(centerX, 205, igaNode ? igaNode.isOn : true)}
-  <text x="${centerX + 18}" y="227" font-family="Arial" font-size="11" font-weight="bold" fill="#0f172a">${igaNode?.kind === "COMBI" ? "COMBI " : ""}IGA · In: ${activeIgaAmps} A</text>
-  <text x="${centerX + 18}" y="241" font-family="Arial" font-size="9.5" fill="#0f6cbd">${supplyType === "trifasico_400v" ? "4P Curva C" : "2P Curva C"} · Icu: ${icuKa} kA${igaNode?.kind === "COMBI" ? " · Combi T2+POP" : ""}</text>
+  <text x="${centerX + 18}" y="227" font-family="Arial" font-size="11" font-weight="bold" fill="#0f172a">${
+    activeIgaAmps > 63
+      ? "MCCB Caja Moldeada · "
+      : igaNode?.kind === "COMBI"
+      ? "COMBI "
+      : ""
+  }IGA · In: ${activeIgaAmps} A</text>
+  <text x="${centerX + 18}" y="241" font-family="Arial" font-size="9.5" fill="#0f6cbd">${
+    activeIgaAmps > 63
+      ? `4P Reg. + Bobina MX · Icu: ${Math.max(icuKa, 25)} kA`
+      : `${supplyType === "trifasico_400v" ? "4P Curva C" : "2P Curva C"} · Icu: ${icuKa} kA${
+          igaNode?.kind === "COMBI" ? " · Combi T2+POP" : ""
+        }`
+  }</text>
   <line x1="${centerX}" y1="253" x2="${centerX}" y2="${busY}" stroke="#0f172a" stroke-width="2.4"/>
 
   ${
     hasCombiSurge
       ? `<line x1="${centerX}" y1="286" x2="${centerX - 115}" y2="286" stroke="#0f172a" stroke-width="1.8"/>
-         <rect x="${centerX - 165}" y="274" width="50" height="24" fill="#fffbeb" stroke="#d97706" stroke-width="1.8"/>
-         <text x="${centerX - 140}" y="290" font-family="Arial" font-size="9.5" font-weight="bold" text-anchor="middle" fill="#92400e">DPS+POP</text>
-         <text x="${centerX - 175}" y="283" font-family="Arial" font-size="8.5" text-anchor="end" fill="#475569">Sobretensiones T2 + Perm.</text>
-         <text x="${centerX - 175}" y="295" font-family="Arial" font-size="8" text-anchor="end" fill="#64748b">Up ≤ ${escapeXml(meta.sobretensionesKv)} kV (ITC-BT-23)</text>
-         <line x1="${centerX - 140}" y1="298" x2="${centerX - 140}" y2="314" stroke="#0f172a" stroke-width="1.5"/>
-         <line x1="${centerX - 152}" y1="314" x2="${centerX - 128}" y2="314" stroke="#059669" stroke-width="1.8"/>
-         <line x1="${centerX - 148}" y1="318" x2="${centerX - 132}" y2="318" stroke="#059669" stroke-width="1.8"/>
-         <line x1="${centerX - 144}" y1="322" x2="${centerX - 136}" y2="322" stroke="#059669" stroke-width="1.8"/>`
+         <rect x="${centerX - 175}" y="274" width="60" height="24" fill="#fffbeb" stroke="#d97706" stroke-width="1.8"/>
+         <text x="${centerX - 145}" y="290" font-family="Arial" font-size="9" font-weight="bold" text-anchor="middle" fill="#92400e">${
+           activeIgaAmps > 63 ? "POP+MX / T1+T2" : "DPS+POP"
+         }</text>
+         <text x="${centerX - 183}" y="283" font-family="Arial" font-size="8.5" text-anchor="end" fill="#475569">${
+           activeIgaAmps > 63
+             ? "Protector indep. + Bobina Disparo (>63A)"
+             : "Combi DIN (IGA + T2 + POP ≤ 63A)"
+         }</text>
+         <text x="${centerX - 183}" y="295" font-family="Arial" font-size="8" text-anchor="end" fill="#64748b">Up ≤ ${escapeXml(meta.sobretensionesKv)} kV (ITC-BT-23)</text>
+         <line x1="${centerX - 145}" y1="298" x2="${centerX - 145}" y2="314" stroke="#0f172a" stroke-width="1.5"/>
+         <line x1="${centerX - 157}" y1="314" x2="${centerX - 133}" y2="314" stroke="#059669" stroke-width="1.8"/>
+         <line x1="${centerX - 153}" y1="318" x2="${centerX - 137}" y2="318" stroke="#059669" stroke-width="1.8"/>
+         <line x1="${centerX - 149}" y1="322" x2="${centerX - 141}" y2="322" stroke="#059669" stroke-width="1.8"/>`
       : ""
   }
 

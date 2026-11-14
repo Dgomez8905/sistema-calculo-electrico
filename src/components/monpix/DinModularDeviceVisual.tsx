@@ -129,15 +129,21 @@ export default function DinModularDeviceVisual({
   // Etiqueta principal tipo aparato real (el Combi integra IGA + T2 + POP)
   const mainMarking =
     mod.kind === "IGA"
-      ? `${mod.curve || "C"}${mod.ratingAmps}`
+      ? mod.ratingAmps > 63
+        ? `MCCB ${mod.ratingAmps}A +MX`
+        : `${mod.curve || "C"}${mod.ratingAmps}`
       : mod.kind === "COMBI"
       ? `${mod.curve || "C"}${mod.ratingAmps} · T2+POP`
       : mod.kind === "DIF"
       ? `${mod.ratingAmps}A · ${mod.sensitivityMa || 30}mA`
       : mod.kind === "DPS"
-      ? "T2 · 15kA"
+      ? mod.poles === 4
+        ? "T1+T2 · 25kA"
+        : "T2 · 15kA"
       : mod.kind === "POP"
-      ? "POP"
+      ? mod.ratingAmps > 63
+        ? "POP → MX"
+        : "POP"
       : mod.kind === "PIA"
       ? `${mod.curve || "C"}${mod.ratingAmps}`
       : mod.kind === "CONTACTOR"

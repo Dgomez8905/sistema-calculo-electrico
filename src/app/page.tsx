@@ -61,6 +61,8 @@ import {
   resolveSpanishRebtIgaAndTariff,
   getSpanishIgaStepsForSupply,
   sanitizeSpanishIgaAmps,
+  REBT_SPAIN_IGA_MONO_STEPS,
+  REBT_SPAIN_IGA_TRI_STEPS,
 } from "@/lib/electrical-calculations";
 import MtdCanariasOfficialForm from "@/components/MtdCanariasOfficialForm";
 import {
@@ -395,6 +397,7 @@ export default function SistemaCalculoRebtPage() {
   const [allProjects, setAllProjects] = useState<SavedProjectRow[]>([]);
   const [panelOverrideIgaAmps, setPanelOverrideIgaAmps] = useState<number | null>(null);
   const [panelOverrideRcdCount, setPanelOverrideRcdCount] = useState<number | null>(null);
+  const [customDesignPowerKw, setCustomDesignPowerKw] = useState<number | null>(null);
 
   const generalServicesW = commonLightingW + hydroW + otherServicesW;
 
@@ -425,10 +428,14 @@ export default function SistemaCalculoRebtPage() {
       circuits: calculatedCircuits,
       areaM2: Number(mtdMeta.superficieUtilM2) || 0,
       overrideIgaAmps: panelOverrideIgaAmps,
+      customDesignPowerWatts:
+        customDesignPowerKw !== null && customDesignPowerKw > 0
+          ? Math.round(customDesignPowerKw * 1000)
+          : null,
     });
 
     const igaAmps = rebtIga.igaAmps;
-    const contractDesignWatts = rebtIga.maxAdmissibleWatts;
+    const contractDesignWatts = rebtIga.effectiveDesignWatts;
     const designCurrentAmps = Number((contractDesignWatts / denom).toFixed(2));
 
     const hasEvCircuitC13 = calculatedCircuits.some(
@@ -468,6 +475,8 @@ export default function SistemaCalculoRebtPage() {
       totalInstalledWatts,
       totalDesignWatts: Math.round(totalDesignWatts),
       contractDesignWatts: Math.round(contractDesignWatts),
+      effectiveDesignKw: rebtIga.effectiveDesignKw,
+      maxAdmissibleWatts: rebtIga.maxAdmissibleWatts,
       maxAdmissibleKw: rebtIga.maxAdmissibleKw,
       simultaneousDemandWatts: rebtIga.simultaneousDemandWatts,
       designCurrentAmps,
@@ -479,6 +488,10 @@ export default function SistemaCalculoRebtPage() {
       tariffDetail: rebtIga.tariffDetail,
       effectiveElectrificationGrade: rebtIga.effectiveElectrificationGrade,
       electrificationLabel: rebtIga.electrificationLabel,
+      commercialTier: rebtIga.commercialTier,
+      commercialTierLabel: rebtIga.commercialTierLabel,
+      headerArchitecture: rebtIga.headerArchitecture,
+      headerProtectionSummary: rebtIga.headerProtectionSummary,
       rebtCitation: rebtIga.rebtCitation,
       exceedsSinglePhaseLimit: rebtIga.exceedsSinglePhaseLimit,
       rcd30mACount,
@@ -495,6 +508,7 @@ export default function SistemaCalculoRebtPage() {
     mtdMeta.superficieUtilM2,
     panelOverrideIgaAmps,
     panelOverrideRcdCount,
+    customDesignPowerKw,
   ]);
 
   // Previsión de Cargas del Edificio (ITC-BT-10 + ITC-BT-52 + ITC-BT-14)
@@ -731,6 +745,7 @@ export default function SistemaCalculoRebtPage() {
       setCircuits(ITC_BT_25_TEMPLATES.slice(0, 5));
       setPanelOverrideIgaAmps(null);
       setPanelOverrideRcdCount(null);
+      setCustomDesignPowerKw(null);
     },
     []
   );
@@ -1471,6 +1486,7 @@ export default function SistemaCalculoRebtPage() {
     if (!currentUser.can_edit_calculations) return;
     setPanelOverrideIgaAmps(null);
     setPanelOverrideRcdCount(null);
+    setCustomDesignPowerKw(null);
     if (preset === "basica") {
       setElectrificationGrade("basica");
       setCircuits(ITC_BT_25_TEMPLATES.slice(0, 5));
@@ -2868,40 +2884,107 @@ export default function SistemaCalculoRebtPage() {
              ================================================================= */}
           {activeSection === "circuitos" && (
             <div className="space-y-6">
-              {/* Tarjetas Resumen en Diseño Claro ( Escalones Oficiales REBT + Tarifas 2.0TD / 3.0TD ) */}
+              {/* Tarjetas Resumen en Diseño Claro ( Potencia Editable + Rangos Comerciales IGA ≤63A Combi DIN vs >63A Caja Moldeada + Bobina ) */}
               <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
+                <div className="rounded-xl border border-blue-200 bg-white p-4 shadow-2xs ring-1 ring-[#0f6cbd]/10">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-medium text-slate-500">
-                      Potencia Prevista REBT (PMA)
+                    <span className="text-xs font-semibold text-slate-600">
+                      Potencia Prevista / Contratada
                     </span>
                     <span
                       className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${
-                        cgmpSummary.effectiveElectrificationGrade === "elevada"
+                        cgmpSummary.commercialTier === "gran_comercio_mccb"
+                          ? "bg-amber-50 text-amber-900 ring-1 ring-amber-500/30"
+                          : cgmpSummary.commercialTier === "comercio_estandar_din"
+                          ? "bg-indigo-50 text-indigo-800 ring-1 ring-indigo-500/25"
+                          : cgmpSummary.effectiveElectrificationGrade === "elevada"
                           ? "bg-blue-50 text-[#0f6cbd] ring-1 ring-[#0f6cbd]/20"
                           : "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-600/20"
                       }`}
                     >
-                      {cgmpSummary.effectiveElectrificationGrade === "elevada"
+                      {cgmpSummary.commercialTier === "gran_comercio_mccb"
+                        ? "> 43 kW · Gran Comercio"
+                        : cgmpSummary.commercialTier === "comercio_estandar_din"
+                        ? "≤ 43 kW · Comercio Estándar"
+                        : cgmpSummary.effectiveElectrificationGrade === "elevada"
                         ? "Elevada ITC-BT-10"
                         : "Básica ITC-BT-10"}
                     </span>
                   </div>
+
                   <p className="mt-1 text-2xl font-bold text-slate-900">
                     {cgmpSummary.contractDesignWatts.toLocaleString()} W{" "}
-                    <span className="text-sm font-semibold text-slate-500">
-                      ({cgmpSummary.maxAdmissibleKw.toFixed(2)} kW)
+                    <span className="text-sm font-semibold text-[#0f6cbd]">
+                      ({cgmpSummary.effectiveDesignKw.toFixed(2)} kW)
                     </span>
                   </p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Suma nominal circuitos:{" "}
+
+                  {/* Selector e Input directo para cambiar la potencia en kW */}
+                  <div className="mt-2 flex items-center gap-1.5">
+                    <label
+                      htmlFor="custom-power-kw-input"
+                      className="text-[11px] font-semibold text-slate-600 whitespace-nowrap"
+                    >
+                      Cambiar kW:
+                    </label>
+                    <input
+                      id="custom-power-kw-input"
+                      type="number"
+                      min={1}
+                      max={173.21}
+                      step={0.05}
+                      value={
+                        customDesignPowerKw !== null
+                          ? customDesignPowerKw
+                          : cgmpSummary.effectiveDesignKw
+                      }
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        if (!raw) {
+                          setCustomDesignPowerKw(null);
+                          return;
+                        }
+                        const valKw = Number(raw);
+                        if (!Number.isFinite(valKw) || valKw <= 0) return;
+                        setCustomDesignPowerKw(valKw);
+                        setPanelOverrideIgaAmps(null);
+                        if (valKw > 14.49 && supplyType === "monofasico_230v") {
+                          setSupplyType("trifasico_400v");
+                          setElectrificationGrade("elevada");
+                        } else if (
+                          supplyType === "monofasico_230v" &&
+                          valKw > 7.36
+                        ) {
+                          setElectrificationGrade("elevada");
+                        }
+                      }}
+                      className="w-24 rounded-lg border border-slate-300 bg-slate-50 px-2 py-1 font-mono text-xs font-bold text-slate-900 focus:border-[#0f6cbd] focus:bg-white focus:outline-none"
+                      title="Escribe cualquier potencia en kW (ej. 5.75, 9.2, 22.17, 43.65, 55.43, 86.6)"
+                    />
+                    <span className="text-[11px] font-semibold text-slate-500">
+                      kW
+                    </span>
+                    {customDesignPowerKw !== null && (
+                      <button
+                        type="button"
+                        onClick={() => setCustomDesignPowerKw(null)}
+                        className="ml-auto rounded border border-slate-300 bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 hover:bg-slate-200"
+                        title="Volver al cálculo automático según circuitos"
+                      >
+                        Auto
+                      </button>
+                    )}
+                  </div>
+
+                  <p className="mt-1.5 text-[11px] text-slate-500">
+                    PMA IGA: {cgmpSummary.maxAdmissibleKw.toFixed(2)} kW · Suma nominal:{" "}
                     {cgmpSummary.totalInstalledWatts.toLocaleString()} W
                   </p>
                 </div>
 
                 <div className="rounded-xl border border-blue-200 bg-white p-4 shadow-2xs ring-1 ring-[#0f6cbd]/10">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-medium text-slate-600">
+                    <span className="text-xs font-semibold text-slate-600">
                       Protección General (CGMP) y Tarifa
                     </span>
                     <span
@@ -2917,7 +3000,8 @@ export default function SistemaCalculoRebtPage() {
                   </div>
                   <div className="mt-1 flex items-baseline justify-between gap-2">
                     <p className="text-2xl font-bold text-[#0f6cbd]">
-                      IGA {cgmpSummary.igaAmps} A{" "}
+                      {cgmpSummary.igaAmps > 63 ? "MCCB " : "IGA "}
+                      {cgmpSummary.igaAmps} A{" "}
                       <span className="text-xs font-semibold text-slate-500">
                         ({cgmpSummary.igaPoles}P)
                       </span>
@@ -2929,48 +3013,84 @@ export default function SistemaCalculoRebtPage() {
                       </strong>
                     </span>
                   </div>
+
+                  {/* Selector agrupado por Tipo de Local y Rango Comercial (≤63A Combi DIN vs >63A Caja Moldeada + Bobina) */}
                   <div className="mt-2">
                     <select
-                      aria-label="Escalón IGA según REBT y tarifas de electrificación en España"
+                      aria-label="Seleccionar potencia y calibre IGA según tipo de local (Vivienda, Comercio Estándar ≤43kW o Gran Comercio >43kW)"
                       value={
                         panelOverrideIgaAmps === null
                           ? "auto"
-                          : String(cgmpSummary.igaAmps)
+                          : `${supplyType === "trifasico_400v" ? "3F" : "1F"}-${cgmpSummary.igaAmps}`
                       }
                       onChange={(e) => {
                         const val = e.target.value;
                         if (val === "auto") {
                           setPanelOverrideIgaAmps(null);
-                        } else {
-                          const nextAmps = Number(val);
-                          setPanelOverrideIgaAmps(nextAmps);
-                          if (
-                            supplyType === "monofasico_230v" &&
-                            nextAmps >= 40
-                          ) {
-                            setElectrificationGrade("elevada");
-                          } else if (
-                            supplyType === "monofasico_230v" &&
-                            nextAmps <= 32 &&
-                            calculatedCircuits.length <= 5
-                          ) {
-                            setElectrificationGrade("basica");
-                          }
+                          return;
+                        }
+                        const [phaseTag, ampsStr] = val.split("-");
+                        const nextAmps = Number(ampsStr);
+                        const nextSupply: SystemSupplyType =
+                          phaseTag === "3F" ? "trifasico_400v" : "monofasico_230v";
+                        setSupplyType(nextSupply);
+                        setCustomDesignPowerKw(null);
+                        setPanelOverrideIgaAmps(nextAmps);
+                        if (nextSupply === "trifasico_400v" || nextAmps >= 40) {
+                          setElectrificationGrade("elevada");
+                        } else if (
+                          nextAmps <= 32 &&
+                          calculatedCircuits.length <= 5
+                        ) {
+                          setElectrificationGrade("basica");
                         }
                       }}
                       className="w-full rounded-lg border border-slate-300 bg-slate-50 px-2 py-1 text-[11px] font-semibold text-slate-800 focus:border-[#0f6cbd] focus:outline-none"
                     >
                       <option value="auto">
-                        Automático REBT (IGA {cgmpSummary.autoIgaAmps} A ·{" "}
+                        Automático ({cgmpSummary.autoIgaAmps} A ·{" "}
+                        {cgmpSummary.effectiveDesignKw.toFixed(2)} kW ·{" "}
                         {cgmpSummary.accessTariff})
                       </option>
-                      {getSpanishIgaStepsForSupply(supplyType).map((st) => (
-                        <option key={st.igaAmps} value={st.igaAmps}>
-                          {st.shortLabel}
-                        </option>
-                      ))}
+                      <optgroup label="Vivienda / Pequeño Local Monofásico 230 V (≤ 14,49 kW · Combi DIN)">
+                        {REBT_SPAIN_IGA_MONO_STEPS.map((st) => (
+                          <option key={`1F-${st.igaAmps}`} value={`1F-${st.igaAmps}`}>
+                            1F · {st.shortLabel}
+                          </option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="Comercio Estándar Trifásico 400 V (≤ 43,65 kW · 25A–63A · Combi DIN compacto)">
+                        {REBT_SPAIN_IGA_TRI_STEPS.filter((st) => st.igaAmps <= 63).map(
+                          (st) => (
+                            <option
+                              key={`3F-${st.igaAmps}`}
+                              value={`3F-${st.igaAmps}`}
+                            >
+                              3F · {st.shortLabel}
+                            </option>
+                          )
+                        )}
+                      </optgroup>
+                      <optgroup label="Gran Comercio / Mediana Industria (> 43,65 kW · 80A–250A · Caja Moldeada + Bobina)">
+                        {REBT_SPAIN_IGA_TRI_STEPS.filter((st) => st.igaAmps > 63).map(
+                          (st) => (
+                            <option
+                              key={`3F-${st.igaAmps}`}
+                              value={`3F-${st.igaAmps}`}
+                            >
+                              3F · {st.shortLabel}
+                            </option>
+                          )
+                        )}
+                      </optgroup>
                     </select>
                   </div>
+
+                  <p className="mt-1.5 text-[10.5px] font-medium text-slate-600">
+                    {cgmpSummary.igaAmps > 63
+                      ? "⚙️ > 63 A: Caja Moldeada + Bobina MX + DPS/POP indep."
+                      : "🧩 ≤ 63 A: Equipo compacto Combi carril DIN (IGA+POP+T2)"}
+                  </p>
                 </div>
 
                 <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
