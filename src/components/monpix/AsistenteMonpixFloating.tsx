@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   MessageSquareText,
   Mic,
@@ -9,6 +9,9 @@ import {
   ArrowRight,
   PlusCircle,
   ShieldAlert,
+  GripVertical,
+  Minimize2,
+  RotateCcw,
 } from "lucide-react";
 import {
   answerRebtQuestion,
@@ -22,6 +25,14 @@ interface AsistenteMonpixFloatingProps {
   onQuickCreateTask: (title: string) => void;
 }
 
+interface FloatingPos {
+  x: number;
+  y: number;
+}
+
+const STORAGE_POS_KEY = "rebt_assistant_fab_pos_v1";
+const STORAGE_COMPACT_KEY = "rebt_assistant_fab_compact_v1";
+
 const QUICK_PROMPTS = [
   "¿Qué sección para un horno de 3,5 kW?",
   "¿Cómo hago una toma de tierra?",
@@ -30,11 +41,46 @@ const QUICK_PROMPTS = [
   "Punto de recarga coche eléctrico",
 ];
 
+function clampPosition(
+  pos: FloatingPos,
+  btnWidth = 210,
+  btnHeight = 48
+): FloatingPos {
+  if (typeof window === "undefined") return pos;
+  const margin = 12;
+  const maxX = Math.max(margin, window.innerWidth - btnWidth - margin);
+  const maxY = Math.max(margin, window.innerHeight - btnHeight - margin);
+  return {
+    x: Math.min(Math.max(margin, Math.round(pos.x)), maxX),
+    y: Math.min(Math.max(margin, Math.round(pos.y)), maxY),
+  };
+}
+
+function getDefaultPosition(compact = false): FloatingPos {
+  if (typeof window === "undefined") return { x: 24, y: 24 };
+  const isMobile = window.innerWidth < 1024;
+  const btnW = compact ? 52 : 215;
+  const btnH = 48;
+  return clampPosition(
+    {
+      x: window.innerWidth - btnW - (isMobile ? 16 : 24),
+      y: window.innerHeight - btnH - (isMobile ? 72 : 24),
+    },
+    btnW,
+    btnH
+  );
+}
+
 export default function AsistenteMonpixFloating({
   onNavigateSection,
   onQuickCreateTask,
 }: AsistenteMonpixFloatingProps) {
   const [open, setOpen] = useState(false);
+  const [compactPill, setCompactPill] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [pos, setPos] = useState<FloatingPos>({ x: 24, y: 24 });
+  const [isDragging, setIsDragging] = useState(false);
+
   const [query, setQuery] = useState("");
   const [history, setHistory] = useState<
     { question: string; response: RebtQaResponse }[]
@@ -43,12 +89,158 @@ export default function AsistenteMonpixFloating({
     null
   );
 
+  const buttonRef = useRef<HTMLDivElement | null>(null);
+  const dragStateRef = useRef<{
+    active: boolean;
+    pointerId: number;
+    startClientX: number;
+    startClientY: number;
+    originX: number;
+    originY: number;
+    moved: boolean;
+  }>({
+    active: false,
+    pointerId: -1,
+    startClientX: 0,
+    startClientY: 0,
+    originX: 0,
+    originY: 0,
+    moved: false,
+  });
+
+  // Inicializar posición persistida y mantener dentro del viewport al redimensionar
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let initialCompact = false;
+    try {
+      initialCompact = window.localStorage.getItem(STORAGE_COMPACT_KEY) === "1";
+      setCompactPill(initialCompact);
+      const raw = window.localStorage.getItem(STORAGE_POS_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as FloatingPos;
+        if (typeof parsed?.x === "number" && typeof parsed?.y === "number") {
+          setPos(clampPosition(parsed, initialCompact ? 52 : 215, 48));
+          setMounted(true);
+          return;
+        }
+      }
+    } catch {
+      // Ignorar errores de lectura de localStorage
+    }
+    setPos(getDefaultPosition(initialCompact));
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted || typeof window === "undefined") return;
+    const handleResize = () => {
+      const w = buttonRef.current?.offsetWidth || (compactPill ? 52 : 215);
+      const h = buttonRef.current?.offsetHeight || 48;
+      setPos((prev) => clampPosition(prev, w, h));
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [mounted, compactPill]);
+
+  const persistPos = useCallback((next: FloatingPos) => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(STORAGE_POS_KEY, JSON.stringify(next));
+    } catch {
+      // Ignorar errores de cuota
+    }
+  }, []);
+
+  const toggleCompactMode = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const nextCompact = !compactPill;
+    setCompactPill(nextCompact);
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.setItem(STORAGE_COMPACT_KEY, nextCompact ? "1" : "0");
+      } catch {
+        // Ignorar
+      }
+    }
+    setPos((prev) => clampPosition(prev, nextCompact ? 52 : 215, 48));
+  };
+
+  const resetToDefaultCorner = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const def = getDefaultPosition(compactPill);
+    setPos(def);
+    persistPos(def);
+  };
+
+  // Gestión de arrastre interactivo (ratón, táctil y lápiz)
+  const handlePointerDown = (e: React.PointerEvent<HTMLElement>) => {
+    if (e.button !== 0 && e.pointerType === "mouse") return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    dragStateRef.current = {
+      active: true,
+      pointerId: e.pointerId,
+      startClientX: e.clientX,
+      startClientY: e.clientY,
+      originX: pos.x,
+      originY: pos.y,
+      moved: false,
+    };
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLElement>) => {
+    const st = dragStateRef.current;
+    if (!st.active || st.pointerId !== e.pointerId) return;
+    const dx = e.clientX - st.startClientX;
+    const dy = e.clientY - st.startClientY;
+    if (!st.moved && Math.hypot(dx, dy) < 6) {
+      return;
+    }
+    if (!st.moved) {
+      st.moved = true;
+      setIsDragging(true);
+    }
+    const w = buttonRef.current?.offsetWidth || (compactPill ? 52 : 215);
+    const h = buttonRef.current?.offsetHeight || 48;
+    const next = clampPosition(
+      {
+        x: st.originX + dx,
+        y: st.originY + dy,
+      },
+      w,
+      h
+    );
+    setPos(next);
+  };
+
+  const handlePointerUp = (
+    e: React.PointerEvent<HTMLElement>,
+    toggleOnClick: boolean
+  ) => {
+    const st = dragStateRef.current;
+    if (!st.active || st.pointerId !== e.pointerId) return;
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {
+      // Ignorar si ya fue liberado
+    }
+    const wasDragged = st.moved;
+    dragStateRef.current.active = false;
+    setIsDragging(false);
+
+    if (wasDragged) {
+      persistPos(pos);
+    } else if (toggleOnClick) {
+      setOpen((prev) => !prev);
+    }
+  };
+
   const runAsk = (qText: string) => {
     const clean = qText.trim();
     if (!clean) return;
-    // Detectar si el usuario pide crear una tarea como acción del asistente
     if (/^(apunta|crea tarea|recuerdame|recuérdame)\s+/i.test(clean)) {
-      setPendingActionConfirm(clean.replace(/^(apunta|crea tarea|recuerdame|recuérdame)\s+/i, ""));
+      setPendingActionConfirm(
+        clean.replace(/^(apunta|crea tarea|recuerdame|recuérdame)\s+/i, "")
+      );
       setQuery("");
       return;
     }
@@ -64,36 +256,155 @@ export default function AsistenteMonpixFloating({
     }
   );
 
+  // Calcular anclaje inteligente del panel desplegable según dónde esté el botón
+  const getPopoverStyle = (): React.CSSProperties => {
+    if (typeof window === "undefined") {
+      return { right: 24, bottom: 84 };
+    }
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const panelMaxW = Math.min(420, vw - 24);
+    const btnW = buttonRef.current?.offsetWidth || (compactPill ? 52 : 215);
+    const btnH = buttonRef.current?.offsetHeight || 48;
+
+    const openUpward = pos.y > vh * 0.48;
+    const alignRightSide = pos.x + btnW / 2 > vw * 0.5;
+
+    const left = alignRightSide
+      ? Math.max(12, Math.min(vw - panelMaxW - 12, pos.x + btnW - panelMaxW))
+      : Math.max(12, Math.min(vw - panelMaxW - 12, pos.x));
+
+    if (openUpward) {
+      const bottomOffset = Math.max(12, vh - pos.y + 10);
+      const maxH = Math.max(260, pos.y - 20);
+      return {
+        left,
+        bottom: bottomOffset,
+        width: panelMaxW,
+        maxHeight: Math.min(maxH, Math.round(vh * 0.78)),
+      };
+    }
+
+    const topOffset = Math.min(vh - 260, pos.y + btnH + 10);
+    const maxH = Math.max(260, vh - topOffset - 16);
+    return {
+      left,
+      top: topOffset,
+      width: panelMaxW,
+      maxHeight: Math.min(maxH, Math.round(vh * 0.78)),
+    };
+  };
+
   return (
     <div className="no-print">
-      {/* Botón flotante siempre accesible */}
-      <button
-        type="button"
-        onClick={() => setOpen((prev) => !prev)}
-        className="fixed bottom-16 right-4 lg:bottom-6 lg:right-6 z-40 inline-flex items-center gap-2 rounded-full bg-[#0f6cbd] px-4 py-3 text-xs font-bold text-white shadow-lg ring-2 ring-white transition hover:bg-[#115ea3]"
+      {/* Botón flotante interactivo y libremente arrastrable */}
+      <div
+        ref={buttonRef}
+        style={
+          mounted
+            ? {
+                left: `${pos.x}px`,
+                top: `${pos.y}px`,
+                touchAction: "none",
+              }
+            : {
+                right: "24px",
+                bottom: "24px",
+                touchAction: "none",
+              }
+        }
+        className={`fixed z-40 select-none flex items-center rounded-full bg-[#0f6cbd] text-white shadow-lg ring-2 ring-white transition-shadow ${
+          isDragging
+            ? "cursor-grabbing shadow-2xl scale-[1.03] ring-blue-200"
+            : "cursor-grab hover:bg-[#115ea3] hover:shadow-xl"
+        }`}
       >
-        <MessageSquareText className="h-4 w-4" />
-        <span>Pregunta al REBT 🎤</span>
-      </button>
+        <div
+          role="button"
+          tabIndex={0}
+          title="Arrastra para mover de posición · Haz clic para abrir el Asistente REBT"
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={(e) => handlePointerUp(e, true)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              setOpen((prev) => !prev);
+            }
+          }}
+          className={`inline-flex items-center gap-2 text-xs font-bold ${
+            compactPill ? "p-3" : "pl-3 pr-2.5 py-2.5"
+          }`}
+        >
+          <GripVertical className="h-3.5 w-3.5 text-blue-200 shrink-0" />
+          <MessageSquareText className="h-4 w-4 shrink-0" />
+          {!compactPill && (
+            <span className="whitespace-nowrap">Pregunta al REBT 🎤</span>
+          )}
+        </div>
 
+        {/* Botón rápido para compactar/expandir la píldora si estorba en tablas */}
+        <button
+          type="button"
+          onClick={toggleCompactMode}
+          title={
+            compactPill
+              ? "Expandir botón Pregunta al REBT"
+              : "Compactar botón a icono"
+          }
+          className="mr-1.5 rounded-full p-1.5 text-blue-100 transition hover:bg-white/20 hover:text-white"
+        >
+          <Minimize2 className="h-3 w-3" />
+        </button>
+      </div>
+
+      {/* Ventana del Asistente REBT (su cabecera también permite arrastrar todo el bloque) */}
       {open && (
-        <div className="fixed bottom-32 right-3 sm:right-6 lg:bottom-20 z-50 w-[calc(100vw-1.5rem)] max-w-md rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden flex flex-col max-h-[78vh]">
-          <div className="flex items-center justify-between bg-[#0f6cbd] px-4 py-3 text-white">
-            <div>
-              <div className="text-xs font-extrabold">
-                Asistente REBT (Texto y Voz)
-              </div>
-              <div className="text-[10px] text-blue-100">
-                Responde citando la ITC-BT aplicable
+        <div
+          style={getPopoverStyle()}
+          className="fixed z-50 rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden flex flex-col"
+        >
+          <div
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={(e) => handlePointerUp(e, false)}
+            style={{ touchAction: "none" }}
+            title="Arrastra esta barra para mover el Asistente REBT"
+            className={`flex items-center justify-between bg-[#0f6cbd] px-3.5 py-3 text-white select-none ${
+              isDragging ? "cursor-grabbing" : "cursor-grab"
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <GripVertical className="h-4 w-4 text-blue-200 shrink-0" />
+              <div>
+                <div className="text-xs font-extrabold">
+                  Asistente REBT Interactivo (Texto y Voz)
+                </div>
+                <div className="text-[10px] text-blue-100">
+                  Arrastra para mover · Cita la ITC-BT aplicable
+                </div>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              className="rounded-lg p-1 hover:bg-white/20"
-            >
-              <X className="h-4 w-4" />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={resetToDefaultCorner}
+                onPointerDown={(e) => e.stopPropagation()}
+                title="Restaurar posición en esquina inferior derecha"
+                className="rounded-lg p-1.5 text-blue-100 hover:bg-white/20 hover:text-white"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                onPointerDown={(e) => e.stopPropagation()}
+                title="Cerrar ventana"
+                className="rounded-lg p-1.5 hover:bg-white/20"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </div>
 
           <div className="bg-amber-50 px-3 py-1.5 text-[10px] font-semibold text-amber-900 flex items-center gap-1.5 border-b border-amber-200">
@@ -123,7 +434,8 @@ export default function AsistenteMonpixFloating({
                   Confirmar acción en la app (Revísalo y guárdalo):
                 </div>
                 <p className="text-amber-900">
-                  ¿Crear la tarea pendiente <strong>«{pendingActionConfirm}»</strong>?
+                  ¿Crear la tarea pendiente{" "}
+                  <strong>«{pendingActionConfirm}»</strong>?
                 </p>
                 <div className="flex justify-end gap-2">
                   <button
@@ -151,8 +463,11 @@ export default function AsistenteMonpixFloating({
 
             {history.length === 0 ? (
               <p className="text-slate-500 text-[11px] leading-relaxed">
-                Pregúntame cualquier duda rápida en obra (sección para un horno, diferencial, volúmenes del baño, caída de tensión o di{" "}
-                <em>«Apunta comprar diferencial Clase A mañana»</em>).
+                Pregúntame cualquier duda rápida en obra (sección para un horno,
+                diferencial, volúmenes del baño, caída de tensión o di{" "}
+                <em>«Apunta comprar diferencial Clase A mañana»</em>). Puedes
+                arrastrar este botón a cualquier zona de la pantalla para que
+                nunca tape tus tablas.
               </p>
             ) : (
               history.map((item, idx) => (
@@ -173,13 +488,16 @@ export default function AsistenteMonpixFloating({
                     {item.response.answer}
                   </p>
                   <p className="rounded-lg bg-white p-2 text-[11px] text-emerald-900 border border-emerald-100">
-                    💡 <strong>Consejo de obra:</strong> {item.response.practicalTip}
+                    💡 <strong>Consejo de obra:</strong>{" "}
+                    {item.response.practicalTip}
                   </p>
                   {item.response.suggestedAction && (
                     <button
                       type="button"
                       onClick={() => {
-                        onNavigateSection(item.response.suggestedAction!.targetSection);
+                        onNavigateSection(
+                          item.response.suggestedAction!.targetSection
+                        );
                         setOpen(false);
                       }}
                       className="inline-flex items-center gap-1 font-bold text-[#0f6cbd] hover:underline"
@@ -237,4 +555,3 @@ export default function AsistenteMonpixFloating({
     </div>
   );
 }
-

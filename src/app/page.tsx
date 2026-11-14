@@ -83,7 +83,9 @@ import {
 } from "@/lib/monpix-engine";
 import AsistenteMonpixFloating from "@/components/monpix/AsistenteMonpixFloating";
 import ExpedientesSection from "@/components/sections/ExpedientesSection";
-import AdminRbacSection from "@/components/sections/AdminRbacSection";
+import AdminRbacSection, {
+  type EditableUserPatch,
+} from "@/components/sections/AdminRbacSection";
 
 const CalculadorasObraView = dynamic(
   () => import("@/components/monpix/CalculadorasObraView")
@@ -752,6 +754,13 @@ export default function SistemaCalculoRebtPage() {
 
   // Cambiar de Usuario Activo (limpiando el formulario activo para que nunca se mezclen reportes entre usuarios)
   const switchActiveUser = (targetUser: AppUser) => {
+    if (!targetUser.is_active) {
+      setStatusBanner({
+        type: "warning",
+        text: `El usuario "${targetUser.full_name}" se encuentra inactivo. Reactívalo primero en la Matriz de Usuarios para iniciar sesión con su cuenta.`,
+      });
+      return;
+    }
     const targetTenant = tenants.find((t) => t.id === targetUser.tenant_id);
     setCurrentUserId(targetUser.id);
     startNewBlankProjectForUser(targetUser, targetTenant);
@@ -1480,6 +1489,183 @@ export default function SistemaCalculoRebtPage() {
         // Persistido localmente
       }
     }
+  };
+
+  const handleUpdateUser = async (
+    userId: number,
+    patch: EditableUserPatch
+  ): Promise<boolean> => {
+    if (!currentUser.can_manage_users && currentUser.role !== "super_admin") {
+      setStatusBanner({
+        type: "warning",
+        text: "Solo un usuario con permiso de Administración puede editar cuentas de usuario.",
+      });
+      return false;
+    }
+
+    const cleanName = patch.full_name.trim();
+    const cleanEmail = patch.email.trim().toLowerCase();
+    const cleanPin = patch.access_pin.trim() || "1234";
+
+    if (!cleanName || !cleanEmail) {
+      setStatusBanner({
+        type: "warning",
+        text: "El nombre completo y el correo electrónico son obligatorios.",
+      });
+      return false;
+    }
+
+    if (
+      users.some(
+        (u) => u.id !== userId && u.email.trim().toLowerCase() === cleanEmail
+      )
+    ) {
+      setStatusBanner({
+        type: "warning",
+        text: `Ya existe otro usuario registrado con el correo "${cleanEmail}".`,
+      });
+      return false;
+    }
+
+    const effectiveIsActive =
+      userId === currentUser.id ? true : Boolean(patch.is_active);
+    const isAdminRole =
+      patch.role === "super_admin" || patch.role === "admin_empresa";
+    const isReadOnly = patch.role === "visor_auditor";
+
+    const existingUser = users.find((u) => u.id === userId);
+    const roleChanged = existingUser && existingUser.role !== patch.role;
+
+    const updatedFields: Partial<AppUser> = {
+      full_name: cleanName,
+      email: cleanEmail,
+      access_pin: cleanPin,
+      tenant_id: patch.tenant_id,
+      role: patch.role,
+      doi_nif: patch.doi_nif.trim(),
+      cci_or_colegiado: patch.cci_or_colegiado.trim(),
+      is_active: effectiveIsActive,
+      ...(roleChanged
+        ? {
+            can_create_projects: !isReadOnly,
+            can_edit_calculations: !isReadOnly,
+            can_export_mtd: true,
+            can_delete_projects: isAdminRole,
+            can_manage_users: isAdminRole,
+          }
+        : {}),
+    };
+
+    setUsers((prev) => {
+      const updated = prev.map((u) =>
+        u.id === userId ? { ...u, ...updatedFields } : u
+      );
+      persistDirectoryLocally(undefined, updated, undefined);
+      return updated;
+    });
+
+    if (supabase) {
+      try {
+        await supabase.from("app_users").update(updatedFields).eq("id", userId);
+        // Si existe la columna pin_hash en BD remota, limpiarla para regenerar o validar nuevo PIN
+        if (existingUser && existingUser.access_pin !== cleanPin) {
+          await supabase
+            .from("app_users")
+            .update({ pin_hash: "" } as Record<string, unknown>)
+            .eq("id", userId);
+        }
+      } catch {
+        // Persistido localmente
+      }
+    }
+
+    setStatusBanner({
+      type: "success",
+      text: `Datos del usuario "${cleanName}" actualizados correctamente.`,
+    });
+    return true;
+  };
+
+  const handleToggleUserActive = async (targetUser: AppUser) => {
+    if (!currentUser.can_manage_users && currentUser.role !== "super_admin") {
+      setStatusBanner({
+        type: "warning",
+        text: "Solo un usuario con permiso de Administración puede activar o inactivar cuentas.",
+      });
+      return;
+    }
+
+    if (targetUser.id === currentUser.id && targetUser.is_active) {
+      setStatusBanner({
+        type: "warning",
+        text: "No puedes inactivar el usuario con el que tienes la sesión iniciada actualmente.",
+      });
+      return;
+    }
+
+    const nextActive = !targetUser.is_active;
+    setUsers((prev) => {
+      const updated = prev.map((u) =>
+        u.id === targetUser.id ? { ...u, is_active: nextActive } : u
+      );
+      persistDirectoryLocally(undefined, updated, undefined);
+      return updated;
+    });
+
+    if (supabase) {
+      try {
+        await supabase
+          .from("app_users")
+          .update({ is_active: nextActive })
+          .eq("id", targetUser.id);
+      } catch {
+        // Persistido localmente
+      }
+    }
+
+    setStatusBanner({
+      type: nextActive ? "success" : "warning",
+      text: nextActive
+        ? `Usuario "${targetUser.full_name}" reactivado. Ya puede volver a iniciar sesión.`
+        : `Usuario "${targetUser.full_name}" inactivado. Su acceso al sistema ha quedado bloqueado.`,
+    });
+  };
+
+  const handleDeleteUser = async (targetUser: AppUser) => {
+    if (!currentUser.can_manage_users && currentUser.role !== "super_admin") {
+      setStatusBanner({
+        type: "warning",
+        text: "Solo un usuario con permiso de Administración puede eliminar usuarios.",
+      });
+      return;
+    }
+
+    if (targetUser.id === currentUser.id) {
+      setStatusBanner({
+        type: "warning",
+        text: "No puedes eliminar el usuario con la sesión activa actual.",
+      });
+      return;
+    }
+
+    setUsers((prev) => {
+      const updated = prev.filter((u) => u.id !== targetUser.id);
+      persistDirectoryLocally(undefined, updated, undefined);
+      return updated;
+    });
+
+    if (supabase) {
+      try {
+        await supabase.from("app_users").delete().eq("id", targetUser.id);
+      } catch {
+        // Persistido localmente
+      }
+    }
+
+    setStatusBanner({
+      type: "success",
+      text: `Usuario "${targetUser.full_name}" eliminado correctamente del directorio.`,
+    });
   };
 
   const loadPresetDwellings = (preset: "basica" | "elevada_ve") => {
@@ -4087,6 +4273,9 @@ export default function SistemaCalculoRebtPage() {
               onCreateUser={handleCreateUser}
               onCreateTenant={handleCreateTenant}
               onTogglePermission={handleTogglePermission}
+              onUpdateUser={handleUpdateUser}
+              onToggleUserActive={handleToggleUserActive}
+              onDeleteUser={handleDeleteUser}
               newUserName={newUserName}
               setNewUserName={setNewUserName}
               newUserEmail={newUserEmail}
