@@ -550,29 +550,95 @@ export default function SistemaCalculoRebtPage() {
     ]
   );
 
-  // Cargar Tenants, Usuarios y Expedientes desde Supabase
+  // Cargar Tenants, Usuarios y Expedientes desde caché local persistente + Supabase (si está activo)
+  const LOCAL_TENANTS_KEY = "rebt_local_tenants_v1";
+  const LOCAL_USERS_KEY = "rebt_local_users_v1";
+  const LOCAL_PROJECTS_KEY = "rebt_local_projects_v1";
+  const LOCAL_CIRCUITS_KEY = "rebt_local_project_circuits_v1";
+
+  const persistDirectoryLocally = useCallback(
+    (nextTenants?: AppTenant[], nextUsers?: AppUser[], nextProjects?: SavedProjectRow[]) => {
+      if (typeof window === "undefined") return;
+      try {
+        if (nextTenants) {
+          window.localStorage.setItem(LOCAL_TENANTS_KEY, JSON.stringify(nextTenants));
+        }
+        if (nextUsers) {
+          window.localStorage.setItem(LOCAL_USERS_KEY, JSON.stringify(nextUsers));
+        }
+        if (nextProjects) {
+          window.localStorage.setItem(LOCAL_PROJECTS_KEY, JSON.stringify(nextProjects));
+        }
+      } catch {
+        // Ignorar errores de cuota de almacenamiento local
+      }
+    },
+    []
+  );
+
+  const isNetworkFetchError = (msg?: string) =>
+    Boolean(
+      msg &&
+        (msg.toLowerCase().includes("failed to fetch") ||
+          msg.toLowerCase().includes("fetch failed") ||
+          msg.toLowerCase().includes("networkerror") ||
+          msg.toLowerCase().includes("load failed"))
+    );
+
   const fetchDirectoryAndProjects = useCallback(async () => {
+    if (typeof window !== "undefined") {
+      try {
+        const rawT = window.localStorage.getItem(LOCAL_TENANTS_KEY);
+        if (rawT) {
+          const parsedT = JSON.parse(rawT) as AppTenant[];
+          if (Array.isArray(parsedT) && parsedT.length > 0) setTenants(parsedT);
+        }
+        const rawU = window.localStorage.getItem(LOCAL_USERS_KEY);
+        if (rawU) {
+          const parsedU = JSON.parse(rawU) as AppUser[];
+          if (Array.isArray(parsedU) && parsedU.length > 0) setUsers(parsedU);
+        }
+        const rawP = window.localStorage.getItem(LOCAL_PROJECTS_KEY);
+        if (rawP) {
+          const parsedP = JSON.parse(rawP) as SavedProjectRow[];
+          if (Array.isArray(parsedP)) setAllProjects(parsedP);
+        }
+      } catch {
+        // Continúa con valores por defecto
+      }
+    }
+
     if (!supabase) return;
 
-    const [tenantsRes, usersRes, projectsRes] = await Promise.all([
-      supabase.from("app_tenants").select("*").order("id", { ascending: true }),
-      supabase.from("app_users").select("*").order("id", { ascending: true }),
-      supabase
-        .from("electrical_projects")
-        .select("*")
-        .order("created_at", { ascending: false }),
-    ]);
+    try {
+      const [tenantsRes, usersRes, projectsRes] = await Promise.all([
+        supabase.from("app_tenants").select("*").order("id", { ascending: true }),
+        supabase.from("app_users").select("*").order("id", { ascending: true }),
+        supabase
+          .from("electrical_projects")
+          .select("*")
+          .order("created_at", { ascending: false }),
+      ]);
 
-    if (tenantsRes.data && tenantsRes.data.length > 0) {
-      setTenants(tenantsRes.data as AppTenant[]);
+      if (tenantsRes.data && tenantsRes.data.length > 0) {
+        const remoteTenants = tenantsRes.data as AppTenant[];
+        setTenants(remoteTenants);
+        persistDirectoryLocally(remoteTenants, undefined, undefined);
+      }
+      if (usersRes.data && usersRes.data.length > 0) {
+        const remoteUsers = usersRes.data as AppUser[];
+        setUsers(remoteUsers);
+        persistDirectoryLocally(undefined, remoteUsers, undefined);
+      }
+      if (projectsRes.data) {
+        const remoteProjects = projectsRes.data as SavedProjectRow[];
+        setAllProjects(remoteProjects);
+        persistDirectoryLocally(undefined, undefined, remoteProjects);
+      }
+    } catch {
+      // Si el servidor remoto no responde, mantiene los datos locales persistidos
     }
-    if (usersRes.data && usersRes.data.length > 0) {
-      setUsers(usersRes.data as AppUser[]);
-    }
-    if (projectsRes.data) {
-      setAllProjects(projectsRes.data as SavedProjectRow[]);
-    }
-  }, []);
+  }, [persistDirectoryLocally]);
 
   useEffect(() => {
     fetchDirectoryAndProjects();
@@ -703,17 +769,23 @@ export default function SistemaCalculoRebtPage() {
       };
     }
 
-    setUsers((prev) =>
-      prev.map((u) =>
+    setUsers((prev) => {
+      const updated = prev.map((u) =>
         u.id === targetUser.id ? { ...u, access_pin: newPinValue } : u
-      )
-    );
+      );
+      persistDirectoryLocally(undefined, updated, undefined);
+      return updated;
+    });
 
     if (supabase) {
-      await supabase
-        .from("app_users")
-        .update({ access_pin: newPinValue })
-        .eq("id", targetUser.id);
+      try {
+        await supabase
+          .from("app_users")
+          .update({ access_pin: newPinValue })
+          .eq("id", targetUser.id);
+      } catch {
+        // Persistido localmente
+      }
     }
 
     return {
@@ -723,7 +795,6 @@ export default function SistemaCalculoRebtPage() {
   };
 
   const handleLoadProject = async (projectId: number) => {
-    if (!supabase) return;
     const proj = isolatedProjects.find((p) => p.id === projectId);
     if (!proj) {
       setStatusBanner({
@@ -734,6 +805,8 @@ export default function SistemaCalculoRebtPage() {
     }
 
     setActiveProjectId(proj.id);
+    setPanelOverrideIgaAmps(proj.iga_amps || null);
+    setPanelOverrideRcdCount(proj.rcd_count || null);
 
     // 1. Restaurar Titular, Ubicación y Profesional Habilitado
     if (
@@ -817,35 +890,57 @@ export default function SistemaCalculoRebtPage() {
       }
     }
 
-    // 5. Restaurar Circuitos Interiores desde electrical_circuits
-    const { data: dbCircuits } = await supabase
-      .from("electrical_circuits")
-      .select("*")
-      .eq("project_id", projectId)
-      .order("circuit_number", { ascending: true });
+    // 5. Restaurar Circuitos Interiores desde electrical_circuits o caché local
+    let restoredFromRemote = false;
+    if (supabase) {
+      try {
+        const { data: dbCircuits } = await supabase
+          .from("electrical_circuits")
+          .select("*")
+          .eq("project_id", projectId)
+          .order("circuit_number", { ascending: true });
 
-    if (dbCircuits && dbCircuits.length > 0) {
-      setCircuits(
-        dbCircuits.map((row) => ({
-          code: row.circuit_code || `C${row.circuit_number}`,
-          description: row.description,
-          usageType:
-            (row.usage_type as CircuitUsageType) || "vivienda_interior",
-          phaseSystem: row.phases === 3 ? "trifasico" : "monofasico",
-          phaseAssigned: row.phases === 3 ? "L1-L2-L3" : "L1",
-          voltage: row.phases === 3 ? 400 : 230,
-          powerWatts: Number(row.power_va) || 2300,
-          cosPhi: Number(row.power_factor) || 1.0,
-          simultaneityFactor: Number(row.simultaneity_factor) || 1.0,
-          utilizationFactor: Number(row.utilization_factor) || 1.0,
-          lengthMeters: Number(row.length_meters) || 15,
-          installationMethod:
-            (row.installation_method as InstallationMethod) || "B1",
-          insulationType: (row.insulation_type as InsulationType) || "PVC_70",
-          material: row.conductor_material === "Al" ? "Al" : "Cu",
-          fixedPiaAmps: Number(row.breaker_amps) || undefined,
-        }))
-      );
+        if (dbCircuits && dbCircuits.length > 0) {
+          restoredFromRemote = true;
+          setCircuits(
+            dbCircuits.map((row) => ({
+              code: row.circuit_code || `C${row.circuit_number}`,
+              description: row.description,
+              usageType:
+                (row.usage_type as CircuitUsageType) || "vivienda_interior",
+              phaseSystem: row.phases === 3 ? "trifasico" : "monofasico",
+              phaseAssigned: row.phases === 3 ? "L1-L2-L3" : "L1",
+              voltage: row.phases === 3 ? 400 : 230,
+              powerWatts: Number(row.power_va) || 2300,
+              cosPhi: Number(row.power_factor) || 1.0,
+              simultaneityFactor: Number(row.simultaneity_factor) || 1.0,
+              utilizationFactor: Number(row.utilization_factor) || 1.0,
+              lengthMeters: Number(row.length_meters) || 15,
+              installationMethod:
+                (row.installation_method as InstallationMethod) || "B1",
+              insulationType: (row.insulation_type as InsulationType) || "PVC_70",
+              material: row.conductor_material === "Al" ? "Al" : "Cu",
+              fixedPiaAmps: Number(row.breaker_amps) || undefined,
+            }))
+          );
+        }
+      } catch {
+        // Fallback a circuitos locales
+      }
+    }
+
+    if (!restoredFromRemote && typeof window !== "undefined") {
+      try {
+        const rawMap = window.localStorage.getItem(LOCAL_CIRCUITS_KEY);
+        const map = rawMap
+          ? (JSON.parse(rawMap) as Record<string, RebtCircuitInput[]>)
+          : {};
+        if (Array.isArray(map[String(projectId)]) && map[String(projectId)].length > 0) {
+          setCircuits(map[String(projectId)]);
+        }
+      } catch {
+        // Ignorar
+      }
     }
 
     setStatusBanner({
@@ -862,22 +957,39 @@ export default function SistemaCalculoRebtPage() {
       });
       return;
     }
-    if (!supabase) return;
-    const { error } = await supabase
-      .from("electrical_projects")
-      .delete()
-      .eq("id", projectId);
 
-    if (!error) {
-      if (activeProjectId === projectId) {
-        setActiveProjectId(null);
+    if (supabase) {
+      try {
+        await supabase.from("electrical_projects").delete().eq("id", projectId);
+      } catch {
+        // Continúa con borrado local
       }
-      await fetchDirectoryAndProjects();
-      setStatusBanner({
-        type: "success",
-        text: `Registro #${projectId} eliminado del historial correctamente.`,
-      });
     }
+
+    if (activeProjectId === projectId) {
+      setActiveProjectId(null);
+    }
+    setAllProjects((prev) => {
+      const filtered = prev.filter((p) => p.id !== projectId);
+      persistDirectoryLocally(undefined, undefined, filtered);
+      return filtered;
+    });
+    if (typeof window !== "undefined") {
+      try {
+        const rawMap = window.localStorage.getItem(LOCAL_CIRCUITS_KEY);
+        if (rawMap) {
+          const map = JSON.parse(rawMap) as Record<string, RebtCircuitInput[]>;
+          delete map[String(projectId)];
+          window.localStorage.setItem(LOCAL_CIRCUITS_KEY, JSON.stringify(map));
+        }
+      } catch {
+        // Ignorar
+      }
+    }
+    setStatusBanner({
+      type: "success",
+      text: `Registro #${projectId} eliminado del historial correctamente.`,
+    });
   };
 
   const handleSaveToSupabase = async (
@@ -887,14 +999,6 @@ export default function SistemaCalculoRebtPage() {
       setStatusBanner({
         type: "warning",
         text: "Tu perfil actual no tiene permiso para crear o editar registros.",
-      });
-      return;
-    }
-
-    if (!supabase) {
-      setStatusBanner({
-        type: "error",
-        text: "Configura las credenciales de Supabase para guardar.",
       });
       return;
     }
@@ -958,6 +1062,54 @@ export default function SistemaCalculoRebtPage() {
       },
       mtd_metadata_json: mtdMeta,
     };
+
+    const saveProjectLocally = (forcedId?: number) => {
+      const nextId =
+        forcedId ??
+        (shouldUpdate && activeProjectId !== null
+          ? activeProjectId
+          : Math.max(0, ...allProjects.map((p) => p.id)) + 1);
+      const nowIso = new Date().toISOString();
+      const localRow: SavedProjectRow = {
+        id: nextId,
+        ...projectPayload,
+        created_at:
+          allProjects.find((p) => p.id === nextId)?.created_at || nowIso,
+      };
+      setAllProjects((prev) => {
+        const exists = prev.some((p) => p.id === nextId);
+        const updated = exists
+          ? prev.map((p) => (p.id === nextId ? localRow : p))
+          : [localRow, ...prev];
+        persistDirectoryLocally(undefined, undefined, updated);
+        return updated;
+      });
+      if (typeof window !== "undefined") {
+        try {
+          const rawMap = window.localStorage.getItem(LOCAL_CIRCUITS_KEY);
+          const map = rawMap
+            ? (JSON.parse(rawMap) as Record<string, RebtCircuitInput[]>)
+            : {};
+          map[String(nextId)] = circuits;
+          window.localStorage.setItem(LOCAL_CIRCUITS_KEY, JSON.stringify(map));
+        } catch {
+          // Ignorar
+        }
+      }
+      setActiveProjectId(nextId);
+      setStatusBanner({
+        type: "success",
+        text: shouldUpdate
+          ? `Registro #${nextId} actualizado correctamente en el historial.`
+          : `Nuevo Registro #${nextId} añadido al historial de ${currentUser.full_name}.`,
+      });
+    };
+
+    if (!supabase) {
+      saveProjectLocally();
+      setIsSaving(false);
+      return;
+    }
 
     try {
       let targetProjectId = activeProjectId;
@@ -1045,10 +1197,14 @@ export default function SistemaCalculoRebtPage() {
       });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Error desconocido";
-      setStatusBanner({
-        type: "error",
-        text: `Error al guardar en Supabase: ${msg}`,
-      });
+      if (isNetworkFetchError(msg)) {
+        saveProjectLocally();
+      } else {
+        setStatusBanner({
+          type: "error",
+          text: `Error al guardar expediente: ${msg}`,
+        });
+      }
     } finally {
       setIsSaving(false);
     }
@@ -1058,54 +1214,99 @@ export default function SistemaCalculoRebtPage() {
   const handleCreateTenant = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTenantName.trim()) return;
-    if (!supabase) return;
 
-    const { data, error } = await supabase
-      .from("app_tenants")
-      .insert({
+    const saveTenantLocally = () => {
+      const nextId = Math.max(0, ...tenants.map((t) => t.id)) + 1;
+      const created: AppTenant = {
+        id: nextId,
         name: newTenantName.trim(),
         cif: newTenantCif.trim(),
         empresa_instaladora_num: newTenantNum.trim(),
         isla: newTenantIsla,
-      })
-      .select("*")
-      .single();
-
-    if (error) {
-      setStatusBanner({
-        type: "error",
-        text: `No se pudo crear la empresa: ${error.message}`,
+        is_active: true,
+      };
+      setTenants((prev) => {
+        const updated = [...prev, created];
+        persistDirectoryLocally(updated, undefined, undefined);
+        return updated;
       });
-      return;
-    }
-
-    if (data) {
       setNewTenantName("");
       setNewTenantCif("");
       setNewTenantNum("");
-      await fetchDirectoryAndProjects();
       setStatusBanner({
         type: "success",
-        text: `Empresa / Tenant "${data.name}" creada correctamente.`,
+        text: `Empresa / Tenant "${created.name}" creada correctamente.`,
       });
+    };
+
+    if (!supabase) {
+      saveTenantLocally();
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from("app_tenants")
+        .insert({
+          name: newTenantName.trim(),
+          cif: newTenantCif.trim(),
+          empresa_instaladora_num: newTenantNum.trim(),
+          isla: newTenantIsla,
+        })
+        .select("*")
+        .single();
+
+      if (error) {
+        if (isNetworkFetchError(error.message)) {
+          saveTenantLocally();
+          return;
+        }
+        setStatusBanner({
+          type: "error",
+          text: `No se pudo crear la empresa: ${error.message}`,
+        });
+        return;
+      }
+
+      if (data) {
+        setNewTenantName("");
+        setNewTenantCif("");
+        setNewTenantNum("");
+        await fetchDirectoryAndProjects();
+        setStatusBanner({
+          type: "success",
+          text: `Empresa / Tenant "${data.name}" creada correctamente.`,
+        });
+      }
+    } catch {
+      saveTenantLocally();
     }
   };
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newUserName.trim() || !newUserEmail.trim()) return;
-    if (!supabase) return;
+
+    const cleanEmail = newUserEmail.trim().toLowerCase();
+    if (users.some((u) => u.email.trim().toLowerCase() === cleanEmail)) {
+      setStatusBanner({
+        type: "warning",
+        text: `Ya existe un usuario registrado con el correo "${cleanEmail}".`,
+      });
+      return;
+    }
 
     const isAdminRole =
       newUserRole === "super_admin" || newUserRole === "admin_empresa";
     const isReadOnly = newUserRole === "visor_auditor";
 
-    const { data, error } = await supabase
-      .from("app_users")
-      .insert({
+    const saveUserLocally = () => {
+      const nextId = Math.max(0, ...users.map((u) => u.id)) + 1;
+      const createdUser: AppUser = {
+        id: nextId,
         tenant_id: newUserTenantId,
         full_name: newUserName.trim(),
-        email: newUserEmail.trim().toLowerCase(),
+        email: cleanEmail,
         access_pin: newUserPin.trim() || "1234",
         doi_nif: newUserDoi.trim(),
         role: newUserRole,
@@ -1115,28 +1316,73 @@ export default function SistemaCalculoRebtPage() {
         can_export_mtd: true,
         can_delete_projects: isAdminRole,
         can_manage_users: isAdminRole,
-      })
-      .select("*")
-      .single();
-
-    if (error) {
-      setStatusBanner({
-        type: "error",
-        text: `Error al crear usuario: ${error.message}`,
+        is_active: true,
+      };
+      setUsers((prev) => {
+        const updated = [...prev, createdUser];
+        persistDirectoryLocally(undefined, updated, undefined);
+        return updated;
       });
-      return;
-    }
-
-    if (data) {
       setNewUserName("");
       setNewUserEmail("");
       setNewUserDoi("");
       setNewUserCci("");
-      await fetchDirectoryAndProjects();
       setStatusBanner({
         type: "success",
-        text: `Usuario "${data.full_name}" creado con su propio espacio aislado de reportes.`,
+        text: `Usuario "${createdUser.full_name}" creado con su propio espacio aislado de reportes.`,
       });
+    };
+
+    if (!supabase) {
+      saveUserLocally();
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from("app_users")
+        .insert({
+          tenant_id: newUserTenantId,
+          full_name: newUserName.trim(),
+          email: cleanEmail,
+          access_pin: newUserPin.trim() || "1234",
+          doi_nif: newUserDoi.trim(),
+          role: newUserRole,
+          cci_or_colegiado: newUserCci.trim(),
+          can_create_projects: !isReadOnly,
+          can_edit_calculations: !isReadOnly,
+          can_export_mtd: true,
+          can_delete_projects: isAdminRole,
+          can_manage_users: isAdminRole,
+        })
+        .select("*")
+        .single();
+
+      if (error) {
+        if (isNetworkFetchError(error.message)) {
+          saveUserLocally();
+          return;
+        }
+        setStatusBanner({
+          type: "error",
+          text: `Error al crear usuario: ${error.message}`,
+        });
+        return;
+      }
+
+      if (data) {
+        setNewUserName("");
+        setNewUserEmail("");
+        setNewUserDoi("");
+        setNewUserCci("");
+        await fetchDirectoryAndProjects();
+        setStatusBanner({
+          type: "success",
+          text: `Usuario "${data.full_name}" creado con su propio espacio aislado de reportes.`,
+        });
+      }
+    } catch {
+      saveUserLocally();
     }
   };
 
@@ -1159,17 +1405,23 @@ export default function SistemaCalculoRebtPage() {
     }
 
     const nextVal = !targetUser[permField];
-    setUsers((prev) =>
-      prev.map((u) =>
+    setUsers((prev) => {
+      const updated = prev.map((u) =>
         u.id === targetUser.id ? { ...u, [permField]: nextVal } : u
-      )
-    );
+      );
+      persistDirectoryLocally(undefined, updated, undefined);
+      return updated;
+    });
 
     if (supabase) {
-      await supabase
-        .from("app_users")
-        .update({ [permField]: nextVal })
-        .eq("id", targetUser.id);
+      try {
+        await supabase
+          .from("app_users")
+          .update({ [permField]: nextVal })
+          .eq("id", targetUser.id);
+      } catch {
+        // Persistido localmente
+      }
     }
   };
 
