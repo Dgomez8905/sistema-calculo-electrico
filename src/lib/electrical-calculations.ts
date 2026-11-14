@@ -520,9 +520,23 @@ export function resolveSpanishRebtIgaAndTariff(params: {
     ) || steps[steps.length - 1];
 
   // Validar override manual: en monofásico 230 V nunca se admite IGA > 63 A (ej. 80 A heredado)
-  const validOverrideStep =
+  const validOverrideStep: RebtSpainIgaStep | null =
     typeof overrideIgaAmps === "number" && overrideIgaAmps > 0
-      ? steps.find((s) => s.igaAmps === overrideIgaAmps) ?? null
+      ? steps.find((s) => s.igaAmps === overrideIgaAmps) ??
+        (supplyType === "monofasico_230v" && overrideIgaAmps <= 63
+          ? {
+              igaAmps: overrideIgaAmps,
+              poles: 2,
+              supplyType: "monofasico_230v",
+              maxPowerWatts: Math.round(230 * overrideIgaAmps),
+              maxPowerKw: Number(((230 * overrideIgaAmps) / 1000).toFixed(2)),
+              accessTariff: "2.0TD",
+              electrificationGrade: overrideIgaAmps >= 40 ? "elevada" : "basica",
+              shortLabel: `Cabecera ${overrideIgaAmps} A · ${((230 * overrideIgaAmps) / 1000).toFixed(2)} kW (2.0TD)`,
+              label: `Cabecera ${overrideIgaAmps} A — ${Math.round(230 * overrideIgaAmps).toLocaleString()} W · Estado existente`,
+              rebtCitation: "Inspección de estado existente (ITC-BT-17 / suministro preexistente)",
+            }
+          : null)
       : null;
 
   const chosenStep = validOverrideStep || autoStep;
@@ -1372,6 +1386,12 @@ export interface MtdFormMetadata {
   interiorCanalizacionDesc: string;
 
   sobretensionesKv: string;
+  tieneSobretensiones?: boolean;
+  tieneIgaReglamentario?: boolean;
+  calibreCabeceraDetectadoTexto?: string;
+  modalidadReporteFoto?: "estandar" | "estado_actual" | "instalacion_corregida";
+  dictamenCumplimientoResumen?: string;
+  expedienteVinculadoPar?: string;
   diferencialClase: "AC" | "A" | "S" | "B";
   diferencialCalibreAmps: number;
   numContadoresTotal: number;

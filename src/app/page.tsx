@@ -86,6 +86,10 @@ import ExpedientesSection from "@/components/sections/ExpedientesSection";
 import AdminRbacSection, {
   type EditableUserPatch,
 } from "@/components/sections/AdminRbacSection";
+import NewExpedienteWizardModal, {
+  type GuidedScratchExpedientePayload,
+} from "@/components/NewExpedienteWizardModal";
+import type { DualPanelEvaluationResult } from "@/lib/rebt-vision-canarias";
 
 const CalculadorasObraView = dynamic(
   () => import("@/components/monpix/CalculadorasObraView")
@@ -341,6 +345,11 @@ export default function SistemaCalculoRebtPage() {
   // Expediente activo
   const [activeProjectId, setActiveProjectId] = useState<number | null>(null);
   const [mtdMeta, setMtdMeta] = useState<MtdFormMetadata>(DEFAULT_MTD_METADATA);
+  const [showNewWizardModal, setShowNewWizardModal] = useState(false);
+  const [dualPhotoState, setDualPhotoState] = useState<{
+    evaluation: DualPanelEvaluationResult;
+    activeMode: "estado_actual" | "instalacion_corregida";
+  } | null>(null);
 
   // Configuración Eléctrica REBT
   const [supplyType, setSupplyType] =
@@ -748,9 +757,471 @@ export default function SistemaCalculoRebtPage() {
       setPanelOverrideIgaAmps(null);
       setPanelOverrideRcdCount(null);
       setCustomDesignPowerKw(null);
+      setDualPhotoState(null);
     },
     []
   );
+
+  // Activar una de las dos opciones separadas tras analizar la foto del cuadro (-ACT vs -COR)
+  const applyDualPhotoSnapshotToActiveWorkspace = (
+    evaluation: DualPanelEvaluationResult,
+    mode: "estado_actual" | "instalacion_corregida",
+    destination?: "ficha_mtd" | "unifilar_cuadro" | "circuitos" | "stay"
+  ) => {
+    const profile =
+      mode === "estado_actual" ? evaluation.actual : evaluation.corregido;
+
+    setDualPhotoState({ evaluation, activeMode: mode });
+
+    // Si ya fue guardado previamente ese expediente (-ACT o -COR) en el historial del usuario, vincular su ID
+    const existingSaved = allProjects.find(
+      (p) =>
+        p.owner_user_id === currentUser.id &&
+        p.mtd_metadata_json?.expedienteNum === profile.expedienteNum
+    );
+    setActiveProjectId(existingSaved ? existingSaved.id : null);
+
+    setSupplyType(profile.supplyType);
+    setElectrificationGrade(profile.electrificationGrade);
+    setCircuits(profile.circuits);
+    setPanelOverrideIgaAmps(profile.igaAmps);
+    setPanelOverrideRcdCount(profile.rcdCount);
+    setCustomDesignPowerKw(null);
+
+    setMtdMeta((prev) => ({
+      ...prev,
+      instaladorNombrePh:
+        prev.instaladorNombrePh ||
+        currentUser.full_name.replace(/\s*\(.*?\)\s*/g, ""),
+      tecnicoNombre:
+        prev.tecnicoNombre ||
+        currentUser.full_name.replace(/\s*\(.*?\)\s*/g, ""),
+      instaladorDoi: prev.instaladorDoi || currentUser.doi_nif,
+      instaladorCciNum: prev.instaladorCciNum || currentUser.cci_or_colegiado,
+      tecnicoColegiadoNum:
+        prev.tecnicoColegiadoNum || currentUser.cci_or_colegiado,
+      empresaInstaladoraNombre:
+        prev.empresaInstaladoraNombre || currentTenant?.name || "",
+      empresaInstaladoraNum:
+        prev.empresaInstaladoraNum ||
+        currentTenant?.empresa_instaladora_num ||
+        "",
+      ...profile.mtdPatch,
+    }));
+
+    if (destination && destination !== "stay") {
+      setTargetMtdPage("all");
+      setActiveSection(destination);
+    }
+
+    setStatusBanner({
+      type:
+        mode === "estado_actual" && !evaluation.overallCompliant
+          ? "warning"
+          : "success",
+      text:
+        mode === "estado_actual"
+          ? `Ficha Técnica #1 cargada (${profile.expedienteNum} · Estado Actual): ${evaluation.verdictBadge}.`
+          : `Ficha Técnica #2 cargada (${profile.expedienteNum} · Instalación Corregida REBT): Diseño adecuado al 100% con ${profile.circuits.length} circuitos.`,
+    });
+  };
+
+  // Guardar de una sola vez AMBAS opciones de foto como 2 expedientes independientes con distintas Fichas Técnicas (-ACT y -COR)
+  const handleSaveBothDualPhotoOptions = async (
+    evaluation: DualPanelEvaluationResult,
+    openAfterSave: "estado_actual" | "instalacion_corregida" = "instalacion_corregida"
+  ) => {
+    if (!currentUser.can_create_projects) {
+      setStatusBanner({
+        type: "warning",
+        text: "Tu perfil actual no tiene permiso para crear registros.",
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const profiles = [evaluation.actual, evaluation.corregido] as const;
+      let nextLocalId = Math.max(0, ...allProjects.map((p) => p.id)) + 1;
+      const newLocalRows: SavedProjectRow[] = [];
+      const circuitsToStore: Record<string, RebtCircuitInput[]> = {};
+
+      for (const prof of profiles) {
+        const calcList = prof.circuits.map((c) => calculateRebtCircuit(c));
+        const diRes = resolveSpanishRebtIgaAndTariff({
+          supplyType: prof.supplyType,
+          electrificationGrade: prof.electrificationGrade,
+          circuits: calcList,
+          areaM2: mtdMeta.superficieUtilM2,
+          overrideIgaAmps: prof.igaAmps,
+        });
+        const totalInstalled = calcList.reduce(
+          (acc, c) => acc + c.powerWatts,
+          0
+        );
+        const profMeta: MtdFormMetadata = {
+          ...mtdMeta,
+          instaladorNombrePh: currentUser.full_name.replace(/\s*\(.*?\)\s*/g, ""),
+          tecnicoNombre: currentUser.full_name.replace(/\s*\(.*?\)\s*/g, ""),
+          instaladorDoi: currentUser.doi_nif,
+          instaladorCciNum: currentUser.cci_or_colegiado,
+          tecnicoColegiadoNum: currentUser.cci_or_colegiado,
+          empresaInstaladoraNombre: currentTenant?.name || "",
+          empresaInstaladoraNum: currentTenant?.empresa_instaladora_num || "",
+          ...prof.mtdPatch,
+        };
+
+        const rowPayload = {
+          tenant_id: currentUser.tenant_id,
+          owner_user_id: currentUser.id,
+          name:
+            prof.mode === "estado_actual"
+              ? `M.T.D. ${prof.expedienteNum} - Estado Actual (${
+                  evaluation.overallCompliant ? "Cumple REBT" : "No Cumple REBT"
+                })`
+              : `M.T.D. ${prof.expedienteNum} - Instalación Corregida REBT`,
+          client_name: profMeta.titularNombre || "Titular sin especificar",
+          location: `${profMeta.direccionCalle} ${profMeta.direccionNum}, ${profMeta.terminoMunicipal} (${profMeta.isla})`,
+          system_type: prof.supplyType,
+          electrification_grade: prof.electrificationGrade,
+          itc04_group: itc04Group,
+          document_type: itc04Evaluation.documentType,
+          requires_oca: itc04Evaluation.requiresInitialOcaInspection,
+          demand_factor: 1.0,
+          ambient_temp_c: 40,
+          total_connected_va: totalInstalled,
+          total_demand_va: diRes.effectiveDesignWatts,
+          main_breaker_amps: prof.igaAmps,
+          iga_amps: prof.igaAmps,
+          di_section_mm2: prof.igaAmps >= 40 ? 10 : 6,
+          rcd_count: prof.rcdCount,
+          main_feeder_awg: `${prof.igaAmps >= 40 ? 10 : 6} mm² Cu XLPE`,
+          building_forecast_json: {
+            ...buildingForecast,
+            _inputs: {
+              basicDwellings,
+              elevatedDwellings,
+              commonLightingW,
+              hydroW,
+              otherServicesW,
+              commercialCount,
+              commercialAreaM2,
+              garageAreaM2,
+              garageForcedVent,
+              parkingSpaces,
+              hasSpl,
+              lgaLengthMeters,
+            },
+          },
+          earthing_json: {
+            ...earthingResult,
+            _inputs: {
+              soilResistivity,
+              rodLengthMeters,
+              numRods,
+              buriedConductorMeters,
+              maxContactVoltageV,
+              rcdSensitivityMa,
+              itc04Group,
+              itc04CustomPowerKw,
+              itc04ParkingSpaces,
+            },
+          },
+          mtd_metadata_json: profMeta,
+        };
+
+        let savedId = nextLocalId++;
+        if (supabase) {
+          try {
+            const { data: inserted } = await supabase
+              .from("electrical_projects")
+              .insert(rowPayload)
+              .select("id")
+              .single();
+            if (inserted?.id) {
+              savedId = inserted.id;
+              const cRows = calcList.map((c, idx) => ({
+                project_id: savedId,
+                circuit_number: idx + 1,
+                circuit_code: c.code,
+                description: c.description,
+                load_category: "especial",
+                usage_type: c.usageType,
+                phase_assignment: c.phaseAssigned,
+                phases: c.phaseSystem === "trifasico" ? 3 : 1,
+                voltage: c.voltage,
+                power_va: c.powerWatts,
+                power_factor: c.cosPhi,
+                simultaneity_factor: c.simultaneityFactor,
+                utilization_factor: c.utilizationFactor,
+                is_continuous: true,
+                length_meters: c.lengthMeters,
+                conductor_material: c.material,
+                installation_method: c.installationMethod,
+                insulation_type: c.insulationType,
+                calculated_current_amps: c.currentIbAmps,
+                design_current_amps: c.correctedCurrentAmps,
+                ampacity_iz_amps: c.ampacityIzAmps,
+                recommended_awg: `${c.sectionMm2} mm²`,
+                section_mm2: c.sectionMm2,
+                neutral_section_mm2: c.neutralSectionMm2,
+                pe_section_mm2: c.peSectionMm2,
+                tube_diameter_mm: c.tubeDiameterMm,
+                breaker_amps: c.piaAmps,
+                voltage_drop_pct: c.voltageDropPct,
+                max_allowed_drop_pct: c.maxAllowedDropPct,
+              }));
+              await supabase.from("electrical_circuits").insert(cRows);
+            }
+          } catch {
+            // Respaldo local garantizado abajo
+          }
+        }
+
+        circuitsToStore[String(savedId)] = prof.circuits;
+        newLocalRows.push({
+          id: savedId,
+          ...rowPayload,
+          created_at: new Date().toISOString(),
+        });
+      }
+
+      setAllProjects((prev) => {
+        const updated = [...newLocalRows, ...prev];
+        persistDirectoryLocally(undefined, undefined, updated);
+        return updated;
+      });
+
+      if (typeof window !== "undefined") {
+        try {
+          const rawMap = window.localStorage.getItem(LOCAL_CIRCUITS_KEY);
+          const map = rawMap
+            ? (JSON.parse(rawMap) as Record<string, RebtCircuitInput[]>)
+            : {};
+          Object.assign(map, circuitsToStore);
+          window.localStorage.setItem(LOCAL_CIRCUITS_KEY, JSON.stringify(map));
+        } catch {
+          // Ignorar
+        }
+      }
+
+      applyDualPhotoSnapshotToActiveWorkspace(
+        evaluation,
+        openAfterSave,
+        "ficha_mtd"
+      );
+      setStatusBanner({
+        type: "success",
+        text: `¡Guardados los 2 expedientes separados! Ficha #1 (${evaluation.actual.expedienteNum} · Estado Actual) y Ficha #2 (${evaluation.corregido.expedienteNum} · Instalación Corregida) disponibles en Mis Expedientes.`,
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Crear expediente limpio guiado paso a paso desde el Modal Nuevo
+  const handleCreateGuidedScratch = (
+    payload: GuidedScratchExpedientePayload
+  ) => {
+    const randNum = Math.floor(100 + Math.random() * 900);
+    const islandPrefix = (payload.isla || currentTenant?.isla || "TF")
+      .slice(0, 2)
+      .toUpperCase();
+    const expCode = `EXP-${islandPrefix}-2026-${randNum}`;
+    const instCode = `BT-2026-U${currentUser.id}-${randNum}`;
+
+    setActiveProjectId(null);
+    setDualPhotoState(null);
+    setSupplyType(payload.supplyType);
+    setCustomDesignPowerKw(null);
+
+    if (payload.templateId === "vivienda_basica") {
+      setElectrificationGrade("basica");
+      setCircuits(ITC_BT_25_TEMPLATES.slice(0, 5));
+      setPanelOverrideIgaAmps(25);
+      setPanelOverrideRcdCount(2);
+    } else if (payload.templateId === "vivienda_elevada_ve") {
+      setElectrificationGrade("elevada");
+      setCircuits(ITC_BT_25_TEMPLATES);
+      setPanelOverrideIgaAmps(40);
+      setPanelOverrideRcdCount(3);
+    } else if (payload.templateId === "local_comercial") {
+      setElectrificationGrade("elevada");
+      setPanelOverrideIgaAmps(40);
+      setPanelOverrideRcdCount(2);
+      setCircuits([
+        {
+          code: "A1",
+          description: "Alumbrado general sala de ventas / oficina",
+          usageType: "alumbrado",
+          phaseSystem: "monofasico",
+          phaseAssigned: "L1",
+          voltage: 230,
+          powerWatts: 2500,
+          cosPhi: 0.95,
+          simultaneityFactor: 1,
+          utilizationFactor: 1,
+          lengthMeters: 22,
+          installationMethod: "B1",
+          insulationType: "XLPE_90",
+          material: "Cu",
+          minSectionMm2: 1.5,
+          fixedPiaAmps: 10,
+        },
+        {
+          code: "E1",
+          description: "Alumbrado de emergencia y señalización",
+          usageType: "alumbrado",
+          phaseSystem: "monofasico",
+          phaseAssigned: "L2",
+          voltage: 230,
+          powerWatts: 400,
+          cosPhi: 0.95,
+          simultaneityFactor: 1,
+          utilizationFactor: 1,
+          lengthMeters: 20,
+          installationMethod: "B1",
+          insulationType: "XLPE_90",
+          material: "Cu",
+          minSectionMm2: 1.5,
+          fixedPiaAmps: 10,
+        },
+        {
+          code: "F1",
+          description: "Tomas de fuerza puestos de trabajo e informática",
+          usageType: "fuerza_otros",
+          phaseSystem: "monofasico",
+          phaseAssigned: "L3",
+          voltage: 230,
+          powerWatts: 3450,
+          cosPhi: 0.9,
+          simultaneityFactor: 1,
+          utilizationFactor: 1,
+          lengthMeters: 24,
+          installationMethod: "B1",
+          insulationType: "XLPE_90",
+          material: "Cu",
+          minSectionMm2: 2.5,
+          fixedPiaAmps: 16,
+        },
+        {
+          code: "CL1",
+          description: "Equipo de climatización / bomba de calor",
+          usageType: "motor",
+          phaseSystem:
+            payload.supplyType === "trifasico_400v" ? "trifasico" : "monofasico",
+          phaseAssigned:
+            payload.supplyType === "trifasico_400v" ? "L1-L2-L3" : "L1",
+          voltage: payload.supplyType === "trifasico_400v" ? 400 : 230,
+          powerWatts: 5500,
+          cosPhi: 0.85,
+          simultaneityFactor: 1,
+          utilizationFactor: 1,
+          lengthMeters: 18,
+          installationMethod: "B1",
+          insulationType: "XLPE_90",
+          material: "Cu",
+          minSectionMm2: 4,
+          fixedPiaAmps: 25,
+        },
+      ]);
+    } else {
+      setElectrificationGrade("elevada");
+      setSupplyType("trifasico_400v");
+      setPanelOverrideIgaAmps(80);
+      setPanelOverrideRcdCount(2);
+      setCircuits([
+        {
+          code: "A1",
+          description: "Alumbrado general nave / gran comercio",
+          usageType: "alumbrado",
+          phaseSystem: "monofasico",
+          phaseAssigned: "L1",
+          voltage: 230,
+          powerWatts: 3200,
+          cosPhi: 0.95,
+          simultaneityFactor: 1,
+          utilizationFactor: 1,
+          lengthMeters: 30,
+          installationMethod: "E",
+          insulationType: "XLPE_90",
+          material: "Cu",
+          minSectionMm2: 2.5,
+          fixedPiaAmps: 16,
+        },
+        {
+          code: "F1",
+          description: "Línea trifásica maquinaria / cuadro secundario",
+          usageType: "motor",
+          phaseSystem: "trifasico",
+          phaseAssigned: "L1-L2-L3",
+          voltage: 400,
+          powerWatts: 18500,
+          cosPhi: 0.85,
+          simultaneityFactor: 1,
+          utilizationFactor: 1,
+          lengthMeters: 28,
+          installationMethod: "E",
+          insulationType: "XLPE_90",
+          material: "Cu",
+          minSectionMm2: 10,
+          fixedPiaAmps: 40,
+        },
+        {
+          code: "CL1",
+          description: "Climatización industrial trifásica",
+          usageType: "motor",
+          phaseSystem: "trifasico",
+          phaseAssigned: "L1-L2-L3",
+          voltage: 400,
+          powerWatts: 15000,
+          cosPhi: 0.85,
+          simultaneityFactor: 1,
+          utilizationFactor: 1,
+          lengthMeters: 25,
+          installationMethod: "E",
+          insulationType: "XLPE_90",
+          material: "Cu",
+          minSectionMm2: 6,
+          fixedPiaAmps: 32,
+        },
+      ]);
+    }
+
+    setMtdMeta({
+      ...DEFAULT_MTD_METADATA,
+      instalacionNum: instCode,
+      expedienteNum: expCode,
+      titularNombre: payload.titularNombre,
+      titularNif: payload.titularNif,
+      direccionCalle: payload.direccionCalle,
+      direccionNum: payload.direccionNum,
+      portalPlanta: "",
+      terminoMunicipal: payload.terminoMunicipal,
+      isla: payload.isla,
+      superficieUtilM2: payload.superficieUtilM2,
+      usoDestino: payload.usoDestino,
+      tipoActuacion: payload.tipoActuacion,
+      tieneSobretensiones: true,
+      tieneIgaReglamentario: true,
+      modalidadReporteFoto: "estandar",
+      diferencialClase: "A",
+      instaladorNombrePh: currentUser.full_name.replace(/\s*\(.*?\)\s*/g, ""),
+      tecnicoNombre: currentUser.full_name.replace(/\s*\(.*?\)\s*/g, ""),
+      instaladorDoi: currentUser.doi_nif,
+      instaladorCciNum: currentUser.cci_or_colegiado,
+      tecnicoColegiadoNum: currentUser.cci_or_colegiado,
+      empresaInstaladoraNombre: currentTenant?.name || "",
+      empresaInstaladoraNum: currentTenant?.empresa_instaladora_num || "",
+    });
+
+    setTargetMtdPage("all");
+    setActiveSection(payload.openTarget);
+    setStatusBanner({
+      type: "success",
+      text: `Nuevo expediente ${expCode} iniciado con plantilla «${payload.usoDestino}».`,
+    });
+  };
 
   // Cambiar de Usuario Activo (limpiando el formulario activo para que nunca se mezclen reportes entre usuarios)
   const switchActiveUser = (targetUser: AppUser) => {
@@ -2237,12 +2708,11 @@ export default function SistemaCalculoRebtPage() {
             <div className="flex items-center gap-1.5 sm:gap-2">
               <button
                 type="button"
-                onClick={() =>
-                  startNewBlankProjectForUser(currentUser, currentTenant)
-                }
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 sm:px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50"
+                onClick={() => setShowNewWizardModal(true)}
+                title="Abrir Asistente Guiado: Nuevo Expediente o Análisis Dual por Foto de Cuadro"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-blue-300 bg-white px-2.5 sm:px-3 py-1.5 text-xs font-bold text-[#0f6cbd] shadow-2xs transition hover:bg-blue-50"
               >
-                <FilePlus2 className="h-3.5 w-3.5 text-slate-500" />
+                <FilePlus2 className="h-3.5 w-3.5 text-[#0f6cbd]" />
                 <span className="hidden sm:inline">Nuevo</span>
               </button>
 
@@ -2321,6 +2791,82 @@ export default function SistemaCalculoRebtPage() {
 
         {/* Contenedor de Secciones */}
         <main className="flex-1 p-3 sm:p-6 lg:p-8 pb-20 lg:pb-8">
+          {/* Barra global de conmutación rápida cuando hay 2 Fichas Técnicas separadas desde Foto (-ACT vs -COR) */}
+          {dualPhotoState && (
+            <div className="no-print mb-4 flex flex-wrap items-center justify-between gap-2.5 rounded-xl border-2 border-blue-200 bg-gradient-to-r from-blue-50/90 via-white to-emerald-50/70 px-4 py-2.5 shadow-xs">
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="rounded-md bg-[#0f6cbd] px-2 py-0.5 text-[10px] font-extrabold text-white">
+                  2 FICHAS SEPARADAS (FOTO)
+                </span>
+                <span className="font-semibold text-slate-800">
+                  Viendo ahora:{" "}
+                  <strong
+                    className={
+                      dualPhotoState.activeMode === "estado_actual"
+                        ? "text-amber-800"
+                        : "text-emerald-800"
+                    }
+                  >
+                    {dualPhotoState.activeMode === "estado_actual"
+                      ? `Ficha #1 · Estado Actual (${dualPhotoState.evaluation.actual.expedienteNum})`
+                      : `Ficha #2 · Instalación Corregida (${dualPhotoState.evaluation.corregido.expedienteNum})`}
+                  </strong>
+                </span>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() =>
+                    applyDualPhotoSnapshotToActiveWorkspace(
+                      dualPhotoState.evaluation,
+                      "estado_actual",
+                      "stay"
+                    )
+                  }
+                  className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition ${
+                    dualPhotoState.activeMode === "estado_actual"
+                      ? "bg-amber-600 text-white shadow-2xs"
+                      : "border border-amber-300 bg-white text-amber-900 hover:bg-amber-50"
+                  }`}
+                >
+                  Opción 1: Estado Actual (-ACT)
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    applyDualPhotoSnapshotToActiveWorkspace(
+                      dualPhotoState.evaluation,
+                      "instalacion_corregida",
+                      "stay"
+                    )
+                  }
+                  className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition ${
+                    dualPhotoState.activeMode === "instalacion_corregida"
+                      ? "bg-emerald-600 text-white shadow-2xs"
+                      : "border border-emerald-300 bg-white text-emerald-900 hover:bg-emerald-50"
+                  }`}
+                >
+                  Opción 2: Cómo Debe Ir (-COR)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveSection("ficha_mtd")}
+                  className="rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-[#0f6cbd] hover:bg-blue-100"
+                >
+                  Ver Ficha M.T.D. Activa
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowNewWizardModal(true)}
+                  className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Comparativa
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Flujo guiado del expediente (Wizard Progress Bar) */}
           {activeSection !== "dashboard_tecnico" && (
             <div className="no-print mb-5 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 shadow-2xs">
@@ -2570,9 +3116,7 @@ export default function SistemaCalculoRebtPage() {
                 itc04Evaluation={itc04Evaluation}
                 onNavigate={(sec) => setActiveSection(sec)}
                 onLoadProject={(id) => handleLoadProject(id)}
-                onNewProject={() =>
-                  startNewBlankProjectForUser(currentUser, currentTenant)
-                }
+                onNewProject={() => setShowNewWizardModal(true)}
               />
             </div>
           )}
@@ -2592,9 +3136,7 @@ export default function SistemaCalculoRebtPage() {
               mtdMeta={mtdMeta}
               calculatedCircuits={calculatedCircuits}
               contractDesignWatts={cgmpSummary.contractDesignWatts}
-              onStartNewProject={() =>
-                startNewBlankProjectForUser(currentUser, currentTenant)
-              }
+              onStartNewProject={() => setShowNewWizardModal(true)}
               onNavigate={setActiveSection}
               onLoadProject={handleLoadProject}
               onDeleteProject={handleDeleteProject}
@@ -4257,6 +4799,25 @@ export default function SistemaCalculoRebtPage() {
               rcdSensitivityMa={rcdSensitivityMa}
               canExportMtd={currentUser?.can_export_mtd}
               initialPage={targetMtdPage}
+              dualPhotoSwitcher={
+                dualPhotoState
+                  ? {
+                      activeMode: dualPhotoState.activeMode,
+                      actualExpNum:
+                        dualPhotoState.evaluation.actual.expedienteNum,
+                      corregidoExpNum:
+                        dualPhotoState.evaluation.corregido.expedienteNum,
+                      overallCompliant:
+                        dualPhotoState.evaluation.overallCompliant,
+                      onSwitch: (nextMode) =>
+                        applyDualPhotoSnapshotToActiveWorkspace(
+                          dualPhotoState.evaluation,
+                          nextMode,
+                          "ficha_mtd"
+                        ),
+                    }
+                  : null
+              }
             />
           )}
 
@@ -4439,6 +5000,23 @@ export default function SistemaCalculoRebtPage() {
                 });
               }}
               onOpenFichaMtd={() => setActiveSection("ficha_mtd")}
+              activeDualPhotoEval={dualPhotoState?.evaluation ?? null}
+              activeDualPhotoMode={
+                dualPhotoState?.activeMode ?? "estado_actual"
+              }
+              onSelectDualPhotoMode={(evaluation, mode, dest) =>
+                applyDualPhotoSnapshotToActiveWorkspace(
+                  evaluation,
+                  mode,
+                  dest === "ficha_mtd" ? "ficha_mtd" : "stay"
+                )
+              }
+              onSaveBothDualPhotoModes={(evaluation) =>
+                handleSaveBothDualPhotoOptions(
+                  evaluation,
+                  dualPhotoState?.activeMode ?? "instalacion_corregida"
+                )
+              }
               onApplyMemoriaCanarias={(texto) => {
                 setMtdMeta((prev) => ({
                   ...prev,
@@ -4653,6 +5231,33 @@ export default function SistemaCalculoRebtPage() {
             text: `Tarea "${taskTitle}" guardada en tu lista de trabajo.`,
           });
         }}
+      />
+
+      {/* =====================================================================
+          MODAL ASISTENTE GUIADO DE NUEVO EXPEDIENTE Y ANÁLISIS DUAL POR FOTO
+         ===================================================================== */}
+      <NewExpedienteWizardModal
+        isOpen={showNewWizardModal}
+        onClose={() => setShowNewWizardModal(false)}
+        defaultIsla={mtdMeta.isla || currentTenant?.isla || "Tenerife"}
+        defaultMunicipio={
+          mtdMeta.terminoMunicipal ||
+          (currentTenant?.isla === "Gran Canaria"
+            ? "Las Palmas de G.C."
+            : "Santa Cruz de Tenerife")
+        }
+        initialMeta={mtdMeta}
+        onCreateGuidedScratch={handleCreateGuidedScratch}
+        onApplyPhotoOption={(evaluation, selectedMode, destination) =>
+          applyDualPhotoSnapshotToActiveWorkspace(
+            evaluation,
+            selectedMode,
+            destination
+          )
+        }
+        onSaveBothPhotoOptions={(evaluation, openAfterSave) =>
+          handleSaveBothDualPhotoOptions(evaluation, openAfterSave)
+        }
       />
 
       {/* =====================================================================

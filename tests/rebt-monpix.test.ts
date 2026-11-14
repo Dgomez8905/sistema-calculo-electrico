@@ -32,6 +32,7 @@ import {
 import { buildUnifilarIec60617Svg } from "../src/lib/unifilar-iec60617.ts";
 import {
   buildCanariasVisionFromProject,
+  buildDualPanelEvaluation,
   parseCanariasVisionJsonToSummary,
 } from "../src/lib/rebt-vision-canarias.ts";
 import { generateUnifilarDxf } from "../src/lib/unifilar-dxf.ts";
@@ -602,4 +603,54 @@ test("Visión estructurada Canarias (NRZ103 Tenerife): inventario C1-01, Mermaid
   assert.ok(dxf.includes("APARAMENTA_IEC60617"));
   assert.ok(dxf.includes("H07Z1-K(AS)"));
   assert.ok(dxf.endsWith("EOF"));
+});
+
+test("Análisis Dual desde Foto: separa Ficha #1 Estado Actual (-ACT) y Ficha #2 Instalación Corregida (-COR)", () => {
+  // Simula cuadro antiguo con ICP 15A, sin sobretensiones, 1 ID Clase AC y solo 4 circuitos
+  const dual = buildDualPanelEvaluation({
+    supplyType: "monofasico_230v",
+    rawIgaAmps: 15,
+    hasIcpOnly: true,
+    hasSurgeProtection: false,
+    rcdCount: 1,
+    diferencialCalibreAmps: 40,
+    diferencialClase: "AC",
+    brandDetected: "Schneider",
+    circuits: ITC_BT_25_TEMPLATES.slice(0, 4),
+    baseExpedienteNum: "EXP-TE-2026-915",
+    baseInstalacionNum: "BT-2026-915",
+  });
+
+  // 1. Dictamen normativo del estado existente: NO CUMPLE REBT
+  assert.equal(dual.overallCompliant, false);
+  assert.ok(dual.defectsGraveCount >= 3);
+
+  // 2. Opción 1 (Estado Actual -ACT) preserva exactamente cómo está la instalación con su propia ficha
+  assert.equal(dual.actual.expedienteNum, "EXP-TE-2026-915-ACT");
+  assert.equal(dual.actual.instalacionNum, "BT-2026-915-ACT");
+  assert.equal(dual.actual.igaAmps, 15);
+  assert.equal(dual.actual.hasSurgeProtection, false);
+  assert.equal(dual.actual.circuits.length, 4);
+  assert.equal(dual.actual.mtdPatch.tieneSobretensiones, false);
+  assert.equal(dual.actual.mtdPatch.tieneIgaReglamentario, false);
+  assert.equal(dual.actual.mtdPatch.modalidadReporteFoto, "estado_actual");
+
+  // 3. Opción 2 (Instalación Corregida -COR) genera ficha separada 100% REBT y lista de correcciones
+  assert.equal(dual.corregido.expedienteNum, "EXP-TE-2026-915-COR");
+  assert.equal(dual.corregido.instalacionNum, "BT-2026-915-COR");
+  assert.notEqual(
+    dual.actual.mtdPatch.memoriaDescriptivaTexto,
+    dual.corregido.mtdPatch.memoriaDescriptivaTexto
+  );
+  assert.equal(dual.corregido.igaAmps, 25);
+  assert.equal(dual.corregido.hasSurgeProtection, true);
+  assert.equal(dual.corregido.diferencialClase, "A");
+  assert.ok(dual.corregido.rcdCount >= 2);
+  assert.equal(dual.corregido.circuits.length, 5);
+  assert.equal(dual.corregido.mtdPatch.tieneSobretensiones, true);
+  assert.equal(
+    dual.corregido.mtdPatch.modalidadReporteFoto,
+    "instalacion_corregida"
+  );
+  assert.ok(dual.corrections.length >= 3);
 });

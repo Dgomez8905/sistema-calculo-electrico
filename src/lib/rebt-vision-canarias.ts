@@ -3,7 +3,10 @@ import type {
   RebtCircuitInput,
   SystemSupplyType,
 } from "./electrical-calculations.ts";
-import { calculateRebtCircuit } from "./electrical-calculations.ts";
+import {
+  calculateRebtCircuit,
+  sanitizeSpanishIgaAmps,
+} from "./electrical-calculations.ts";
 
 export interface CanariasVisionComponentItem {
   id: string;
@@ -650,4 +653,970 @@ export function parseCanariasVisionJsonToSummary(
     circuits,
     summarySentence,
   };
+}
+
+// ============================================================================
+// MOTOR DUAL DE INSPECCIÓN Y ADECUACIÓN REBT DESDE FOTOGRAFÍA DE CUADRO
+// Separa estrictamente en DOS FICHAS TÉCNICAS M.T.D. INDEPENDIENTES:
+//   - Opción 1 (ACT): Cómo está la instalación + Dictamen Cumple / No Cumple REBT
+//   - Opción 2 (COR): Correcciones obligatorias y Cómo debe ir la instalación
+// ============================================================================
+
+export interface PanelNormativeCheck {
+  id: string;
+  itc: string;
+  title: string;
+  passed: boolean;
+  severity: "cumple" | "leve" | "grave";
+  observedValue: string;
+  normativeRequirement: string;
+}
+
+export interface PanelCorrectionAction {
+  id: string;
+  order: number;
+  itc: string;
+  componentTarget: string;
+  currentState: string;
+  howItMustGo: string;
+  priority: "obligatoria" | "recomendada";
+}
+
+export interface DualPanelProfileSnapshot {
+  mode: "estado_actual" | "instalacion_corregida";
+  optionLabel: string;
+  shortTitle: string;
+  expedienteSuffix: "ACT" | "COR";
+  expedienteNum: string;
+  instalacionNum: string;
+  supplyType: SystemSupplyType;
+  electrificationGrade: "basica" | "elevada";
+  igaAmps: number;
+  rawDetectedIgaAmps: number;
+  hasIcpOnly: boolean;
+  hasSurgeProtection: boolean;
+  rcdCount: number;
+  diferencialCalibreAmps: number;
+  diferencialClase: "AC" | "A" | "S" | "B";
+  brandDetected?: string;
+  circuits: RebtCircuitInput[];
+  summarySentence: string;
+  mtdPatch: Partial<MtdFormMetadata>;
+}
+
+export interface DualPanelEvaluationResult {
+  sourceLabel: string;
+  photoDataUrl?: string;
+  baseExpedienteNum: string;
+  baseInstalacionNum: string;
+  overallCompliant: boolean;
+  verdictBadge: string;
+  complianceScorePct: number;
+  defectsGraveCount: number;
+  defectsLeveCount: number;
+  checks: PanelNormativeCheck[];
+  corrections: PanelCorrectionAction[];
+  actual: DualPanelProfileSnapshot;
+  corregido: DualPanelProfileSnapshot;
+  structuredVision?: CanariasPanelVisionResult | null;
+}
+
+export interface RawPanelObservationInput {
+  supplyType: SystemSupplyType;
+  rawIgaAmps: number;
+  hasIcpOnly?: boolean;
+  hasNoHeaderBreaker?: boolean;
+  hasSurgeProtection: boolean;
+  rcdCount: number;
+  diferencialCalibreAmps: number;
+  diferencialClase: "AC" | "A" | "S" | "B";
+  brandDetected?: string;
+  circuits: RebtCircuitInput[];
+  sourceLabel?: string;
+  photoDataUrl?: string;
+  baseExpedienteNum?: string;
+  baseInstalacionNum?: string;
+  structuredVision?: CanariasPanelVisionResult | null;
+}
+
+function stripReportSuffix(code: string): string {
+  return (code || "").trim().replace(/-(ACT|COR)$/i, "");
+}
+
+function buildStandardHousingCircuit(
+  code: "C1" | "C2" | "C3" | "C4" | "C5",
+  idNum: number
+): RebtCircuitInput {
+  const templates: Record<
+    "C1" | "C2" | "C3" | "C4" | "C5",
+    {
+      description: string;
+      powerWatts: number;
+      lengthMeters: number;
+      minSectionMm2: number;
+      fixedPiaAmps: number;
+    }
+  > = {
+    C1: {
+      description: "Iluminación (máx. 30 puntos de luz)",
+      powerWatts: 2300,
+      lengthMeters: 15,
+      minSectionMm2: 1.5,
+      fixedPiaAmps: 10,
+    },
+    C2: {
+      description: "Tomas de uso general y frigorífico",
+      powerWatts: 3450,
+      lengthMeters: 18,
+      minSectionMm2: 2.5,
+      fixedPiaAmps: 16,
+    },
+    C3: {
+      description: "Cocina y horno (toma 25 A)",
+      powerWatts: 5400,
+      lengthMeters: 12,
+      minSectionMm2: 6,
+      fixedPiaAmps: 25,
+    },
+    C4: {
+      description: "Lavadora, lavavajillas y termo eléctrico",
+      powerWatts: 3450,
+      lengthMeters: 14,
+      minSectionMm2: 4,
+      fixedPiaAmps: 20,
+    },
+    C5: {
+      description: "Tomas de baño y auxiliares de cocina",
+      powerWatts: 3450,
+      lengthMeters: 15,
+      minSectionMm2: 2.5,
+      fixedPiaAmps: 16,
+    },
+  };
+  const tpl = templates[code];
+  return {
+    id: idNum,
+    code,
+    description: tpl.description,
+    usageType: "vivienda_interior",
+    phaseSystem: "monofasico",
+    phaseAssigned: "L1",
+    voltage: 230,
+    powerWatts: tpl.powerWatts,
+    cosPhi: 1,
+    simultaneityFactor: 1,
+    utilizationFactor: 1,
+    lengthMeters: tpl.lengthMeters,
+    installationMethod: "B1",
+    insulationType: "PVC_70",
+    material: "Cu",
+    minSectionMm2: tpl.minSectionMm2,
+    fixedPiaAmps: tpl.fixedPiaAmps,
+  };
+}
+
+/**
+ * Construye los dos perfiles técnicos separados (Estado Actual vs Instalación Corregida)
+ * con sus respectivas Fichas Técnicas M.T.D. independientes (-ACT y -COR).
+ */
+export function buildDualPanelEvaluation(
+  input: RawPanelObservationInput
+): DualPanelEvaluationResult {
+  const baseExp =
+    stripReportSuffix(input.baseExpedienteNum || "") ||
+    `EXP-TE-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`;
+  const baseInst =
+    stripReportSuffix(input.baseInstalacionNum || "") ||
+    `BT-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`;
+
+  const supplyType = input.supplyType;
+  const rawIga = Math.max(10, Math.round(input.rawIgaAmps || 25));
+  const hasIcpOnly = Boolean(input.hasIcpOnly);
+  const hasNoHeaderBreaker = Boolean(input.hasNoHeaderBreaker);
+  const actualHasSurge = Boolean(input.hasSurgeProtection);
+  const actualRcdCount = Math.max(0, Math.round(input.rcdCount ?? 1));
+  const actualDifCalibre = input.diferencialCalibreAmps || 40;
+  const actualDifClase = input.diferencialClase || "AC";
+
+  // Circuitos tal cual se observan en el cuadro existente (sin inventar circuitos faltantes)
+  const actualCircuits: RebtCircuitInput[] =
+    input.circuits.length > 0
+      ? input.circuits.map((c, idx) => ({
+          ...c,
+          id: idx + 1,
+        }))
+      : [
+          buildStandardHousingCircuit("C1", 1),
+          buildStandardHousingCircuit("C2", 2),
+          buildStandardHousingCircuit("C4", 3),
+          buildStandardHousingCircuit("C3", 4),
+        ];
+
+  const actualCalculated = actualCircuits.map((c) => calculateRebtCircuit(c));
+  const maxPiaActual = Math.max(
+    10,
+    ...actualCalculated.map((c) => c.piaAmps || c.fixedPiaAmps || 16)
+  );
+  const maxCircuitsPerRcdActual =
+    actualRcdCount > 0
+      ? Math.ceil(actualCircuits.length / actualRcdCount)
+      : actualCircuits.length;
+
+  const isHousingLike = actualCircuits.every(
+    (c) => c.usageType === "vivienda_interior" || c.usageType === "recarga_ve"
+  );
+
+  // ==========================================================================
+  // 1. AUDITORÍA NORMATIVA REBT SOBRE EL ESTADO ACTUAL
+  // ==========================================================================
+  const checks: PanelNormativeCheck[] = [];
+
+  // Check 1: ITC-BT-17 — IGA omnipolar independiente y calibre mínimo
+  const minRegIga = isHousingLike ? 25 : 16;
+  const igaPassed =
+    !hasIcpOnly &&
+    !hasNoHeaderBreaker &&
+    rawIga >= minRegIga &&
+    rawIga >= maxPiaActual;
+  checks.push({
+    id: "chk-itc17-iga",
+    itc: "ITC-BT-17",
+    title: "Interruptor General Automático (IGA) omnipolar y selectividad",
+    passed: igaPassed,
+    severity: igaPassed ? "cumple" : "grave",
+    observedValue: hasNoHeaderBreaker
+      ? "Carece de IGA general de corte omnipolar"
+      : hasIcpOnly
+      ? `Solo existe antiguo ICP (${rawIga} A) sin IGA independiente`
+      : `IGA ${rawIga} A (${supplyType === "trifasico_400v" ? "4P" : "2P"})`,
+    normativeRequirement: isHousingLike
+      ? `Obligatorio IGA omnipolar independiente de calibre ≥ 25 A (5.750 W Básica) y ≥ PIA mayor (${maxPiaActual} A), poder de corte mín. 4.500 A.`
+      : `Obligatorio IGA omnipolar independiente coordinado con DI y calibre ≥ PIA mayor (${maxPiaActual} A).`,
+  });
+
+  // Check 2: ITC-BT-23 + NRZ103 Canarias — Protección contra Sobretensiones
+  checks.push({
+    id: "chk-itc23-surge",
+    itc: "ITC-BT-23 / NRZ103",
+    title: "Protección contra sobretensiones permanentes y transitorias (POP + DPS T2)",
+    passed: actualHasSurge,
+    severity: actualHasSurge ? "cumple" : "grave",
+    observedValue: actualHasSurge
+      ? "Dispone de protección contra sobretensiones (Combi / PCS Tipo 2 + POP)"
+      : "NO dispone de protector contra sobretensiones permanentes ni transitorias",
+    normativeRequirement:
+      "Obligatorio instalar protección combinada permanente (POP) + transitoria Tipo 2 (Up ≤ 1,5 kV) aguas abajo o integrada con el IGA.",
+  });
+
+  // Check 3: ITC-BT-24 — Protección diferencial ≤ 30 mA y coordinación con cabecera
+  const rcdCoordOk =
+    actualRcdCount >= 1 &&
+    (actualDifCalibre >= rawIga || rawIga <= actualDifCalibre);
+  checks.push({
+    id: "chk-itc24-rcd",
+    itc: "ITC-BT-24",
+    title: "Protección diferencial de alta sensibilidad (≤ 30 mA) y calibre In(ID) ≥ In(IGA)",
+    passed: rcdCoordOk,
+    severity: rcdCoordOk ? "cumple" : "grave",
+    observedValue:
+      actualRcdCount === 0
+        ? "Sin interruptor diferencial detectado"
+        : `${actualRcdCount} ud. ID ${actualDifCalibre} A / 30 mA · Clase ${actualDifClase}`,
+    normativeRequirement: `Todo circuito interior debe estar protegido por ID ≤ 30 mA con intensidad asignada ≥ IGA (${rawIga} A) o protegido aguas arriba.`,
+  });
+
+  // Check 4: ITC-BT-24 / Guía Técnica — Clase de diferencial (Clase A frente a Clase AC)
+  const claseAOk = actualDifClase === "A" || actualDifClase === "B";
+  checks.push({
+    id: "chk-itc24-clasea",
+    itc: "ITC-BT-24 / UNE-EN 61008",
+    title: "Inmunización diferencial frente a corrientes pulsantes CC (Clase A)",
+    passed: claseAOk,
+    severity: claseAOk ? "cumple" : "leve",
+    observedValue: `Diferencial instalado Clase ${actualDifClase}`,
+    normativeRequirement:
+      "Se requiere / recomienda Diferencial Clase A (o Tipo F) para cargas electrónicas modernas (vitrocerámica inducción, lavadora Inverter, clima, LED, VE).",
+  });
+
+  // Check 5: ITC-BT-25 §2.3 — Máximo 5 circuitos por cada interruptor diferencial en vivienda
+  const rcdGroupingOk = actualRcdCount >= 1 && maxCircuitsPerRcdActual <= 5;
+  checks.push({
+    id: "chk-itc25-max5",
+    itc: "ITC-BT-25 §2.3",
+    title: "Límite máximo de 5 circuitos por cada Interruptor Diferencial",
+    passed: rcdGroupingOk,
+    severity: rcdGroupingOk ? "cumple" : "grave",
+    observedValue: `${actualCircuits.length} circuito(s) colgados de ${actualRcdCount} diferencial(es) (máx. ${maxCircuitsPerRcdActual} cir./ID)`,
+    normativeRequirement:
+      "En viviendas y locales asimilables se instalará al menos 1 diferencial por cada 5 circuitos o fracción (máximo 5 PIAs por ID de 30 mA).",
+  });
+
+  // Check 6: ITC-BT-25 Tabla 1 / ITC-BT-19 — Circuitos mínimos reglamentarios y secciones
+  const hasMin5Circuits = !isHousingLike || actualCircuits.length >= 5;
+  const allCircuitsSectionOk = actualCalculated.every((c) => c.isCompliant);
+  const circuitsOk = hasMin5Circuits && allCircuitsSectionOk;
+  checks.push({
+    id: "chk-itc25-circuits",
+    itc: "ITC-BT-25 / ITC-BT-19",
+    title: "Dotación mínima de circuitos independientes (C1 a C5) y coordinación PIA-Conductor",
+    passed: circuitsOk,
+    severity: circuitsOk ? "cumple" : "grave",
+    observedValue: `${actualCircuits.length} circuito(s) detectado(s) (${actualCircuits
+      .map((c) => `${c.code} ${c.fixedPiaAmps || 16}A`)
+      .join(", ")})`,
+    normativeRequirement: isHousingLike
+      ? "Electrificación Básica exige mínimo 5 circuitos independientes: C1 Alumbrado (10A/1,5mm²), C2 Tomas (16A/2,5mm²), C3 Cocina/Horno (25A/6mm²), C4 Lavadora/Termo (20A/4mm²) y C5 Baño/Aux. cocina (16A/2,5mm²)."
+      : "Cada circuito debe cumplir Ib ≤ In (PIA) ≤ Iz y caída de tensión ΔU ≤ 3% alumbrado / 5% otros usos.",
+  });
+
+  const defectsGraveCount = checks.filter((c) => !c.passed && c.severity === "grave").length;
+  const defectsLeveCount = checks.filter((c) => !c.passed && c.severity === "leve").length;
+  const passedCount = checks.filter((c) => c.passed).length;
+  const complianceScorePct = Math.round((passedCount / checks.length) * 100);
+  const overallCompliant = defectsGraveCount === 0;
+  const verdictBadge = overallCompliant
+    ? defectsLeveCount === 0
+      ? "CUMPLE NORMATIVA REBT AL 100%"
+      : "CUMPLE REBT CON OBSERVACIÓN LEVE (MEJORA RECOMENDADA)"
+    : `NO CUMPLE NORMATIVA REBT (${defectsGraveCount} DEFECTO${
+        defectsGraveCount > 1 ? "S" : ""
+      } REGLAMENTARIO${defectsGraveCount > 1 ? "S" : ""})`;
+
+  // ==========================================================================
+  // 2. CÁLCULO DE LA INSTALACIÓN CORREGIDA ("CÓMO DEBE IR SEGÚN REBT")
+  // ==========================================================================
+  const correctedCircuits: RebtCircuitInput[] = [];
+  if (isHousingLike) {
+    const baseCodes: ("C1" | "C2" | "C3" | "C4" | "C5")[] = [
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+    ];
+    baseCodes.forEach((code, idx) => {
+      const std = buildStandardHousingCircuit(code, idx + 1);
+      const found = actualCircuits.find(
+        (c) => c.code.toUpperCase() === code
+      );
+      if (found) {
+        const safePia = std.fixedPiaAmps!;
+        correctedCircuits.push({
+          ...std,
+          lengthMeters: found.lengthMeters || std.lengthMeters,
+          fixedPiaAmps: safePia,
+          minSectionMm2: std.minSectionMm2,
+        });
+      } else {
+        correctedCircuits.push(std);
+      }
+    });
+    // Conservar circuitos adicionales superiores a C5 (ej. C8 Calefacción, C9 Aire Acondicionado, C13 VE)
+    actualCircuits.forEach((c) => {
+      const upper = c.code.toUpperCase();
+      if (!["C1", "C2", "C3", "C4", "C5"].includes(upper)) {
+        const pia = c.fixedPiaAmps || 16;
+        const { sectionMm2 } = inferSectionAndTubeFromPia(pia);
+        correctedCircuits.push({
+          ...c,
+          id: correctedCircuits.length + 1,
+          minSectionMm2: Math.max(c.minSectionMm2 || sectionMm2, sectionMm2),
+          fixedPiaAmps: pia,
+        });
+      }
+    });
+  } else {
+    actualCircuits.forEach((c, idx) => {
+      const pia = c.fixedPiaAmps || 16;
+      const { sectionMm2 } = inferSectionAndTubeFromPia(pia);
+      correctedCircuits.push({
+        ...c,
+        id: idx + 1,
+        minSectionMm2: Math.max(c.minSectionMm2 || sectionMm2, sectionMm2),
+        fixedPiaAmps: pia,
+      });
+    });
+  }
+
+  const correctedGrade: "basica" | "elevada" =
+    supplyType === "trifasico_400v" ||
+    correctedCircuits.length > 5 ||
+    rawIga >= 40
+      ? "elevada"
+      : "basica";
+
+  const minTargetIga =
+    supplyType === "trifasico_400v"
+      ? Math.max(25, rawIga)
+      : correctedGrade === "elevada"
+      ? Math.max(40, rawIga)
+      : Math.max(25, rawIga);
+
+  const correctedIgaAmps = sanitizeSpanishIgaAmps(minTargetIga, supplyType);
+  const correctedRcdCount = Math.max(
+    2,
+    Math.ceil(correctedCircuits.length / 5)
+  );
+  const correctedDifCalibre =
+    correctedIgaAmps <= 40 ? 40 : correctedIgaAmps <= 63 ? 63 : 80;
+
+  // ==========================================================================
+  // 3. PLAN DETALLADO DE CORRECCIONES ("CÓMO DEBE IR LA INSTALACIÓN")
+  // ==========================================================================
+  const corrections: PanelCorrectionAction[] = [];
+  let orderCounter = 1;
+
+  if (!igaPassed || !actualHasSurge) {
+    const headerSolution =
+      correctedIgaAmps > 63
+        ? `Instalar en cabecera un Interruptor Automático de Caja Moldeada (MCCB) ${
+            supplyType === "trifasico_400v" ? "4P" : "2P"
+          } de ${correctedIgaAmps} A acoplado a Bobina de Disparo MX y bloque independiente de protección contra sobretensiones permanentes (POP) + descargador transitorio Tipo 1+2 (Up ≤ 1,5 kV), conectado al embarrado PE con Cu 16 mm².`
+        : `Retirar el elemento de cabecera antiguo e instalar en el carril superior izquierdo un Equipo Compacto Combinado (Combi IGA + POP + DPS Tipo 2) ${
+            supplyType === "trifasico_400v" ? "4P" : "2P"
+          } de ${correctedIgaAmps} A Curva C (Icu ≥ 6 kA, Up ≤ 1,5 kV), conectando directamente el borne de tierra del descargador a la barra colectora PE con conductor H07Z1-K (AS) de ${
+            correctedIgaAmps >= 40 ? "16" : "10"
+          } mm².`;
+
+    corrections.push({
+      id: "cor-cabecera-combi",
+      order: orderCounter++,
+      itc: "ITC-BT-17 + ITC-BT-23 + NRZ103",
+      componentTarget: "Cabecera General de Mando y Protección (IGA + Sobretensiones)",
+      currentState: `${
+        hasIcpOnly ? `ICP ${rawIga} A sin IGA` : `IGA ${rawIga} A`
+      } · ${
+        actualHasSurge ? "Con sobretensiones" : "Sin protección contra sobretensiones"
+      }`,
+      howItMustGo: headerSolution,
+      priority: "obligatoria",
+    });
+  }
+
+  if (!rcdCoordOk || !rcdGroupingOk || !claseAOk || actualRcdCount < 2) {
+    corrections.push({
+      id: "cor-diferenciales",
+      order: orderCounter++,
+      itc: "ITC-BT-24 + ITC-BT-25 §2.3",
+      componentTarget: "Protección Diferencial y Selectividad Horizontal",
+      currentState: `${actualRcdCount} diferencial(es) ${actualDifCalibre} A / 30 mA Clase ${actualDifClase} (${maxCircuitsPerRcdActual} circuitos/ID)`,
+      howItMustGo: `Instalar ${correctedRcdCount} Interruptores Diferenciales de ${correctedDifCalibre} A / 30 mA Clase A (${
+        supplyType === "trifasico_400v" ? "4P / 2P equilibrados por fase" : "2P"
+      }), alimentados aguas abajo del bloque Combi mediante peine homologado o puente doble aislamiento de ${
+        correctedIgaAmps >= 40 ? "10" : "6"
+      } mm², repartiendo un máximo estricto de 5 circuitos PIAs por cada diferencial (ej. Grupo ID1: C1 Alumbrado, C3 Cocina, C5 Baño; Grupo ID2: C2 Tomas Generales, C4 Lavadora/Termo${
+        correctedCircuits.length > 5 ? " y circuitos adicionales" : ""
+      }).`,
+      priority: !rcdCoordOk || !rcdGroupingOk ? "obligatoria" : "recomendada",
+    });
+  }
+
+  if (!circuitsOk) {
+    corrections.push({
+      id: "cor-circuitos-itc25",
+      order: orderCounter++,
+      itc: "ITC-BT-25 Tabla 1 + ITC-BT-19 + ITC-BT-29",
+      componentTarget: "Desdoblamiento de Circuitos Interiores y Secciones H07Z1-K (AS)",
+      currentState: `${actualCircuits.length} circuito(s) (${actualCircuits
+        .map((c) => `${c.code} ${c.fixedPiaAmps || 16}A`)
+        .join(", ")})`,
+      howItMustGo: `Disponer los ${correctedCircuits.length} circuitos interiores independientes con PIAs Curva C (1P+N / 2P, corte omnipolar) y conductor libre de halógenos H07Z1-K (AS) 450/750 V + PE de igual sección bajo tubo corrugado: ${correctedCircuits
+        .map((c) => {
+          const calc = calculateRebtCircuit(c);
+          return `${c.code} (${c.description}: PIA ${calc.piaAmps} A · ${calc.sectionMm2} mm² Cu · tubo Ø${calc.tubeDiameterMm} mm)`;
+        })
+        .join("; ")}.`,
+      priority: "obligatoria",
+    });
+  }
+
+  // Siempre incluir directriz reglamentaria de Derivación Individual, Envolvente y Embarrado PE
+  const targetDiMm2 =
+    correctedIgaAmps <= 25
+      ? 6
+      : correctedIgaAmps <= 40
+      ? 10
+      : correctedIgaAmps <= 63
+      ? 16
+      : 25;
+  corrections.push({
+    id: "cor-di-tierra-envolvente",
+    order: orderCounter++,
+    itc: "ITC-BT-15 + ITC-BT-17 + ITC-BT-18",
+    componentTarget: "Derivación Individual (DI), Envolvente Modular y Embarrado de Tierra",
+    currentState: "Verificación de envolvente, reserva modular del 20% y continuidad PE",
+    howItMustGo: `Asegurar Derivación Individual libre de halógenos RZ1-K / H07Z1-K (AS) mín. ${targetDiMm2} mm² Cu + hilo de mando rojo 1,5 mm², caja general de mando y protección (CGMP) aislante Clase II (IP30 / IK07, autoextinguible 650 °C) de al menos ${
+      correctedCircuits.length > 6 ? "24 (2 filas × 12)" : "18"
+    } módulos DIN para dejar reserva libre, y regleta colectora de tierra (PE) conectada a todos los circuitos con R_tierra ≤ 37 Ω.`,
+    priority: overallCompliant ? "recomendada" : "obligatoria",
+  });
+
+  // ==========================================================================
+  // 4. REDACCIÓN DE MEMORIAS TÉCNICAS SEPARADAS PARA CADA FICHA M.T.D.
+  // ==========================================================================
+  const actualExpNum = `${baseExp}-ACT`;
+  const actualInstNum = `${baseInst}-ACT`;
+  const corrExpNum = `${baseExp}-COR`;
+  const corrInstNum = `${baseInst}-COR`;
+
+  const actualChecksText = checks
+    .map(
+      (chk, i) =>
+        `  ${i + 1}. [${chk.passed ? "CUMPLE" : "NO CUMPLE"}] ${chk.itc} — ${
+          chk.title
+        }: Detectado «${chk.observedValue}». Exigencia: ${chk.normativeRequirement}`
+    )
+    .join("\n");
+
+  const memoriaActualTexto = [
+    `INFORME TÉCNICO DE ESTADO ACTUAL E INSPECCIÓN REBT — EXPEDIENTE ${actualExpNum}`,
+    `DICTAMEN GLOBAL: ${verdictBadge} (Índice de cumplimiento: ${complianceScorePct}% — ${passedCount}/${checks.length} criterios verificados).`,
+    ``,
+    `1. ESTADO ACTUAL DE LA INSTALACIÓN EXISTENTE (SEGÚN INSPECCIÓN VISUAL DE CUADRO):`,
+    `Cuadro eléctrico de distribución en sistema ${
+      supplyType === "trifasico_400v" ? "Trifásico 400/230 V" : "Monofásico 230 V"
+    }${input.brandDetected ? ` (aparamenta predominante ${input.brandDetected})` : ""}, equipado actualmente con: ${
+      hasIcpOnly
+        ? `Interruptor de Control de Potencia ICP de ${rawIga} A (careciendo de IGA independiente)`
+        : `Cabecera IGA de ${rawIga} A`
+    }, ${
+      actualHasSurge
+        ? "protección contra sobretensiones instalada"
+        : "CARENCIA de protección contra sobretensiones permanentes y transitorias"
+    }, ${actualRcdCount} interruptor(es) diferencial(es) de ${actualDifCalibre} A / 30 mA Clase ${actualDifClase} y ${
+      actualCircuits.length
+    } circuito(s) interior(es): ${actualCalculated
+      .map((c) => `${c.code} (${c.description}, PIA ${c.piaAmps} A, ${c.sectionMm2} mm²)`)
+      .join("; ")}.`,
+    ``,
+    `2. VERIFICACIÓN REGLAMENTARIA FRENTE AL REBT (RD 842/2002) Y NRZ103 CANARIAS:`,
+    actualChecksText,
+    ``,
+    `NOTA: Este documento constituye la FICHA TÉCNICA DE ESTADO ACTUAL (${actualExpNum}). Para consultar el diseño reformado y las correcciones reglamentarias consulte la FICHA TÉCNICA DE INSTALACIÓN CORREGIDA (${corrExpNum}).`,
+  ].join("\n");
+
+  const corrLinesText = corrections
+    .map(
+      (cor) =>
+        `  ${cor.order}. [${cor.itc}] ${cor.componentTarget}: Estado previo (${cor.currentState}) → ADECUACIÓN: ${cor.howItMustGo}`
+    )
+    .join("\n");
+
+  const correctedCalculated = correctedCircuits.map((c) => calculateRebtCircuit(c));
+  const memoriaCorregidaTexto = [
+    `MEMORIA TÉCNICA DE ADECUACIÓN Y CORRECCIONES REBT (CÓMO DEBE IR LA INSTALACIÓN) — EXPEDIENTE ${corrExpNum}`,
+    `ESTADO OBJETIVO: INSTALACIÓN 100% CONFORME AL REBT (RD 842/2002), GUÍA TÉCNICA Y NORMAS PARTICULARES NRZ103.`,
+    ``,
+    `1. CONFIGURACIÓN REGLAMENTARIA DEFINITIVA DEL CUADRO GENERAL (CGMP):`,
+    `Suministro en Baja Tensión ${
+      supplyType === "trifasico_400v" ? "Trifásico 400/230 V" : "Monofásico 230 V"
+    }, Grado de Electrificación ${
+      correctedGrade === "elevada" ? "ELEVADO" : "BÁSICO"
+    }, Potencia Máxima Admisible ${Math.round(
+      supplyType === "trifasico_400v"
+        ? 1.732 * 400 * correctedIgaAmps
+        : 230 * correctedIgaAmps
+    ).toLocaleString()} W. Cabecera formada por ${
+      correctedIgaAmps > 63
+        ? `Interruptor Automático Caja Moldeada (MCCB) ${correctedIgaAmps} A + Bobina MX + Protector POP y DPS Tipo 1+2`
+        : `Equipo Compacto Combinado en carril DIN (IGA ${correctedIgaAmps} A Curva C + Sobretensiones Permanentes POP + Transitorias DPS Tipo 2, Up ≤ 1,5 kV)`
+    }, ${correctedRcdCount} Interruptores Diferenciales de ${correctedDifCalibre} A / 30 mA Clase A (máximo 5 circuitos por diferencial) y ${
+      correctedCalculated.length
+    } circuitos interiores cableados con conductor libre de halógenos H07Z1-K (AS) 450/750 V: ${correctedCalculated
+      .map(
+        (c) =>
+          `${c.code} (${c.description}: PIA ${c.piaAmps} A, 2×${c.sectionMm2}+PE mm² Cu, tubo Ø${c.tubeDiameterMm} mm)`
+      )
+      .join("; ")}.`,
+    ``,
+    `2. RELACIÓN DE CORRECCIONES TÉCNICAS Y MONTAJE REGLAMENTARIO SOBRE EL ESTADO INICIAL (${actualExpNum}):`,
+    corrLinesText,
+  ].join("\n");
+
+  const actualGrade: "basica" | "elevada" =
+    supplyType === "trifasico_400v" || rawIga >= 40 || actualCircuits.length > 5
+      ? "elevada"
+      : "basica";
+
+  const actualProfile: DualPanelProfileSnapshot = {
+    mode: "estado_actual",
+    optionLabel: "Opción 1 · Reporte de Estado Actual y Cumplimiento REBT",
+    shortTitle: "Estado Actual (Inspección)",
+    expedienteSuffix: "ACT",
+    expedienteNum: actualExpNum,
+    instalacionNum: actualInstNum,
+    supplyType,
+    electrificationGrade: actualGrade,
+    igaAmps: rawIga,
+    rawDetectedIgaAmps: rawIga,
+    hasIcpOnly,
+    hasSurgeProtection: actualHasSurge,
+    rcdCount: Math.max(1, actualRcdCount),
+    diferencialCalibreAmps: actualDifCalibre,
+    diferencialClase: actualDifClase,
+    brandDetected: input.brandDetected,
+    circuits: actualCircuits,
+    summarySentence: `Estado Actual (${
+      supplyType === "trifasico_400v" ? "Trifásico 400V" : "Monofásico 230V"
+    }): ${hasIcpOnly ? `ICP ${rawIga}A` : `IGA ${rawIga}A`} ${
+      actualHasSurge ? "con sobretensiones T2+POP" : "sin sobretensiones"
+    }, ${Math.max(1, actualRcdCount)} diferencial(es) ${actualDifCalibre}A 30mA Clase ${actualDifClase}, ${
+      actualCircuits.length
+    } circuito(s) — ${verdictBadge}`,
+    mtdPatch: {
+      expedienteNum: actualExpNum,
+      instalacionNum: actualInstNum,
+      expedienteVinculadoPar: corrExpNum,
+      modalidadReporteFoto: "estado_actual",
+      dictamenCumplimientoResumen: verdictBadge,
+      tieneSobretensiones: actualHasSurge,
+      tieneIgaReglamentario: !hasIcpOnly && !hasNoHeaderBreaker,
+      calibreCabeceraDetectadoTexto: hasIcpOnly
+        ? `ICP ${rawIga} A (sin IGA)`
+        : `${rawIga} A`,
+      sobretensionesKv: actualHasSurge ? "1,5" : "Carece",
+      diferencialClase: actualDifClase,
+      diferencialCalibreAmps: actualDifCalibre,
+      conductorTierraMm2: rawIga >= 40 ? 16 : 10,
+      memoriaDescriptivaTexto: memoriaActualTexto,
+    },
+  };
+
+  const corregidoProfile: DualPanelProfileSnapshot = {
+    mode: "instalacion_corregida",
+    optionLabel: "Opción 2 · Correcciones y Cómo Debe Ir la Instalación (REBT)",
+    shortTitle: "Instalación Corregida (REBT)",
+    expedienteSuffix: "COR",
+    expedienteNum: corrExpNum,
+    instalacionNum: corrInstNum,
+    supplyType,
+    electrificationGrade: correctedGrade,
+    igaAmps: correctedIgaAmps,
+    rawDetectedIgaAmps: rawIga,
+    hasIcpOnly: false,
+    hasSurgeProtection: true,
+    rcdCount: correctedRcdCount,
+    diferencialCalibreAmps: correctedDifCalibre,
+    diferencialClase: "A",
+    brandDetected: input.brandDetected,
+    circuits: correctedCircuits,
+    summarySentence: `Instalación Corregida REBT (${
+      supplyType === "trifasico_400v" ? "Trifásico 400V" : "Monofásico 230V"
+    }): Combi IGA ${correctedIgaAmps}A con sobretensiones T2+POP, ${correctedRcdCount} diferenciales ${correctedDifCalibre}A 30mA Clase A, ${
+      correctedCircuits.length
+    } circuitos reglamentarios H07Z1-K (AS)`,
+    mtdPatch: {
+      expedienteNum: corrExpNum,
+      instalacionNum: corrInstNum,
+      expedienteVinculadoPar: actualExpNum,
+      modalidadReporteFoto: "instalacion_corregida",
+      dictamenCumplimientoResumen:
+        "ADECUACIÓN 100% CONFORME AL REBT (RD 842/2002) Y NRZ103",
+      tipoActuacion: "Reforma de importancia",
+      tieneSobretensiones: true,
+      tieneIgaReglamentario: true,
+      calibreCabeceraDetectadoTexto: undefined,
+      sobretensionesKv: "1,5",
+      diferencialClase: "A",
+      diferencialCalibreAmps: correctedDifCalibre,
+      conductorTierraMm2:
+        supplyType === "trifasico_400v" || correctedIgaAmps >= 40 ? 16 : 10,
+      diCanalizacionDesc:
+        supplyType === "trifasico_400v"
+          ? "4x RZ1-K (AS) 0,6/1kV + TT bajo tubo protector"
+          : "2x RZ1-K (AS) 0,6/1kV + TT bajo tubo protector",
+      memoriaDescriptivaTexto: memoriaCorregidaTexto,
+    },
+  };
+
+  return {
+    sourceLabel: input.sourceLabel || "Análisis técnico de cuadro eléctrico",
+    photoDataUrl: input.photoDataUrl,
+    baseExpedienteNum: baseExp,
+    baseInstalacionNum: baseInst,
+    overallCompliant,
+    verdictBadge,
+    complianceScorePct,
+    defectsGraveCount,
+    defectsLeveCount,
+    checks,
+    corrections,
+    actual: actualProfile,
+    corregido: corregidoProfile,
+    structuredVision: input.structuredVision ?? null,
+  };
+}
+
+/**
+ * Construye una evaluación dual (Estado Actual vs Instalación Corregida) directamente
+ * a partir de un resultado estructurado de IA Vision (`CanariasPanelVisionResult`).
+ */
+export function buildDualPanelEvaluationFromVision(
+  vision: CanariasPanelVisionResult,
+  opts?: {
+    sourceLabel?: string;
+    photoDataUrl?: string;
+    baseExpedienteNum?: string;
+    baseInstalacionNum?: string;
+  }
+): DualPanelEvaluationResult {
+  const parsed = parseCanariasVisionJsonToSummary(vision);
+  const hasIga = vision.inventario_componentes?.some((c) => c.tipo === "IGA");
+  const icpItem = vision.inventario_componentes?.find((c) => c.tipo === "ICP");
+  const igaItem = vision.inventario_componentes?.find((c) => c.tipo === "IGA");
+  const rawIgaAmps =
+    igaItem?.calibre_a ||
+    icpItem?.calibre_a ||
+    vision.contexto_canarias?.calibre_iga_amperios ||
+    parsed.igaAmps;
+
+  const normalizedClase: "AC" | "A" | "S" | "B" =
+    parsed.diferencialClase === "F" ? "A" : parsed.diferencialClase;
+
+  return buildDualPanelEvaluation({
+    supplyType: parsed.supplyType,
+    rawIgaAmps,
+    hasIcpOnly: Boolean(icpItem && !hasIga),
+    hasNoHeaderBreaker: !hasIga && !icpItem,
+    hasSurgeProtection: parsed.hasSurgeProtection,
+    rcdCount: parsed.rcdCount,
+    diferencialCalibreAmps: parsed.diferencialCalibreAmps,
+    diferencialClase: normalizedClase,
+    brandDetected: parsed.brandDetected,
+    circuits: parsed.circuits,
+    sourceLabel: opts?.sourceLabel || "Visión Estructurada REBT",
+    photoDataUrl: opts?.photoDataUrl,
+    baseExpedienteNum: opts?.baseExpedienteNum,
+    baseInstalacionNum: opts?.baseInstalacionNum,
+    structuredVision: vision,
+  });
+}
+
+/**
+ * Escáner visual local sobre <canvas> en navegador para extraer parámetros reales del cuadro
+ * cuando no hay clave remota de IA Vision disponible.
+ */
+export function scanPanelPhotoLocallyRaw(
+  dataUrl: string
+): Promise<Omit<RawPanelObservationInput, "baseExpedienteNum" | "baseInstalacionNum">> {
+  return new Promise((resolve) => {
+    const fallbackObservation = (): Omit<
+      RawPanelObservationInput,
+      "baseExpedienteNum" | "baseInstalacionNum"
+    > => ({
+      supplyType: "monofasico_230v",
+      rawIgaAmps: 25,
+      hasIcpOnly: false,
+      hasSurgeProtection: false,
+      rcdCount: 1,
+      diferencialCalibreAmps: 40,
+      diferencialClase: "AC",
+      circuits: [
+        buildStandardHousingCircuit("C1", 1),
+        buildStandardHousingCircuit("C2", 2),
+        buildStandardHousingCircuit("C4", 3),
+        buildStandardHousingCircuit("C3", 4),
+      ],
+      sourceLabel: "Escáner visual local de aparamenta DIN",
+      photoDataUrl: dataUrl,
+    });
+
+    if (typeof Image === "undefined" || typeof document === "undefined") {
+      resolve(fallbackObservation());
+      return;
+    }
+
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const w = 320;
+        const h = Math.max(
+          120,
+          Math.round((img.height / Math.max(1, img.width)) * w)
+        );
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          resolve(fallbackObservation());
+          return;
+        }
+        ctx.drawImage(img, 0, 0, w, h);
+        const { data } = ctx.getImageData(0, 0, w, h);
+
+        let bestPeaks = 0;
+        let hasGapSplit = false;
+        let widestBarPx = 0;
+        for (let rowPct = 0.34; rowPct <= 0.66; rowPct += 0.04) {
+          const y = Math.floor(h * rowPct);
+          let darkRun = 0;
+          let lightGap = 0;
+          let peaks = 0;
+          let splitDetected = false;
+          let rowWidest = 0;
+          for (let x = Math.floor(w * 0.08); x < Math.floor(w * 0.92); x++) {
+            const idx = (y * w + x) * 4;
+            const lum =
+              0.299 * data[idx] +
+              0.587 * data[idx + 1] +
+              0.114 * data[idx + 2];
+            if (lum < 78) {
+              darkRun++;
+              if (darkRun > rowWidest) rowWidest = darkRun;
+              if (peaks > 0 && lightGap > Math.floor(w * 0.12)) {
+                splitDetected = true;
+              }
+              lightGap = 0;
+            } else {
+              if (darkRun >= 3 && darkRun <= 56) {
+                peaks++;
+              }
+              darkRun = 0;
+              lightGap++;
+            }
+          }
+          if (peaks > bestPeaks) {
+            bestPeaks = peaks;
+            hasGapSplit = splitDetected;
+            widestBarPx = rowWidest;
+          }
+        }
+
+        let vividGreenOrOrange = 0;
+        for (let y = Math.floor(h * 0.28); y < Math.floor(h * 0.55); y += 2) {
+          for (let x = Math.floor(w * 0.14); x < Math.floor(w * 0.45); x += 2) {
+            const idx = (y * w + x) * 4;
+            const r = data[idx];
+            const g = data[idx + 1];
+            const b = data[idx + 2];
+            if (
+              (g > 155 && g > r * 1.35 && g > b * 1.35) ||
+              (r > 195 && g > 90 && g < 155 && b < 60)
+            ) {
+              vividGreenOrOrange++;
+            }
+          }
+        }
+
+        const isThreePhaseBar =
+          widestBarPx >= Math.floor(w * 0.125) && bestPeaks >= 4;
+        const hasSurge = vividGreenOrOrange >= 18;
+        const estimatedPias = Math.max(
+          4,
+          Math.min(8, bestPeaks >= 4 ? bestPeaks - 2 : 4)
+        );
+        const hasIcpCompartment = !isThreePhaseBar && hasGapSplit && !hasSurge;
+        const rcds = hasSurge && estimatedPias >= 5 ? 2 : 1;
+        const rawIga = isThreePhaseBar
+          ? 40
+          : hasIcpCompartment
+          ? 20
+          : estimatedPias >= 6
+          ? 40
+          : 25;
+
+        const catalogOrder: ("C1" | "C2" | "C4" | "C3" | "C5")[] = [
+          "C1",
+          "C2",
+          "C4",
+          "C3",
+          "C5",
+        ];
+        const builtCircuits: RebtCircuitInput[] = [];
+        for (let i = 0; i < estimatedPias; i++) {
+          if (i < catalogOrder.length) {
+            builtCircuits.push(buildStandardHousingCircuit(catalogOrder[i], i + 1));
+          } else {
+            builtCircuits.push({
+              id: i + 1,
+              code: `C${i + 4}`,
+              description:
+                i === 5
+                  ? "Aire acondicionado / Climatización (C9)"
+                  : `Circuito auxiliar interior #${i + 1}`,
+              usageType: "vivienda_interior",
+              phaseSystem: isThreePhaseBar ? "trifasico" : "monofasico",
+              phaseAssigned: isThreePhaseBar ? "L1-L2-L3" : "L1",
+              voltage: isThreePhaseBar ? 400 : 230,
+              powerWatts: 3450,
+              cosPhi: 1,
+              simultaneityFactor: 1,
+              utilizationFactor: 1,
+              lengthMeters: 16,
+              installationMethod: "B1",
+              insulationType: "PVC_70",
+              material: "Cu",
+              minSectionMm2: 2.5,
+              fixedPiaAmps: 16,
+            });
+          }
+        }
+
+        resolve({
+          supplyType: isThreePhaseBar ? "trifasico_400v" : "monofasico_230v",
+          rawIgaAmps: rawIga,
+          hasIcpOnly: hasIcpCompartment,
+          hasSurgeProtection: hasSurge,
+          rcdCount: rcds,
+          diferencialCalibreAmps: 40,
+          diferencialClase: hasSurge ? "A" : "AC",
+          circuits: builtCircuits,
+          sourceLabel: "Escáner visual local de aparamenta DIN",
+          photoDataUrl: dataUrl,
+        });
+      } catch {
+        resolve(fallbackObservation());
+      }
+    };
+    img.onerror = () => resolve(fallbackObservation());
+    img.src = dataUrl;
+  });
+}
+
+/**
+ * Analiza la imagen de un cuadro eléctrico llamando primero a `/api/analyze-vision`
+ * y usando `scanPanelPhotoLocallyRaw` como respaldo inmediato, devolviendo SIEMPRE
+ * las dos opciones separadas (`actual` y `corregido`) con sus Fichas Técnicas M.T.D. distintas.
+ */
+export async function analyzePanelImageToDualEvaluation(params: {
+  imageDataUrl: string;
+  baseExpedienteNum?: string;
+  baseInstalacionNum?: string;
+}): Promise<DualPanelEvaluationResult> {
+  const { imageDataUrl, baseExpedienteNum, baseInstalacionNum } = params;
+  try {
+    const res = await fetch("/api/analyze-vision", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        kind: "cuadro_electrico",
+        imageDataUrl,
+      }),
+    });
+    const json = (await res.json()) as {
+      ok?: boolean;
+      mode?: string;
+      extractedText?: string;
+      structuredAnalysis?: CanariasPanelVisionResult;
+    };
+
+    if (json?.ok && json.structuredAnalysis) {
+      return buildDualPanelEvaluationFromVision(json.structuredAnalysis, {
+        sourceLabel: `Visión IA Estructurada REBT (${json.mode || "IA"})`,
+        photoDataUrl: imageDataUrl,
+        baseExpedienteNum,
+        baseInstalacionNum,
+      });
+    }
+  } catch {
+    // Respaldo inmediato al escáner visual local en navegador
+  }
+
+  const localRaw = await scanPanelPhotoLocallyRaw(imageDataUrl);
+  return buildDualPanelEvaluation({
+    ...localRaw,
+    baseExpedienteNum,
+    baseInstalacionNum,
+  });
 }

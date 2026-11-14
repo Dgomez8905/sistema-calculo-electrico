@@ -178,6 +178,13 @@ interface MtdCanariasProps {
   rcdSensitivityMa: number;
   canExportMtd?: boolean;
   initialPage?: number | "all";
+  dualPhotoSwitcher?: {
+    activeMode: "estado_actual" | "instalacion_corregida";
+    actualExpNum: string;
+    corregidoExpNum: string;
+    overallCompliant: boolean;
+    onSwitch: (mode: "estado_actual" | "instalacion_corregida") => void;
+  } | null;
 }
 
 export default function MtdCanariasOfficialForm({
@@ -193,6 +200,7 @@ export default function MtdCanariasOfficialForm({
   rcdSensitivityMa,
   canExportMtd = true,
   initialPage = "all",
+  dualPhotoSwitcher = null,
 }: MtdCanariasProps) {
   const [selectedPage, setSelectedPage] =
     useState<number | "all">(initialPage);
@@ -711,6 +719,74 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
           COLUMNA IZQUIERDA (FIJA): SELECCIÓN DE APARTADO Y DESCARGA OPCIONAL
          ===================================================================== */}
       <div className="no-print w-full shrink-0 space-y-4 lg:sticky lg:top-20 lg:w-80 xl:w-96">
+        {/* Selector Dual cuando existen dos Fichas Técnicas separadas desde Foto (-ACT vs -COR) */}
+        {dualPhotoSwitcher && (
+          <div className="rounded-xl border-2 border-blue-200 bg-gradient-to-b from-blue-50/80 to-white p-3.5 shadow-xs space-y-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10.5px] font-extrabold uppercase tracking-wide text-[#0f6cbd]">
+                📷 2 Fichas Técnicas Separadas (Foto)
+              </span>
+              <span
+                className={`rounded-full px-2 py-0.5 text-[9.5px] font-bold ${
+                  dualPhotoSwitcher.activeMode === "estado_actual"
+                    ? "bg-amber-100 text-amber-900"
+                    : "bg-emerald-100 text-emerald-900"
+                }`}
+              >
+                {dualPhotoSwitcher.activeMode === "estado_actual"
+                  ? "Ficha #1 Activa"
+                  : "Ficha #2 Activa"}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 gap-1.5">
+              <button
+                type="button"
+                onClick={() => dualPhotoSwitcher.onSwitch("estado_actual")}
+                className={`rounded-lg border px-2.5 py-2 text-left text-xs transition ${
+                  dualPhotoSwitcher.activeMode === "estado_actual"
+                    ? "border-amber-500 bg-amber-50 text-amber-950 font-bold ring-1 ring-amber-400"
+                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span>Ficha #1 · Estado Actual</span>
+                  <span className="font-mono text-[10px]">
+                    {dualPhotoSwitcher.actualExpNum}
+                  </span>
+                </div>
+                <div className="mt-0.5 text-[10px] opacity-80">
+                  {dualPhotoSwitcher.overallCompliant
+                    ? "Dictamen: Cumple normativa REBT"
+                    : "Dictamen: No cumple REBT (con defectos)"}
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  dualPhotoSwitcher.onSwitch("instalacion_corregida")
+                }
+                className={`rounded-lg border px-2.5 py-2 text-left text-xs transition ${
+                  dualPhotoSwitcher.activeMode === "instalacion_corregida"
+                    ? "border-emerald-600 bg-emerald-50 text-emerald-950 font-bold ring-1 ring-emerald-500"
+                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span>Ficha #2 · Instalación Corregida</span>
+                  <span className="font-mono text-[10px]">
+                    {dualPhotoSwitcher.corregidoExpNum}
+                  </span>
+                </div>
+                <div className="mt-0.5 text-[10px] opacity-80">
+                  Correcciones aplicadas · Cómo debe ir según REBT
+                </div>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Tarjeta 1: Selección de Apartado (Dropdown Minimalista) */}
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs space-y-3">
           <div className="flex items-center justify-between">
@@ -1123,6 +1199,25 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
         <div className="mtd-print-page mx-auto max-w-[210mm] rounded-sm border border-slate-400 bg-white p-4 sm:p-5 text-[11px] leading-tight text-black shadow-2xl">
           <OfficialHeader isBtBox={true} />
 
+          {meta.modalidadReporteFoto === "estado_actual" && (
+            <div className="mb-1.5 flex items-center justify-between border border-black bg-amber-50/80 px-2 py-0.5 text-[9.5px] font-bold text-black">
+              <span>
+                FICHA TÉCNICA #1 (ESTADO ACTUAL DE LA INSTALACIÓN EXISTENTE)
+              </span>
+              <span>
+                {meta.dictamenCumplimientoResumen || "INSPECCIÓN NORMATIVA REBT"}
+              </span>
+            </div>
+          )}
+          {meta.modalidadReporteFoto === "instalacion_corregida" && (
+            <div className="mb-1.5 flex items-center justify-between border border-black bg-emerald-50/80 px-2 py-0.5 text-[9.5px] font-bold text-black">
+              <span>
+                FICHA TÉCNICA #2 (PROPUESTA DE CORRECCIONES — CÓMO DEBE IR SEGÚN REBT)
+              </span>
+              <span>ADECUACIÓN 100% CONFORME RD 842/2002</span>
+            </div>
+          )}
+
           {/* DATOS DEL TITULAR Y UBICACIÓN */}
           <div className="border-2 border-black p-2">
             <div className="font-bold underline">DATOS DEL TITULAR:</div>
@@ -1515,9 +1610,12 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
               </div>
               <div className="col-span-10 divide-y divide-black">
                 <div className="flex items-center justify-between px-2 py-0.5">
-                  <span className="font-semibold">[X] I.G.A.</span>
+                  <span className="font-semibold">
+                    [{meta.tieneIgaReglamentario === false ? " " : "X"}] I.G.A.
+                  </span>
                   <span className="font-mono font-bold">
-                    {cgmpSummary.igaAmps} A
+                    {meta.calibreCabeceraDetectadoTexto ||
+                      `${cgmpSummary.igaAmps} A`}
                   </span>
                 </div>
                 <div className="flex items-center justify-between px-2 py-0.5">
@@ -1530,10 +1628,12 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
                 </div>
                 <div className="flex items-center justify-between px-2 py-0.5">
                   <span className="font-semibold">
-                    [X] Sobretensiones/categoría
+                    [{meta.tieneSobretensiones === false ? " " : "X"}] Sobretensiones/categoría
                   </span>
                   <span className="font-mono font-bold">
-                    {meta.sobretensionesKv} kV
+                    {meta.tieneSobretensiones === false
+                      ? "Carece (No cumple ITC-BT-23)"
+                      : `${meta.sobretensionesKv} kV`}
                   </span>
                 </div>
                 <div className="flex items-center justify-between px-2 py-0.5">

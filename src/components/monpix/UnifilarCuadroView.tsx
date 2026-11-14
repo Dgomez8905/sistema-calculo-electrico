@@ -46,9 +46,10 @@ import {
 } from "@/lib/monpix-store";
 import { buildUnifilarIec60617Svg } from "@/lib/unifilar-iec60617";
 import {
+  analyzePanelImageToDualEvaluation,
   buildCanariasVisionFromProject,
-  parseCanariasVisionJsonToSummary,
   type CanariasPanelVisionResult,
+  type DualPanelEvaluationResult,
 } from "@/lib/rebt-vision-canarias";
 import { generateUnifilarDxf } from "@/lib/unifilar-dxf";
 import DinModularDeviceVisual, {
@@ -96,6 +97,16 @@ interface UnifilarCuadroViewProps {
   onOpenFichaMtd?: () => void;
   onApplyMemoriaCanarias?: (texto: string) => void;
   onSaveDiagramRecord: (item: SavedUnifilarDiagram) => void;
+  activeDualPhotoEval?: DualPanelEvaluationResult | null;
+  activeDualPhotoMode?: "estado_actual" | "instalacion_corregida";
+  onSelectDualPhotoMode?: (
+    evaluation: DualPanelEvaluationResult,
+    mode: "estado_actual" | "instalacion_corregida",
+    destination?: "ficha_mtd" | "stay"
+  ) => void;
+  onSaveBothDualPhotoModes?: (
+    evaluation: DualPanelEvaluationResult
+  ) => Promise<void> | void;
 }
 
 export default function UnifilarCuadroView({
@@ -115,11 +126,26 @@ export default function UnifilarCuadroView({
   onOpenFichaMtd,
   onApplyMemoriaCanarias,
   onSaveDiagramRecord,
+  activeDualPhotoEval,
+  activeDualPhotoMode = "estado_actual",
+  onSelectDualPhotoMode,
+  onSaveBothDualPhotoModes,
 }: UnifilarCuadroViewProps) {
   const [stepTab, setStepTab] = useState<
     "captura_datos" | "cuadro_din" | "esquema_a3"
   >("cuadro_din");
-  const [hasCombiSurge, setHasCombiSurge] = useState(true);
+  const [hasCombiSurge, setHasCombiSurge] = useState(
+    meta.tieneSobretensiones !== false
+  );
+  const [localDualEval, setLocalDualEval] =
+    useState<DualPanelEvaluationResult | null>(null);
+  const effectiveDualEval = activeDualPhotoEval ?? localDualEval;
+
+  useEffect(() => {
+    if (typeof meta.tieneSobretensiones === "boolean") {
+      setHasCombiSurge(meta.tieneSobretensiones);
+    }
+  }, [meta.tieneSobretensiones, meta.expedienteNum]);
   const [planNumber, setPlanNumber] = useState("01");
   const [icuKa, setIcuKa] = useState(6);
   const [draggedModId, setDraggedModId] = useState<string | null>(null);
@@ -383,6 +409,51 @@ export default function UnifilarCuadroView({
       img.src = dataUrl;
     });
 
+  const applyDualProfileLocallyAndNotify = (
+    dual: DualPanelEvaluationResult,
+    mode: "estado_actual" | "instalacion_corregida",
+    opts?: {
+      openFicha?: boolean;
+      switchToTab?: "cuadro_din" | "esquema_a3";
+    }
+  ) => {
+    const chosen = mode === "estado_actual" ? dual.actual : dual.corregido;
+    const baseDraft = parseUnifilarFromSpeechOrText(chosen.summarySentence);
+    const nextDraft: ParsedPanelDraft = {
+      ...baseDraft,
+      supplyType: chosen.supplyType,
+      igaAmps: chosen.igaAmps,
+      hasSurgeProtection: chosen.hasSurgeProtection,
+      rcdCount: chosen.rcdCount,
+      diferencialCalibreAmps: chosen.diferencialCalibreAmps,
+      diferencialClase: chosen.diferencialClase === "AC" ? "AC" : "A",
+      electrificationGrade: chosen.electrificationGrade,
+      formatLabel: chosen.shortTitle,
+      circuits: chosen.circuits,
+    };
+    setSpeechText(chosen.summarySentence);
+    setPendingDraft(nextDraft);
+    setHasCombiSurge(chosen.hasSurgeProtection);
+    if (onSelectDualPhotoMode) {
+      onSelectDualPhotoMode(
+        dual,
+        mode,
+        opts?.openFicha ? "ficha_mtd" : "stay"
+      );
+    } else {
+      applyDraftEverywhere(nextDraft, {
+        isAutoFromPhoto: true,
+        switchToTab: opts?.switchToTab,
+      });
+      if (opts?.openFicha && onOpenFichaMtd) {
+        onOpenFichaMtd();
+      }
+    }
+    if (opts?.switchToTab) {
+      setStepTab(opts.switchToTab);
+    }
+  };
+
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -393,92 +464,29 @@ export default function UnifilarCuadroView({
       setIsAnalyzingPhoto(true);
       setPhotoVisionNote("");
       try {
-        const res = await fetch("/api/analyze-vision", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            kind: "cuadro_electrico",
-            imageDataUrl: dataUrl,
-          }),
+        const dualEval = await analyzePanelImageToDualEvaluation({
+          imageDataUrl: dataUrl,
+          baseExpedienteNum: meta.expedienteNum,
+          baseInstalacionNum: meta.instalacionNum,
         });
-        const json = (await res.json()) as {
-          ok?: boolean;
-          mode?: string;
-          extractedText?: string;
-          structuredAnalysis?: CanariasPanelVisionResult;
-          note?: string;
-        };
-
-        if (json?.ok && json.structuredAnalysis) {
-          setVisionReport(json.structuredAnalysis);
-          const parsedVis = parseCanariasVisionJsonToSummary(
-            json.structuredAnalysis
-          );
-          if (
-            parsedVis.brandDetected &&
-            parsedVis.brandDetected in DIN_BRAND_STYLES
-          ) {
-            setDinBrand(parsedVis.brandDetected as DinBrandId);
-          }
-          const baseDraft = parseUnifilarFromSpeechOrText(
-            parsedVis.summarySentence
-          );
-          const richDraft: ParsedPanelDraft = {
-            ...baseDraft,
-            supplyType: parsedVis.supplyType,
-            igaAmps: sanitizeSpanishIgaAmps(
-              parsedVis.igaAmps,
-              parsedVis.supplyType
-            ),
-            hasSurgeProtection: parsedVis.hasSurgeProtection,
-            rcdCount: parsedVis.rcdCount,
-            diferencialCalibreAmps: parsedVis.diferencialCalibreAmps,
-            diferencialClase:
-              parsedVis.diferencialClase === "AC" ? "AC" : "A",
-            circuits:
-              parsedVis.circuits.length > 0
-                ? parsedVis.circuits
-                : baseDraft.circuits,
-          };
-          setSpeechText(parsedVis.summarySentence);
-          setPendingDraft(richDraft);
-          applyDraftEverywhere(richDraft, { isAutoFromPhoto: true });
-          setPhotoVisionNote(
-            `✅ Visión Estructurada REBT Canarias (${json.mode}): ${json.structuredAnalysis.inventario_componentes.length} componentes identificados (C1-01..), Simulador DIN, Unifilar IEC 60617 / DXF y Ficha M.T.D. actualizados.`
-          );
-          return;
-        }
-
-        let textToParse = "";
-        let sourceTag = "Escáner visual local";
-        if (
-          json?.ok &&
-          json.extractedText &&
-          json.mode &&
-          json.mode !== "heuristic_fallback"
-        ) {
-          textToParse = json.extractedText;
-          sourceTag = `Visión IA (${json.mode})`;
+        setLocalDualEval(dualEval);
+        if (dualEval.structuredVision) {
+          setVisionReport(dualEval.structuredVision);
         } else {
-          textToParse = await analyzePanelPhotoLocally(dataUrl);
+          setVisionReport(null);
         }
-        const detectedDraft = parseUnifilarFromSpeechOrText(textToParse);
-        setVisionReport(null);
-        setSpeechText(textToParse);
-        setPendingDraft(detectedDraft);
-        applyDraftEverywhere(detectedDraft, { isAutoFromPhoto: true });
+        if (
+          dualEval.actual.brandDetected &&
+          dualEval.actual.brandDetected in DIN_BRAND_STYLES
+        ) {
+          setDinBrand(dualEval.actual.brandDetected as DinBrandId);
+        }
+        // Por defecto cargamos primero el Estado Actual y habilitamos ambas opciones separadas
+        applyDualProfileLocallyAndNotify(dualEval, "estado_actual");
         setPhotoVisionNote(
-          `✅ ${sourceTag}: Formato «${detectedDraft.formatLabel}» detectado. El Simulador DIN, el Esquema Unifilar IEC 60617 y la Ficha Técnica M.T.D. ya se han generado automáticamente.`
-        );
-      } catch {
-        const localText = await analyzePanelPhotoLocally(dataUrl);
-        const detectedDraft = parseUnifilarFromSpeechOrText(localText);
-        setVisionReport(null);
-        setSpeechText(localText);
-        setPendingDraft(detectedDraft);
-        applyDraftEverywhere(detectedDraft, { isAutoFromPhoto: true });
-        setPhotoVisionNote(
-          `✅ Escáner visual local: Formato «${detectedDraft.formatLabel}» detectado. Simulador DIN, Esquema Unifilar y Ficha Técnica M.T.D. generados automáticamente.`
+          `✅ Foto analizada (${dualEval.sourceLabel}): Se han habilitado 2 opciones separadas con Fichas Técnicas M.T.D. independientes — Ficha #1 (${dualEval.actual.expedienteNum}: ${
+            dualEval.overallCompliant ? "Cumple REBT" : "No cumple REBT"
+          }) y Ficha #2 (${dualEval.corregido.expedienteNum}: Correcciones y cómo debe ir).`
         );
       } finally {
         setIsAnalyzingPhoto(false);
@@ -1355,6 +1363,142 @@ export default function UnifilarCuadroView({
         </div>
       )}
 
+      {/* BARRA DUAL CUANDO SE HA SUBIDO UNA FOTO DEL CUADRO: 2 OPCIONES SEPARADAS CON FICHAS DIFERENTES */}
+      {effectiveDualEval && (
+        <div className="no-print rounded-2xl border-2 border-blue-200 bg-gradient-to-r from-blue-50/80 via-white to-emerald-50/60 p-4 shadow-xs space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <span className="inline-flex items-center gap-1.5 rounded-md bg-[#0f6cbd] px-2.5 py-0.5 text-[10.5px] font-bold text-white">
+                📷 Análisis Dual desde Foto del Cuadro · 2 Fichas Técnicas Independientes
+              </span>
+              <p className="mt-1 text-xs text-slate-700">
+                Alterna entre el <strong>Reporte de Estado Actual</strong> (si cumple o no las normativas) y la <strong>Propuesta de Correcciones</strong> (cómo debe ir la instalación).
+              </p>
+            </div>
+            {onSaveBothDualPhotoModes && (
+              <button
+                type="button"
+                onClick={() => onSaveBothDualPhotoModes(effectiveDualEval)}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-[#0f6cbd] px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#115ea3]"
+              >
+                <Save className="h-3.5 w-3.5" />
+                Guardar Ambas Opciones por Separado (-ACT y -COR)
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            {/* Tarjeta Selector Opción 1: Estado Actual */}
+            <div
+              className={`rounded-xl border p-3.5 transition ${
+                activeDualPhotoMode === "estado_actual"
+                  ? "border-2 border-amber-500 bg-amber-50/70 shadow-xs"
+                  : "border-slate-200 bg-white"
+              }`}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs font-extrabold text-amber-950">
+                  OPCIÓN 1 · CÓMO ESTÁ LA INSTALACIÓN
+                </span>
+                <span className="rounded bg-white px-2 py-0.5 font-mono text-[10.5px] font-bold text-amber-900 border border-amber-300">
+                  Ficha #1: {effectiveDualEval.actual.expedienteNum}
+                </span>
+              </div>
+              <p
+                className={`mt-1.5 rounded-lg px-2.5 py-1 text-[11px] font-bold ${
+                  effectiveDualEval.overallCompliant
+                    ? "bg-emerald-100 text-emerald-900"
+                    : "bg-rose-100 text-rose-900"
+                }`}
+              >
+                {effectiveDualEval.overallCompliant
+                  ? `✅ CUMPLE NORMATIVA REBT (${effectiveDualEval.complianceScorePct}%)`
+                  : `❌ NO CUMPLE REBT — ${effectiveDualEval.defectsGraveCount} defecto(s) detectado(s)`}
+              </p>
+              <div className="mt-2.5 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    applyDualProfileLocallyAndNotify(
+                      effectiveDualEval,
+                      "estado_actual"
+                    )
+                  }
+                  className="rounded-lg border border-amber-400 bg-white px-2.5 py-1.5 text-[11px] font-bold text-amber-950 hover:bg-amber-100"
+                >
+                  Cargar Estado Actual en Cuadro
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    applyDualProfileLocallyAndNotify(
+                      effectiveDualEval,
+                      "estado_actual",
+                      { openFicha: true }
+                    )
+                  }
+                  className="inline-flex items-center gap-1 rounded-lg bg-amber-600 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-amber-700"
+                >
+                  <ClipboardList className="h-3.5 w-3.5" />
+                  Abrir Ficha Técnica #1 (-ACT)
+                </button>
+              </div>
+            </div>
+
+            {/* Tarjeta Selector Opción 2: Instalación Corregida */}
+            <div
+              className={`rounded-xl border p-3.5 transition ${
+                activeDualPhotoMode === "instalacion_corregida"
+                  ? "border-2 border-emerald-600 bg-emerald-50/70 shadow-xs"
+                  : "border-slate-200 bg-white"
+              }`}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs font-extrabold text-emerald-950">
+                  OPCIÓN 2 · CORRECCIONES Y CÓMO DEBE IR
+                </span>
+                <span className="rounded bg-white px-2 py-0.5 font-mono text-[10.5px] font-bold text-emerald-900 border border-emerald-300">
+                  Ficha #2: {effectiveDualEval.corregido.expedienteNum}
+                </span>
+              </div>
+              <p className="mt-1.5 rounded-lg bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-900">
+                🛠️ ADECUACIÓN 100% REBT: Combi IGA {effectiveDualEval.corregido.igaAmps} A +{" "}
+                {effectiveDualEval.corregido.rcdCount} ID Clase A +{" "}
+                {effectiveDualEval.corregido.circuits.length} circuitos
+              </p>
+              <div className="mt-2.5 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    applyDualProfileLocallyAndNotify(
+                      effectiveDualEval,
+                      "instalacion_corregida"
+                    )
+                  }
+                  className="rounded-lg border border-emerald-400 bg-white px-2.5 py-1.5 text-[11px] font-bold text-emerald-950 hover:bg-emerald-100"
+                >
+                  Cargar Instalación Corregida en Cuadro
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    applyDualProfileLocallyAndNotify(
+                      effectiveDualEval,
+                      "instalacion_corregida",
+                      { openFicha: true }
+                    )
+                  }
+                  className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-emerald-700"
+                >
+                  <ClipboardList className="h-3.5 w-3.5" />
+                  Abrir Ficha Técnica #2 (-COR)
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* PESTAÑA 1: DESDE FOTO, DESDE TEXTO/VOZ Y CAJETÍN */}
       {stepTab === "captura_datos" && (
         <div className="no-print grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -1493,6 +1637,48 @@ export default function UnifilarCuadroView({
               {photoVisionNote && (
                 <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-medium text-emerald-950">
                   {photoVisionNote}
+                </div>
+              )}
+
+              {/* Desglose detallado de Diagnóstico Normativo vs Correcciones directamente en Pestaña 1 */}
+              {effectiveDualEval && (
+                <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-3.5">
+                  <div className="text-[11px] font-extrabold uppercase tracking-wide text-slate-700">
+                    Detalle del Diagnóstico Normativo (Opción 1) y Correcciones REBT (Opción 2):
+                  </div>
+                  <div className="space-y-1.5">
+                    {effectiveDualEval.checks.map((chk) => (
+                      <div
+                        key={chk.id}
+                        className={`rounded-lg border px-2.5 py-1.5 text-[11px] ${
+                          chk.passed
+                            ? "border-emerald-200 bg-emerald-50/40"
+                            : "border-rose-200 bg-rose-50/40"
+                        }`}
+                      >
+                        <strong>
+                          {chk.passed ? "✓ CUMPLE" : "✗ NO CUMPLE"} ({chk.itc}):
+                        </strong>{" "}
+                        {chk.observedValue}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="border-t border-slate-100 pt-2 space-y-1.5">
+                    <div className="text-[11px] font-bold text-emerald-900">
+                      🛠️ Cómo debe ir la instalación (Correcciones Ficha #2):
+                    </div>
+                    {effectiveDualEval.corrections.map((cor) => (
+                      <div
+                        key={cor.id}
+                        className="rounded-lg border border-emerald-200 bg-emerald-50/35 px-2.5 py-1.5 text-[11px] text-slate-800"
+                      >
+                        <strong>
+                          {cor.order}. {cor.componentTarget} ({cor.itc}):
+                        </strong>{" "}
+                        {cor.howItMustGo}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>

@@ -81,10 +81,7 @@ export default function ExpedientesSection({
 
           <button
             type="button"
-            onClick={() => {
-              onStartNewProject();
-              onNavigate("titular_ubicacion");
-            }}
+            onClick={() => onStartNewProject()}
             className="inline-flex items-center gap-2 rounded-lg bg-[#0f6cbd] px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-[#115ea3]"
           >
             <Plus className="h-4 w-4" />
