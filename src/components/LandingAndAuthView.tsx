@@ -570,265 +570,355 @@ export default function LandingAndAuthView({
   }
 
   // ===========================================================================
-  // VISTA 2 Y 3: LOGIN Y RESTABLECIMIENTO DE CONTRASEÑA
+  // VISTA 2 Y 3: LOGIN Y RESTABLECIMIENTO DE CONTRASEÑA (SPLIT-SCREEN: LOGIN IZQUIERDA / FOTO DERECHA)
   // ===========================================================================
   return (
-    <div className="relative min-h-screen bg-[#f4f7fb] flex flex-col justify-between p-4 sm:p-6 isolate">
-      <div
-        aria-hidden="true"
-        className="pointer-events-none fixed inset-0 -z-10 bg-cover bg-center bg-no-repeat opacity-95 mix-blend-multiply"
-        style={{
-          backgroundImage: "url('/bg-electrical-cad.jpg')",
-          filter: "grayscale(100%) contrast(280%) brightness(88%)",
-        }}
-      />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(#94a3b8_1px,transparent_1px)] [background-size:28px_28px] opacity-25"
-      />
-      <div className="mx-auto w-full max-w-6xl pt-2">
-        <button
-          type="button"
-          onClick={() => {
-            setAuthError(null);
-            setAuthSuccess(null);
-            setMode("landing");
-          }}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50"
-        >
-          <ChevronLeft className="h-4 w-4" />
-          Volver a la Página de Inicio
-        </button>
-      </div>
-
-      <div className="mx-auto my-8 w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 shadow-xl">
-        {/* Cabecera del Formulario */}
-        <div className="flex flex-col items-center text-center">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#0f6cbd] text-white shadow-sm">
-            {mode === "login" ? (
-              <Lock className="h-5 w-5" />
-            ) : (
-              <KeyRound className="h-5 w-5" />
-            )}
-          </div>
-          <h1 className="mt-3 text-lg font-bold text-slate-900">
-            {mode === "login"
-              ? "Iniciar Sesión en REBT Cloud Suite"
-              : "Restablecer Contraseña / PIN"}
-          </h1>
-          <p className="mt-1 text-xs text-slate-500">
-            {mode === "login"
-              ? "Accede a tu espacio aislado de expedientes y Memoria Técnica M.T.D."
-              : "Verifica tu correo electrónico y NIF/Colegiado para asignar una nueva clave"}
-          </p>
-        </div>
-
-        {/* Pestañas Login / Recuperar */}
-        <div className="mt-5 grid grid-cols-2 rounded-xl bg-slate-100 p-1 text-xs font-semibold">
-          <button
-            type="button"
-            onClick={() => {
-              setAuthError(null);
-              setAuthSuccess(null);
-              setMode("login");
-            }}
-            className={`rounded-lg py-2 transition ${
-              mode === "login"
-                ? "bg-white text-[#0f6cbd] shadow-2xs"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
-          >
-            Iniciar Sesión
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setAuthError(null);
-              setAuthSuccess(null);
-              setMode("reset_password");
-            }}
-            className={`rounded-lg py-2 transition ${
-              mode === "reset_password"
-                ? "bg-white text-[#0f6cbd] shadow-2xs"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
-          >
-            Recuperar Clave
-          </button>
-        </div>
-
-        {authError && (
-          <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-medium text-rose-800">
-            {authError}
-          </div>
-        )}
-
-        {authSuccess && (
-          <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-medium text-emerald-800 space-y-2">
-            <p>{authSuccess}</p>
-            {mode === "reset_password" && (
-              <button
-                type="button"
-                onClick={() => {
-                  setAuthSuccess(null);
-                  setMode("login");
-                }}
-                className="inline-flex items-center gap-1 font-bold text-[#0f6cbd] underline"
-              >
-                Ir a Iniciar Sesión ahora →
-              </button>
-            )}
-          </div>
-        )}
-
-        {mode === "login" ? (
-          <form onSubmit={handleLogin} className="mt-5 space-y-4">
+    <div className="min-h-screen w-full grid grid-cols-1 lg:grid-cols-12 bg-white text-slate-900">
+      {/* =====================================================================
+          COLUMNA IZQUIERDA: PANEL DE ACCESO Y RECUPERACIÓN DE CLAVE
+      ===================================================================== */}
+      <div className="lg:col-span-5 xl:col-span-5 flex flex-col justify-between bg-white px-6 py-6 sm:px-10 lg:px-12 xl:px-16 border-b lg:border-b-0 lg:border-r border-slate-200/80 relative z-10">
+        {/* Barra Superior: Marca + Volver al Inicio */}
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#0f6cbd] text-white shadow-xs">
+              <Zap className="h-5 w-5" />
+            </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700">
-                Correo Electrónico Profesional
-              </label>
-              <div className="relative mt-1">
-                <Mail className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="correo@empresa.es"
-                  className="w-full rounded-xl border border-slate-300 bg-white pl-9 pr-3 py-2 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
-                />
+              <div className="text-sm font-extrabold tracking-tight text-slate-900 leading-none">
+                REBT Cloud Suite
+              </div>
+              <div className="mt-0.5 text-[10px] font-semibold text-[#0f6cbd]">
+                RD 842/2002 · M.T.D. Canarias
               </div>
             </div>
+          </div>
 
-            <div>
-              <div className="flex items-center justify-between">
-                <label className="block text-xs font-semibold text-slate-700">
-                  Contraseña / PIN de Acceso
-                </label>
+          <button
+            type="button"
+            onClick={() => {
+              setAuthError(null);
+              setAuthSuccess(null);
+              setMode("landing");
+            }}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 hover:text-slate-900"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+            Volver al Inicio
+          </button>
+        </div>
+
+        {/* Contenedor Central del Formulario */}
+        <div className="mx-auto my-auto w-full max-w-md py-8 sm:py-10">
+          <div className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50/80 px-3 py-1 text-[11px] font-semibold text-[#0f6cbd]">
+            <ShieldCheck className="h-3.5 w-3.5" />
+            Entorno Multi-Tenant Aislado · RBAC
+          </div>
+
+          <div className="mt-4">
+            <h1 className="text-2xl sm:text-[26px] font-extrabold tracking-tight text-slate-900 leading-tight">
+              {mode === "login"
+                ? "Iniciar Sesión en tu Espacio REBT"
+                : "Restablecer Contraseña / PIN"}
+            </h1>
+            <p className="mt-1.5 text-xs sm:text-sm text-slate-500 leading-relaxed">
+              {mode === "login"
+                ? "Accede a tus expedientes técnicos, simulador DIN interactivo y Memoria Técnica de Diseño M.T.D."
+                : "Verifica tu correo electrónico profesional y NIF o Nº de Colegiado para definir una nueva clave."}
+            </p>
+          </div>
+
+          {/* Pestañas Login / Recuperar */}
+          <div className="mt-6 grid grid-cols-2 rounded-xl bg-slate-100 p-1 text-xs font-semibold">
+            <button
+              type="button"
+              onClick={() => {
+                setAuthError(null);
+                setAuthSuccess(null);
+                setMode("login");
+              }}
+              className={`inline-flex items-center justify-center gap-1.5 rounded-lg py-2.5 transition ${
+                mode === "login"
+                  ? "bg-white text-[#0f6cbd] shadow-xs ring-1 ring-slate-200/70"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <Lock className="h-3.5 w-3.5" />
+              Iniciar Sesión
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setAuthError(null);
+                setAuthSuccess(null);
+                setMode("reset_password");
+              }}
+              className={`inline-flex items-center justify-center gap-1.5 rounded-lg py-2.5 transition ${
+                mode === "reset_password"
+                  ? "bg-white text-[#0f6cbd] shadow-xs ring-1 ring-slate-200/70"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <KeyRound className="h-3.5 w-3.5" />
+              Recuperar Clave
+            </button>
+          </div>
+
+          {authError && (
+            <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-3 text-xs font-medium text-rose-800">
+              {authError}
+            </div>
+          )}
+
+          {authSuccess && (
+            <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-3 text-xs font-medium text-emerald-800 space-y-2">
+              <p>{authSuccess}</p>
+              {mode === "reset_password" && (
                 <button
                   type="button"
                   onClick={() => {
-                    setResetEmail(email);
-                    setAuthError(null);
                     setAuthSuccess(null);
-                    setMode("reset_password");
+                    setMode("login");
                   }}
-                  className="text-[11px] font-semibold text-[#0f6cbd] hover:underline"
+                  className="inline-flex items-center gap-1 font-bold text-[#0f6cbd] underline"
                 >
-                  ¿Olvidaste tu contraseña?
+                  Ir a Iniciar Sesión ahora →
                 </button>
-              </div>
-              <div className="relative mt-1">
-                <KeyRound className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-                <input
-                  type={showPin ? "text" : "password"}
-                  required
-                  value={pin}
-                  onChange={(e) => setPin(e.target.value)}
-                  placeholder="••••"
-                  className="w-full rounded-xl border border-slate-300 bg-white pl-9 pr-9 py-2 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPin((p) => !p)}
-                  className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600"
-                >
-                  {showPin ? (
-                    <EyeOff className="h-4 w-4" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
-                </button>
-              </div>
+              )}
             </div>
+          )}
 
-            <button
-              type="submit"
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#0f6cbd] px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-[#115ea3]"
-            >
-              Entrar al Sistema REBT
-              <ArrowRight className="h-4 w-4" />
-            </button>
-          </form>
-        ) : (
-          <form onSubmit={handlePasswordReset} className="mt-5 space-y-3.5">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700">
-                Correo Electrónico de la Cuenta
-              </label>
-              <input
-                type="email"
-                required
-                value={resetEmail}
-                onChange={(e) => setResetEmail(e.target.value)}
-                placeholder="correo@empresa.es"
-                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700">
-                D.O.I. / N.I.F. del Titular o Nº Colegiado / CCI
-              </label>
-              <input
-                type="text"
-                required
-                value={resetDoi}
-                onChange={(e) => setResetDoi(e.target.value)}
-                placeholder="Introduce tu NIF o Nº de Colegiado / CCI"
-                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
-              />
-              <p className="mt-1 text-[10px] text-slate-500">
-                Introduce el documento de identidad o número de colegiado registrado en tu perfil profesional.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {mode === "login" ? (
+            <form onSubmit={handleLogin} className="mt-6 space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700">
-                  Nueva Contraseña / PIN
+                  Correo Electrónico Profesional
                 </label>
-                <input
-                  type="password"
-                  required
-                  value={newPin}
-                  onChange={(e) => setNewPin(e.target.value)}
-                  placeholder="Mín. 4 caracteres"
-                  className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
-                />
+                <div className="relative mt-1.5">
+                  <Mail className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="correo@empresa.es"
+                    className="w-full rounded-xl border border-slate-300 bg-slate-50/40 pl-10 pr-3.5 py-2.5 sm:py-3 text-sm text-slate-900 placeholder:text-slate-400 transition focus:border-[#0f6cbd] focus:bg-white focus:outline-none focus:ring-4 focus:ring-[#0f6cbd]/10"
+                  />
+                </div>
               </div>
 
               <div>
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-semibold text-slate-700">
+                    Contraseña / PIN de Acceso
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setResetEmail(email);
+                      setAuthError(null);
+                      setAuthSuccess(null);
+                      setMode("reset_password");
+                    }}
+                    className="text-xs font-semibold text-[#0f6cbd] hover:underline"
+                  >
+                    ¿Olvidaste tu contraseña?
+                  </button>
+                </div>
+                <div className="relative mt-1.5">
+                  <KeyRound className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <input
+                    type={showPin ? "text" : "password"}
+                    required
+                    value={pin}
+                    onChange={(e) => setPin(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full rounded-xl border border-slate-300 bg-slate-50/40 pl-10 pr-10 py-2.5 sm:py-3 text-sm text-slate-900 placeholder:text-slate-400 transition focus:border-[#0f6cbd] focus:bg-white focus:outline-none focus:ring-4 focus:ring-[#0f6cbd]/10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPin((p) => !p)}
+                    aria-label={showPin ? "Ocultar contraseña" : "Mostrar contraseña"}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                  >
+                    {showPin ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-[#0f6cbd] px-5 py-3 text-sm font-bold text-white shadow-md shadow-[#0f6cbd]/20 transition hover:bg-[#115ea3] active:scale-[0.99]"
+              >
+                Entrar al Sistema REBT
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handlePasswordReset} className="mt-6 space-y-4">
+              <div>
                 <label className="block text-xs font-semibold text-slate-700">
-                  Confirmar Contraseña
+                  Correo Electrónico de la Cuenta
+                </label>
+                <div className="relative mt-1.5">
+                  <Mail className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <input
+                    type="email"
+                    required
+                    value={resetEmail}
+                    onChange={(e) => setResetEmail(e.target.value)}
+                    placeholder="correo@empresa.es"
+                    className="w-full rounded-xl border border-slate-300 bg-slate-50/40 pl-10 pr-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 transition focus:border-[#0f6cbd] focus:bg-white focus:outline-none focus:ring-4 focus:ring-[#0f6cbd]/10"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700">
+                  D.O.I. / N.I.F. del Titular o Nº Colegiado / CCI
                 </label>
                 <input
-                  type="password"
+                  type="text"
                   required
-                  value={confirmPin}
-                  onChange={(e) => setConfirmPin(e.target.value)}
-                  placeholder="Repite la clave"
-                  className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
+                  value={resetDoi}
+                  onChange={(e) => setResetDoi(e.target.value)}
+                  placeholder="Introduce tu NIF o Nº de Colegiado / CCI"
+                  className="mt-1.5 w-full rounded-xl border border-slate-300 bg-slate-50/40 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 transition focus:border-[#0f6cbd] focus:bg-white focus:outline-none focus:ring-4 focus:ring-[#0f6cbd]/10"
                 />
+                <p className="mt-1 text-[11px] text-slate-500">
+                  Documento de identidad o número de instalador/colegiado registrado en tu perfil.
+                </p>
               </div>
-            </div>
 
-            <button
-              type="submit"
-              disabled={isResetting}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#0f6cbd] px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-[#115ea3] disabled:opacity-50"
-            >
-              <KeyRound className="h-4 w-4" />
-              {isResetting
-                ? "Actualizando Contraseña..."
-                : "Restablecer Contraseña Ahora"}
-            </button>
-          </form>
-        )}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700">
+                    Nueva Contraseña / PIN
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    value={newPin}
+                    onChange={(e) => setNewPin(e.target.value)}
+                    placeholder="Mín. 4 caracteres"
+                    className="mt-1.5 w-full rounded-xl border border-slate-300 bg-slate-50/40 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 transition focus:border-[#0f6cbd] focus:bg-white focus:outline-none focus:ring-4 focus:ring-[#0f6cbd]/10"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700">
+                    Confirmar Contraseña
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    value={confirmPin}
+                    onChange={(e) => setConfirmPin(e.target.value)}
+                    placeholder="Repite la clave"
+                    className="mt-1.5 w-full rounded-xl border border-slate-300 bg-slate-50/40 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 transition focus:border-[#0f6cbd] focus:bg-white focus:outline-none focus:ring-4 focus:ring-[#0f6cbd]/10"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isResetting}
+                className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-[#0f6cbd] px-5 py-3 text-sm font-bold text-white shadow-md shadow-[#0f6cbd]/20 transition hover:bg-[#115ea3] disabled:opacity-50"
+              >
+                <KeyRound className="h-4 w-4" />
+                {isResetting
+                  ? "Actualizando Contraseña..."
+                  : "Restablecer Contraseña Ahora"}
+              </button>
+            </form>
+          )}
+
+          {/* Sellos Técnicos de Confianza bajo el formulario */}
+          <div className="mt-7 pt-5 border-t border-slate-100 grid grid-cols-3 gap-2 text-center">
+            <div className="rounded-lg bg-slate-50 px-2 py-2 border border-slate-200/60">
+              <div className="text-[11px] font-bold text-slate-800">ITC-BT 01–52</div>
+              <div className="text-[10px] text-slate-500">Cálculo Oficial</div>
+            </div>
+            <div className="rounded-lg bg-slate-50 px-2 py-2 border border-slate-200/60">
+              <div className="text-[11px] font-bold text-slate-800">IEC 60617</div>
+              <div className="text-[10px] text-slate-500">Unifilar & DXF</div>
+            </div>
+            <div className="rounded-lg bg-slate-50 px-2 py-2 border border-slate-200/60">
+              <div className="text-[11px] font-bold text-slate-800">M.T.D. 11 Hojas</div>
+              <div className="text-[10px] text-slate-500">Sede Canarias</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Pie Izquierdo */}
+        <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400 pt-2">
+          <span>REBT Cloud Suite · Ingeniería B.T.</span>
+          <span>Seguridad Multi-Tenant Aislada</span>
+        </div>
       </div>
 
-      <div className="text-center text-[11px] text-slate-400 pb-2">
-        REBT Cloud Suite · Seguridad Multi-Tenant con Aislamiento de Expedientes
+      {/* =====================================================================
+          COLUMNA DERECHA: FOTOGRAFÍA PROFESIONAL DE INGENIERÍA ELÉCTRICA REBT
+      ===================================================================== */}
+      <div className="lg:col-span-7 xl:col-span-7 relative min-h-[340px] sm:min-h-[420px] lg:min-h-screen overflow-hidden bg-slate-950 flex flex-col justify-between p-6 sm:p-10 lg:p-12">
+        {/* Imagen Fotográfica Principal a Pantalla Completa */}
+        <img
+          src="/hero-rebt-banner.jpg"
+          alt="Cuadro Eléctrico Modular REBT, Esquema Unifilar y Memoria Técnica de Diseño"
+          className="absolute inset-0 h-full w-full object-cover object-center scale-[1.01]"
+        />
+
+        {/* Capas de Contraste Suaves para Realzar la Foto y Garantizar Lectura */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/25 to-slate-950/40"
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 bg-gradient-to-r from-slate-950/35 via-transparent to-transparent"
+        />
+
+        {/* Cabecera Flotante sobre la Fotografía */}
+        <div className="relative z-10 flex flex-wrap items-center justify-between gap-3">
+          <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-slate-950/55 px-3.5 py-1.5 text-xs font-semibold text-white backdrop-blur-md shadow-sm">
+            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+            Homologado REBT · RD 842/2002 · NRZ103 Endesa
+          </div>
+
+          <div className="hidden sm:inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/95 px-3.5 py-1.5 text-[11px] font-bold text-slate-900 shadow-sm">
+            <Building2 className="h-3.5 w-3.5 text-[#0f6cbd]" />
+            Empresas Instaladoras Habilitadas B.T.
+          </div>
+        </div>
+
+        {/* Tarjeta Inferior Glassmorphism sobre la Fotografía */}
+        <div className="relative z-10 mt-auto max-w-2xl rounded-2xl border border-white/15 bg-slate-950/65 p-5 sm:p-6 text-white backdrop-blur-md shadow-2xl">
+          <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-sky-300">
+            <Sparkles className="h-3.5 w-3.5" />
+            Automatización Integral de Proyectos y Boletines Eléctricos
+          </div>
+          <h2 className="mt-2 text-lg sm:text-xl font-bold tracking-tight text-white leading-snug">
+            De la fotografía del cuadro eléctrico al esquema unifilar IEC 60617 y la Memoria Técnica Oficial en minutos.
+          </h2>
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs text-slate-200">
+            <div className="flex items-center gap-2 rounded-xl bg-white/10 px-3 py-2 border border-white/10">
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
+              <span>Reconocimiento IA de Cuadros DIN</span>
+            </div>
+            <div className="flex items-center gap-2 rounded-xl bg-white/10 px-3 py-2 border border-white/10">
+              <FileSpreadsheet className="h-4 w-4 shrink-0 text-sky-400" />
+              <span>M.T.D. Canarias Autocompletada</span>
+            </div>
+            <div className="flex items-center gap-2 rounded-xl bg-white/10 px-3 py-2 border border-white/10">
+              <Activity className="h-4 w-4 shrink-0 text-amber-300" />
+              <span>Exportación PDF A3 y AutoCAD DXF</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
