@@ -12,6 +12,9 @@ import {
   calculateRebtCircuit,
   getConductivity,
   REBT_SECTIONS_MM2,
+  REBT_SPAIN_IGA_MONO_STEPS,
+  sanitizeSpanishIgaAmps,
+  resolveSpanishRebtIgaAndTariff,
 } from "./electrical-calculations.ts";
 
 export const ORIENTATIVE_DISCLAIMER =
@@ -411,19 +414,15 @@ export function calculateHomeConsumption(params: {
   const vatOrIgic = subtotal * (params.taxPct / 100);
   const totalMonthlyEuro = subtotal + vatOrIgic;
 
-  // Escalones normalizados de IGA monofásico 230 V
-  const igaSteps = [
-    { iga: 10, kw: 2.3 },
-    { iga: 15, kw: 3.45 },
-    { iga: 20, kw: 4.6 },
-    { iga: 25, kw: 5.75 },
-    { iga: 32, kw: 7.36 },
-    { iga: 40, kw: 9.2 },
-    { iga: 50, kw: 11.5 },
-    { iga: 63, kw: 14.49 },
-  ];
+  // Escalones oficiales REBT de IGA monofásico 230 V en España (Tarifa 2.0TD ≤ 15 kW)
+  const igaSteps = REBT_SPAIN_IGA_MONO_STEPS.map((s) => ({
+    iga: s.igaAmps,
+    kw: s.maxPowerKw,
+    tariff: s.accessTariff,
+  }));
   const minimumIga =
     igaSteps.find((s) => s.kw >= params.contractedKw) || igaSteps[igaSteps.length - 1];
+  const accessTariff = params.contractedKw <= 15 ? "2.0TD" : "3.0TD";
 
   return {
     powerCost: Number(powerCost.toFixed(2)),
@@ -435,6 +434,7 @@ export function calculateHomeConsumption(params: {
     totalMonthlyEuro: Number(totalMonthlyEuro.toFixed(2)),
     minimumIgaAmps: minimumIga.iga,
     maxPowerForIgaKw: minimumIga.kw,
+    accessTariff,
   };
 }
 
@@ -676,22 +676,6 @@ export interface ParsedPanelDraft {
   summaryNotes: string[];
 }
 
-const CIRCUIT_REBT_FACTORS: Record<string, { sim: number; util: number }> = {
-  C1: { sim: 0.75, util: 0.5 },
-  C2: { sim: 0.2, util: 0.25 },
-  C3: { sim: 0.5, util: 0.75 },
-  C4: { sim: 0.66, util: 0.75 },
-  C5: { sim: 0.4, util: 0.5 },
-  C6: { sim: 0.75, util: 0.5 },
-  C7: { sim: 0.2, util: 0.25 },
-  C8: { sim: 1.0, util: 0.75 },
-  C9: { sim: 1.0, util: 1.0 },
-  C10: { sim: 1.0, util: 0.75 },
-  C11: { sim: 0.75, util: 0.5 },
-  C12: { sim: 0.5, util: 0.5 },
-  C13: { sim: 1.0, util: 1.0 },
-};
-
 export function parseUnifilarFromSpeechOrText(text: string): ParsedPanelDraft {
   const lower = text.toLowerCase();
   const isThreePhase =
@@ -702,9 +686,9 @@ export function parseUnifilarFromSpeechOrText(text: string): ParsedPanelDraft {
     lower.includes("4 polos") ||
     lower.includes("4p") ||
     lower.includes("3f+n");
+  const supplyType = isThreePhase ? "trifasico_400v" : "monofasico_230v";
 
   const igaMatch = lower.match(/(?:iga|icp|general)\s*(?:de\s*)?(\d{2,3})\s*a?/);
-  const igaAmps = igaMatch ? Number(igaMatch[1]) : 40;
   const explicitlyNoSurge =
     lower.includes("sin sobretension") || lower.includes("no lleva sobretension");
   const hasSurgeProtection =
@@ -714,7 +698,7 @@ export function parseUnifilarFromSpeechOrText(text: string): ParsedPanelDraft {
       lower.includes("combi"));
 
   const rcdMatch = lower.match(/(\d)\s*diferencial/);
-  const rcdCount = rcdMatch ? Math.max(1, Number(rcdMatch[1])) : 2;
+  const rcdCount = rcdMatch ? Math.max(1, Number(rcdMatch[1])) : 1;
 
   const circuits: RebtCircuitInput[] = [];
   const phasesCycle: ("L1" | "L2" | "L3")[] = ["L1", "L2", "L3"];
@@ -727,7 +711,6 @@ export function parseUnifilarFromSpeechOrText(text: string): ParsedPanelDraft {
     usage: RebtCircuitInput["usageType"] = "vivienda_interior"
   ) => {
     const upperCode = code.toUpperCase();
-    const factors = CIRCUIT_REBT_FACTORS[upperCode] || { sim: 0.5, util: 0.5 };
     const isCircuitThreePhase = isThreePhase && watts >= 7000;
     const assignedPhase = isCircuitThreePhase
       ? "L1-L2-L3"
@@ -735,6 +718,8 @@ export function parseUnifilarFromSpeechOrText(text: string): ParsedPanelDraft {
       ? phasesCycle[circuits.length % 3]
       : "L1";
 
+    // En ITC-BT-25 Tabla 1 los valores de watts (2300, 3450, 5400...) ya incluyen Fs × Fu
+    // para el dimensionado individual de cada circuito; el IGA se calcula por escalón REBT.
     circuits.push({
       code: upperCode,
       description,
@@ -744,8 +729,8 @@ export function parseUnifilarFromSpeechOrText(text: string): ParsedPanelDraft {
       voltage: isCircuitThreePhase ? 400 : 230,
       powerWatts: watts,
       cosPhi: 1,
-      simultaneityFactor: factors.sim,
-      utilizationFactor: factors.util,
+      simultaneityFactor: 1.0,
+      utilizationFactor: 1.0,
       lengthMeters: 15,
       installationMethod: "B1",
       insulationType: usage === "recarga_ve" ? "XLPE_90" : "PVC_70",
@@ -838,9 +823,22 @@ export function parseUnifilarFromSpeechOrText(text: string): ParsedPanelDraft {
     pushCircuit("C5", "Baño y auxiliares de cocina", 16, 2.5, 3450);
   }
 
+  const calcCircuits = circuits.map((c) => calculateRebtCircuit(c));
+  const preliminaryGrade: "basica" | "elevada" =
+    lower.includes("elevada") || circuits.length > 5 ? "elevada" : "basica";
+  const explicitSanitizedIga = igaMatch
+    ? sanitizeSpanishIgaAmps(Number(igaMatch[1]), supplyType)
+    : null;
+  const rebtResolution = resolveSpanishRebtIgaAndTariff({
+    supplyType,
+    electrificationGrade: preliminaryGrade,
+    circuits: calcCircuits,
+    overrideIgaAmps: explicitSanitizedIga,
+  });
+  const igaAmps = rebtResolution.igaAmps;
+  const electrificationGrade = rebtResolution.effectiveElectrificationGrade;
+
   const resolvedRcdCount = Math.max(rcdCount, Math.ceil(circuits.length / 5));
-  const electrificationGrade: "basica" | "elevada" =
-    igaAmps >= 40 || circuits.length > 5 ? "elevada" : "basica";
   const hasElectronicLoads = circuits.some(
     (c) => c.usageType === "recarga_ve" || c.code === "C9" || c.code === "C11"
   );
@@ -849,20 +847,24 @@ export function parseUnifilarFromSpeechOrText(text: string): ParsedPanelDraft {
   const diferencialCalibreAmps = igaAmps > 40 ? 63 : 40;
   const formatLabel = `${
     isThreePhase ? "Trifásico 400/230 V (3F+N+PE)" : "Monofásico 230 V (1F+N+PE)"
-  } · Electrificación ${electrificationGrade === "elevada" ? "Elevada" : "Básica"}`;
+  } · Electrificación ${electrificationGrade === "elevada" ? "Elevada" : "Básica"} · ${
+    rebtResolution.tariffBadgeLabel
+  }`;
 
   return {
     igaAmps,
     hasSurgeProtection,
     rcdCount: resolvedRcdCount,
-    supplyType: isThreePhase ? "trifasico_400v" : "monofasico_230v",
+    supplyType,
     electrificationGrade,
     diferencialCalibreAmps,
     diferencialClase,
     formatLabel,
     circuits,
     summaryNotes: [
-      `Formato detectado: ${formatLabel} · IGA ${igaAmps} A`,
+      `Formato detectado: ${formatLabel} · IGA ${igaAmps} A (${rebtResolution.maxAdmissibleKw.toFixed(
+        2
+      )} kW)`,
       `Diferenciales: ${resolvedRcdCount} × ${diferencialCalibreAmps} A / 30 mA (Clase ${diferencialClase}) · DPS: ${
         hasSurgeProtection ? "Sí (Combi T2+POP)" : "No instalado"
       }`,

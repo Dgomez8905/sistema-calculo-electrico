@@ -7,7 +7,8 @@ import type {
   MtdFormMetadata,
   RebtCalculatedCircuit,
   SystemSupplyType,
-} from "@/lib/electrical-calculations";
+} from "../../lib/electrical-calculations.ts";
+import { sanitizeSpanishIgaAmps } from "../../lib/electrical-calculations.ts";
 
 export type DinModuleKind =
   | "IGA"
@@ -60,7 +61,8 @@ export interface PanelDiagnostic {
     | "add_surge"
     | "fix_neutral"
     | "fix_pe"
-    | "upsize_iga";
+    | "upsize_iga"
+    | "normalize_iga";
 }
 
 export interface FaultChallengeScenario {
@@ -142,7 +144,8 @@ export function buildDinModulesFromProject(params: {
   meta: MtdFormMetadata;
   circuits: RebtCalculatedCircuit[];
 }): DinModule[] {
-  const { supplyType, igaAmps, rcdCount, hasCombiSurge, meta, circuits } = params;
+  const { supplyType, rcdCount, hasCombiSurge, meta, circuits } = params;
+  const igaAmps = sanitizeSpanishIgaAmps(params.igaAmps, supplyType);
   const isThreePhase = supplyType === "trifasico_400v";
   const modules: DinModule[] = [];
 
@@ -289,6 +292,32 @@ export function validateDinPanelInstallation(
     });
   } else {
     const iga = igas[0];
+    if (iga.poles <= 2 && iga.ratingAmps > 63) {
+      issues.push({
+        id: "err-iga-over63-mono",
+        severity: "error",
+        code: "IGA-FUERA-REBT",
+        title: `IGA monofásico (${iga.ratingAmps} A) fuera de REBT y tarifas en España`,
+        detail: `En suministro monofásico 230 V (Tarifa 2.0TD ≤ 15 kW) el calibre máximo reglamentario admitido por REBT y distribuidoras es IGA 63 A (14.490 W).`,
+        itc: "ITC-BT-10 / ITC-BT-17 / ITC-BT-25 §2.2",
+        solution:
+          "Ajusta el IGA a un escalón REBT (25 A Básica 5,75 kW, 40 A Elevada 9,20 kW o máx. 63 A 14,49 kW) o pasa a suministro Trifásico 400 V (Tarifa 3.0TD).",
+        moduleId: iga.id,
+        autoFixType: "normalize_iga",
+      });
+    } else if (iga.poles <= 2 && pias.length >= 5 && iga.ratingAmps < 25) {
+      issues.push({
+        id: "warn-iga-below-basic",
+        severity: "warning",
+        code: "IGA-MENOR-BASICA",
+        title: `IGA (${iga.ratingAmps} A) inferior al mínimo de Electrificación Básica (25 A)`,
+        detail: `En viviendas REBT el grado de electrificación básica exige una previsión mínima de 5.750 W con IGA ≥ 25 A.`,
+        itc: "ITC-BT-10 §2.1 / ITC-BT-25 §2.2",
+        solution: "Sube el IGA al escalón reglamentario de 25 A (5,75 kW · Tarifa 2.0TD).",
+        moduleId: iga.id,
+        autoFixType: "normalize_iga",
+      });
+    }
     const oversizedPia = pias.find((p) => p.ratingAmps > iga.ratingAmps);
     if (oversizedPia) {
       issues.push({

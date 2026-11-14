@@ -54,11 +54,13 @@ import {
   MtdFormMetadata,
   DEFAULT_MTD_METADATA,
   ITC_BT_25_TEMPLATES,
-  REBT_PIA_RATINGS,
   calculateRebtCircuit,
   calculateBuildingLoadForecastItc10,
   evaluateItc04Documentation,
   calculateEarthingItc18,
+  resolveSpanishRebtIgaAndTariff,
+  getSpanishIgaStepsForSupply,
+  sanitizeSpanishIgaAmps,
 } from "@/lib/electrical-calculations";
 import MtdCanariasOfficialForm from "@/components/MtdCanariasOfficialForm";
 import {
@@ -402,7 +404,7 @@ export default function SistemaCalculoRebtPage() {
     [circuits]
   );
 
-  // Resumen del Cuadro General de Mando y Protección (CGMP) y Derivación Individual
+  // Resumen del Cuadro General de Mando y Protección (CGMP), Escalón Oficial IGA REBT, Tarifa 2.0TD/3.0TD y D.I.
   const cgmpSummary = useMemo(() => {
     const totalInstalledWatts = calculatedCircuits.reduce(
       (acc, c) => acc + c.powerWatts,
@@ -413,20 +415,20 @@ export default function SistemaCalculoRebtPage() {
       0
     );
 
-    const minNormativeWatts = electrificationGrade === "elevada" ? 9200 : 5750;
     const supplyVoltage = supplyType === "trifasico_400v" ? 400 : 230;
     const denom =
       supplyType === "trifasico_400v" ? Math.sqrt(3) * 400 : 230;
 
-    const baseContractWatts = Math.max(totalDesignWatts, minNormativeWatts);
-    const baseDesignCurrentAmps = Number((baseContractWatts / denom).toFixed(2));
-    const autoIgaAmps =
-      REBT_PIA_RATINGS.find((r) => r >= baseDesignCurrentAmps && r >= 25) || 63;
+    const rebtIga = resolveSpanishRebtIgaAndTariff({
+      supplyType,
+      electrificationGrade,
+      circuits: calculatedCircuits,
+      areaM2: Number(mtdMeta.superficieUtilM2) || 0,
+      overrideIgaAmps: panelOverrideIgaAmps,
+    });
 
-    const igaAmps = panelOverrideIgaAmps ?? autoIgaAmps;
-    const contractDesignWatts = panelOverrideIgaAmps
-      ? Math.round(panelOverrideIgaAmps * denom)
-      : baseContractWatts;
+    const igaAmps = rebtIga.igaAmps;
+    const contractDesignWatts = rebtIga.maxAdmissibleWatts;
     const designCurrentAmps = Number((contractDesignWatts / denom).toFixed(2));
 
     const hasEvCircuitC13 = calculatedCircuits.some(
@@ -466,8 +468,19 @@ export default function SistemaCalculoRebtPage() {
       totalInstalledWatts,
       totalDesignWatts: Math.round(totalDesignWatts),
       contractDesignWatts: Math.round(contractDesignWatts),
+      maxAdmissibleKw: rebtIga.maxAdmissibleKw,
+      simultaneousDemandWatts: rebtIga.simultaneousDemandWatts,
       designCurrentAmps,
       igaAmps,
+      autoIgaAmps: rebtIga.autoIgaAmps,
+      igaPoles: rebtIga.poles,
+      accessTariff: rebtIga.accessTariff,
+      tariffBadgeLabel: rebtIga.tariffBadgeLabel,
+      tariffDetail: rebtIga.tariffDetail,
+      effectiveElectrificationGrade: rebtIga.effectiveElectrificationGrade,
+      electrificationLabel: rebtIga.electrificationLabel,
+      rebtCitation: rebtIga.rebtCitation,
+      exceedsSinglePhaseLimit: rebtIga.exceedsSinglePhaseLimit,
       rcd30mACount,
       hasEvCircuitC13,
       diCalculation,
@@ -479,6 +492,7 @@ export default function SistemaCalculoRebtPage() {
     supplyType,
     diLengthMeters,
     diType,
+    mtdMeta.superficieUtilM2,
     panelOverrideIgaAmps,
     panelOverrideRcdCount,
   ]);
@@ -585,6 +599,21 @@ export default function SistemaCalculoRebtPage() {
           msg.toLowerCase().includes("load failed"))
     );
 
+  const sanitizeSavedProjectRow = useCallback((row: SavedProjectRow): SavedProjectRow => {
+    if (row.system_type !== "trifasico_400v" && Number(row.iga_amps) > 63) {
+      const normalizedIga = row.electrification_grade === "elevada" ? 40 : 25;
+      const normalizedWatts = normalizedIga * 230;
+      const normalizedDi = normalizedIga >= 40 ? 16 : 10;
+      return {
+        ...row,
+        iga_amps: normalizedIga,
+        total_demand_va: normalizedWatts,
+        di_section_mm2: normalizedDi,
+      };
+    }
+    return row;
+  }, []);
+
   const fetchDirectoryAndProjects = useCallback(async () => {
     if (typeof window !== "undefined") {
       try {
@@ -601,7 +630,11 @@ export default function SistemaCalculoRebtPage() {
         const rawP = window.localStorage.getItem(LOCAL_PROJECTS_KEY);
         if (rawP) {
           const parsedP = JSON.parse(rawP) as SavedProjectRow[];
-          if (Array.isArray(parsedP)) setAllProjects(parsedP);
+          if (Array.isArray(parsedP)) {
+            const sanitizedP = parsedP.map(sanitizeSavedProjectRow);
+            setAllProjects(sanitizedP);
+            persistDirectoryLocally(undefined, undefined, sanitizedP);
+          }
         }
       } catch {
         // Continúa con valores por defecto
@@ -631,14 +664,16 @@ export default function SistemaCalculoRebtPage() {
         persistDirectoryLocally(undefined, remoteUsers, undefined);
       }
       if (projectsRes.data) {
-        const remoteProjects = projectsRes.data as SavedProjectRow[];
+        const remoteProjects = (projectsRes.data as SavedProjectRow[]).map(
+          sanitizeSavedProjectRow
+        );
         setAllProjects(remoteProjects);
         persistDirectoryLocally(undefined, undefined, remoteProjects);
       }
     } catch {
       // Si el servidor remoto no responde, mantiene los datos locales persistidos
     }
-  }, [persistDirectoryLocally]);
+  }, [persistDirectoryLocally, sanitizeSavedProjectRow]);
 
   useEffect(() => {
     fetchDirectoryAndProjects();
@@ -805,7 +840,14 @@ export default function SistemaCalculoRebtPage() {
     }
 
     setActiveProjectId(proj.id);
-    setPanelOverrideIgaAmps(proj.iga_amps || null);
+    const loadedSupply: SystemSupplyType =
+      proj.system_type === "trifasico_400v" ? "trifasico_400v" : "monofasico_230v";
+    const isValidSavedIga =
+      typeof proj.iga_amps === "number" &&
+      getSpanishIgaStepsForSupply(loadedSupply).some(
+        (st) => st.igaAmps === proj.iga_amps
+      );
+    setPanelOverrideIgaAmps(isValidSavedIga ? proj.iga_amps : null);
     setPanelOverrideRcdCount(proj.rcd_count || null);
 
     // 1. Restaurar Titular, Ubicación y Profesional Habilitado
@@ -1427,6 +1469,8 @@ export default function SistemaCalculoRebtPage() {
 
   const loadPresetDwellings = (preset: "basica" | "elevada_ve") => {
     if (!currentUser.can_edit_calculations) return;
+    setPanelOverrideIgaAmps(null);
+    setPanelOverrideRcdCount(null);
     if (preset === "basica") {
       setElectrificationGrade("basica");
       setCircuits(ITC_BT_25_TEMPLATES.slice(0, 5));
@@ -2824,33 +2868,109 @@ export default function SistemaCalculoRebtPage() {
              ================================================================= */}
           {activeSection === "circuitos" && (
             <div className="space-y-6">
-              {/* Tarjetas Resumen en Diseño Claro */}
+              {/* Tarjetas Resumen en Diseño Claro ( Escalones Oficiales REBT + Tarifas 2.0TD / 3.0TD ) */}
               <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
-                  <span className="text-xs font-medium text-slate-500">
-                    Potencia Prevista / Instalada
-                  </span>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-medium text-slate-500">
+                      Potencia Prevista REBT (PMA)
+                    </span>
+                    <span
+                      className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${
+                        cgmpSummary.effectiveElectrificationGrade === "elevada"
+                          ? "bg-blue-50 text-[#0f6cbd] ring-1 ring-[#0f6cbd]/20"
+                          : "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-600/20"
+                      }`}
+                    >
+                      {cgmpSummary.effectiveElectrificationGrade === "elevada"
+                        ? "Elevada ITC-BT-10"
+                        : "Básica ITC-BT-10"}
+                    </span>
+                  </div>
                   <p className="mt-1 text-2xl font-bold text-slate-900">
-                    {cgmpSummary.contractDesignWatts.toLocaleString()} W
+                    {cgmpSummary.contractDesignWatts.toLocaleString()} W{" "}
+                    <span className="text-sm font-semibold text-slate-500">
+                      ({cgmpSummary.maxAdmissibleKw.toFixed(2)} kW)
+                    </span>
                   </p>
                   <p className="mt-1 text-xs text-slate-500">
-                    Instalada: {cgmpSummary.totalInstalledWatts.toLocaleString()} W
+                    Suma nominal circuitos:{" "}
+                    {cgmpSummary.totalInstalledWatts.toLocaleString()} W
                   </p>
                 </div>
 
-                <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
-                  <span className="text-xs font-medium text-slate-500">
-                    Protección General (CGMP)
-                  </span>
-                  <p className="mt-1 text-2xl font-bold text-[#0f6cbd]">
-                    IGA {cgmpSummary.igaAmps} A
-                  </p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Diferenciales {rcdSensitivityMa} mA:{" "}
-                    <strong className="text-slate-900">
-                      {cgmpSummary.rcd30mACount} ud.
-                    </strong>
-                  </p>
+                <div className="rounded-xl border border-blue-200 bg-white p-4 shadow-2xs ring-1 ring-[#0f6cbd]/10">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-medium text-slate-600">
+                      Protección General (CGMP) y Tarifa
+                    </span>
+                    <span
+                      className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${
+                        cgmpSummary.accessTariff === "3.0TD"
+                          ? "bg-indigo-50 text-indigo-800 ring-1 ring-indigo-500/25"
+                          : "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-600/25"
+                      }`}
+                      title={cgmpSummary.tariffDetail}
+                    >
+                      {cgmpSummary.tariffBadgeLabel}
+                    </span>
+                  </div>
+                  <div className="mt-1 flex items-baseline justify-between gap-2">
+                    <p className="text-2xl font-bold text-[#0f6cbd]">
+                      IGA {cgmpSummary.igaAmps} A{" "}
+                      <span className="text-xs font-semibold text-slate-500">
+                        ({cgmpSummary.igaPoles}P)
+                      </span>
+                    </p>
+                    <span className="text-[11px] font-medium text-slate-500">
+                      DIF {rcdSensitivityMa} mA:{" "}
+                      <strong className="text-slate-900">
+                        {cgmpSummary.rcd30mACount} ud.
+                      </strong>
+                    </span>
+                  </div>
+                  <div className="mt-2">
+                    <select
+                      aria-label="Escalón IGA según REBT y tarifas de electrificación en España"
+                      value={
+                        panelOverrideIgaAmps === null
+                          ? "auto"
+                          : String(cgmpSummary.igaAmps)
+                      }
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === "auto") {
+                          setPanelOverrideIgaAmps(null);
+                        } else {
+                          const nextAmps = Number(val);
+                          setPanelOverrideIgaAmps(nextAmps);
+                          if (
+                            supplyType === "monofasico_230v" &&
+                            nextAmps >= 40
+                          ) {
+                            setElectrificationGrade("elevada");
+                          } else if (
+                            supplyType === "monofasico_230v" &&
+                            nextAmps <= 32 &&
+                            calculatedCircuits.length <= 5
+                          ) {
+                            setElectrificationGrade("basica");
+                          }
+                        }
+                      }}
+                      className="w-full rounded-lg border border-slate-300 bg-slate-50 px-2 py-1 text-[11px] font-semibold text-slate-800 focus:border-[#0f6cbd] focus:outline-none"
+                    >
+                      <option value="auto">
+                        Automático REBT (IGA {cgmpSummary.autoIgaAmps} A ·{" "}
+                        {cgmpSummary.accessTariff})
+                      </option>
+                      {getSpanishIgaStepsForSupply(supplyType).map((st) => (
+                        <option key={st.igaAmps} value={st.igaAmps}>
+                          {st.shortLabel}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
                 <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
@@ -2886,7 +3006,8 @@ export default function SistemaCalculoRebtPage() {
                     Verificación REBT (ITC-BT-19 / 22)
                   </span>
                   <div className="mt-1 flex items-center gap-2">
-                    {cgmpSummary.nonCompliantCircuits === 0 ? (
+                    {cgmpSummary.nonCompliantCircuits === 0 &&
+                    !cgmpSummary.exceedsSinglePhaseLimit ? (
                       <>
                         <CheckCircle2 className="h-6 w-6 text-emerald-600" />
                         <span className="text-lg font-bold text-emerald-700">
@@ -2897,16 +3018,43 @@ export default function SistemaCalculoRebtPage() {
                       <>
                         <AlertTriangle className="h-6 w-6 text-amber-600" />
                         <span className="text-lg font-bold text-amber-700">
-                          {cgmpSummary.nonCompliantCircuits} alerta(s)
+                          {cgmpSummary.nonCompliantCircuits +
+                            (cgmpSummary.exceedsSinglePhaseLimit ? 1 : 0)}{" "}
+                          alerta(s)
                         </span>
                       </>
                     )}
                   </div>
                   <p className="mt-1 text-xs text-slate-500">
-                    Condición Ib ≤ In ≤ Iz y caída ΔU%
+                    {cgmpSummary.rebtCitation}
                   </p>
                 </div>
               </section>
+
+              {cgmpSummary.exceedsSinglePhaseLimit && (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs text-amber-950">
+                  <div>
+                    <strong>
+                      Aviso REBT España (Límite Monofásico 63 A / 14,49 kW):
+                    </strong>{" "}
+                    La demanda simultánea estimada (
+                    {cgmpSummary.simultaneousDemandWatts.toLocaleString()} W) supera el
+                    máximo reglamentario monofásico de 14.490 W (IGA 63 A · Tarifa
+                    2.0TD). Se ha limitado el IGA a 63 A; para potencias superiores
+                    cambia a suministro Trifásico 400 V (Tarifa 3.0TD &gt; 15 kW).
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSupplyType("trifasico_400v");
+                      setPanelOverrideIgaAmps(null);
+                    }}
+                    className="rounded-lg bg-amber-700 px-3 py-1.5 font-semibold text-white hover:bg-amber-800"
+                  >
+                    Pasar a Trifásico 400 V (3.0TD)
+                  </button>
+                </div>
+              )}
 
               {/* Controles de Suministro y Plantillas ITC-BT-25 */}
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
@@ -2918,16 +3066,24 @@ export default function SistemaCalculoRebtPage() {
                   <button
                     type="button"
                     onClick={() => loadPresetDwellings("basica")}
-                    className="rounded-lg border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                    className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
+                      cgmpSummary.effectiveElectrificationGrade === "basica"
+                        ? "border-emerald-300 bg-emerald-50 text-emerald-900"
+                        : "border-slate-300 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                    }`}
                   >
-                    Electrificación Básica (C1 a C5)
+                    Electrificación Básica (5.750 W · IGA 25 A)
                   </button>
                   <button
                     type="button"
                     onClick={() => loadPresetDwellings("elevada_ve")}
-                    className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-[#0f6cbd] hover:bg-blue-100"
+                    className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
+                      cgmpSummary.effectiveElectrificationGrade === "elevada"
+                        ? "border-blue-300 bg-blue-50 text-[#0f6cbd]"
+                        : "border-slate-300 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                    }`}
                   >
-                    Electrificación Elevada + VE (C1 a C13)
+                    Electrificación Elevada + VE (≥ 9.200 W · IGA 40/50 A)
                   </button>
                   <button
                     type="button"
@@ -2942,14 +3098,29 @@ export default function SistemaCalculoRebtPage() {
 
                 <div className="flex flex-wrap items-center gap-2">
                   <GoogleSelect
+                    value={electrificationGrade}
+                    onChange={(e) => {
+                      setElectrificationGrade(
+                        e.target.value as "basica" | "elevada"
+                      );
+                      setPanelOverrideIgaAmps(null);
+                    }}
+                    className="w-48"
+                  >
+                    <option value="basica">Grado Básico (5,75 kW · 25 A)</option>
+                    <option value="elevada">Grado Elevado (≥ 9,20 kW · ≥ 40 A)</option>
+                  </GoogleSelect>
+
+                  <GoogleSelect
                     value={supplyType}
-                    onChange={(e) =>
-                      setSupplyType(e.target.value as SystemSupplyType)
-                    }
+                    onChange={(e) => {
+                      setSupplyType(e.target.value as SystemSupplyType);
+                      setPanelOverrideIgaAmps(null);
+                    }}
                     className="w-44"
                   >
-                    <option value="monofasico_230v">Monofásico 230 V</option>
-                    <option value="trifasico_400v">Trifásico 400 V</option>
+                    <option value="monofasico_230v">Monofásico 230 V (2.0TD)</option>
+                    <option value="trifasico_400v">Trifásico 400 V (2.0TD / 3.0TD)</option>
                   </GoogleSelect>
 
                   <GoogleSelect
@@ -3760,7 +3931,7 @@ export default function SistemaCalculoRebtPage() {
               meta={mtdMeta}
               setMeta={setMtdMeta}
               supplyType={supplyType}
-              electrificationGrade={electrificationGrade}
+              electrificationGrade={cgmpSummary.effectiveElectrificationGrade}
               calculatedCircuits={calculatedCircuits}
               cgmpSummary={cgmpSummary}
               buildingForecast={buildingForecast}
@@ -3903,7 +4074,9 @@ export default function SistemaCalculoRebtPage() {
                   setElectrificationGrade(panelMeta.electrificationGrade);
                 }
                 if (typeof panelMeta?.igaAmps === "number") {
-                  setPanelOverrideIgaAmps(panelMeta.igaAmps);
+                  setPanelOverrideIgaAmps(
+                    sanitizeSpanishIgaAmps(panelMeta.igaAmps, nextSupply)
+                  );
                 }
                 if (typeof panelMeta?.rcdCount === "number") {
                   setPanelOverrideRcdCount(panelMeta.rcdCount);

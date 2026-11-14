@@ -76,6 +76,439 @@ export const REBT_PIA_RATINGS = [
   6, 10, 16, 20, 25, 32, 40, 50, 63, 80, 100, 125, 160, 200, 250, 315, 400, 500, 630,
 ];
 
+// ============================================================================
+// Escalones Oficiales de IGA y Tarifas de Acceso en España
+// Normativa: REBT ITC-BT-10, ITC-BT-17, ITC-BT-25, ITC-BT-52 + Circular 3/2020 CNMC
+// - Tarifa 2.0TD: Baja Tensión con potencia contratada ≤ 15,00 kW (3 periodos energía / 2 potencia)
+// - Tarifa 3.0TD: Baja Tensión con potencia contratada > 15,00 kW (6 periodos + maxímetro)
+// - Límite reglamentario monofásico 230 V en España: IGA 63 A (14.490 W / 14,49 kW)
+// ============================================================================
+export type SpanishAccessTariff = "2.0TD" | "3.0TD";
+
+export interface RebtSpainIgaStep {
+  igaAmps: number;
+  poles: 2 | 4;
+  supplyType: SystemSupplyType;
+  maxPowerWatts: number;
+  maxPowerKw: number;
+  accessTariff: SpanishAccessTariff;
+  electrificationGrade: "basica" | "elevada";
+  shortLabel: string;
+  label: string;
+  rebtCitation: string;
+}
+
+export const REBT_SPAIN_IGA_MONO_STEPS: RebtSpainIgaStep[] = [
+  {
+    igaAmps: 10,
+    poles: 2,
+    supplyType: "monofasico_230v",
+    maxPowerWatts: 2300,
+    maxPowerKw: 2.3,
+    accessTariff: "2.0TD",
+    electrificationGrade: "basica",
+    shortLabel: "IGA 10 A · 2,30 kW (2.0TD)",
+    label: "IGA 10 A — 2.300 W (2,30 kW) · Auxiliar / Pequeño suministro · Tarifa 2.0TD",
+    rebtCitation: "ITC-BT-17 · Circular 3/2020 CNMC (2.0TD ≤ 15 kW)",
+  },
+  {
+    igaAmps: 16,
+    poles: 2,
+    supplyType: "monofasico_230v",
+    maxPowerWatts: 3680,
+    maxPowerKw: 3.68,
+    accessTariff: "2.0TD",
+    electrificationGrade: "basica",
+    shortLabel: "IGA 16 A · 3,68 kW (2.0TD)",
+    label: "IGA 16 A — 3.680 W (3,68 kW) · Garaje / Anexo / Suministro reducido · Tarifa 2.0TD",
+    rebtCitation: "ITC-BT-17 · Circular 3/2020 CNMC (2.0TD ≤ 15 kW)",
+  },
+  {
+    igaAmps: 20,
+    poles: 2,
+    supplyType: "monofasico_230v",
+    maxPowerWatts: 4600,
+    maxPowerKw: 4.6,
+    accessTariff: "2.0TD",
+    electrificationGrade: "basica",
+    shortLabel: "IGA 20 A · 4,60 kW (2.0TD)",
+    label: "IGA 20 A — 4.600 W (4,60 kW) · Suministro existente / Pequeño local · Tarifa 2.0TD",
+    rebtCitation: "ITC-BT-17 · Circular 3/2020 CNMC (2.0TD ≤ 15 kW)",
+  },
+  {
+    igaAmps: 25,
+    poles: 2,
+    supplyType: "monofasico_230v",
+    maxPowerWatts: 5750,
+    maxPowerKw: 5.75,
+    accessTariff: "2.0TD",
+    electrificationGrade: "basica",
+    shortLabel: "IGA 25 A · 5,75 kW · Básica (2.0TD)",
+    label: "IGA 25 A — 5.750 W (5,75 kW) · REBT Electrificación Básica · Tarifa 2.0TD",
+    rebtCitation: "ITC-BT-10 §2.1 y ITC-BT-25 §2.2 · Tarifa 2.0TD (≤ 15 kW)",
+  },
+  {
+    igaAmps: 32,
+    poles: 2,
+    supplyType: "monofasico_230v",
+    maxPowerWatts: 7360,
+    maxPowerKw: 7.36,
+    accessTariff: "2.0TD",
+    electrificationGrade: "basica",
+    shortLabel: "IGA 32 A · 7,36 kW · Básica Ampliada (2.0TD)",
+    label: "IGA 32 A — 7.360 W (7,36 kW) · REBT Electrificación Básica Ampliada · Tarifa 2.0TD",
+    rebtCitation: "ITC-BT-25 §2.2 (Escalón intermedio 7.360 W) · Tarifa 2.0TD",
+  },
+  {
+    igaAmps: 40,
+    poles: 2,
+    supplyType: "monofasico_230v",
+    maxPowerWatts: 9200,
+    maxPowerKw: 9.2,
+    accessTariff: "2.0TD",
+    electrificationGrade: "elevada",
+    shortLabel: "IGA 40 A · 9,20 kW · Elevada (2.0TD)",
+    label: "IGA 40 A — 9.200 W (9,20 kW) · REBT Electrificación Elevada · Tarifa 2.0TD",
+    rebtCitation: "ITC-BT-10 §2.2 y ITC-BT-25 §2.2 · Tarifa 2.0TD (≤ 15 kW)",
+  },
+  {
+    igaAmps: 50,
+    poles: 2,
+    supplyType: "monofasico_230v",
+    maxPowerWatts: 11500,
+    maxPowerKw: 11.5,
+    accessTariff: "2.0TD",
+    electrificationGrade: "elevada",
+    shortLabel: "IGA 50 A · 11,50 kW · Elevada + VE (2.0TD)",
+    label: "IGA 50 A — 11.500 W (11,50 kW) · REBT Elevada Superior / Recarga VE · Tarifa 2.0TD",
+    rebtCitation: "ITC-BT-25 §2.2 y ITC-BT-52 · Tarifa 2.0TD (≤ 15 kW)",
+  },
+  {
+    igaAmps: 63,
+    poles: 2,
+    supplyType: "monofasico_230v",
+    maxPowerWatts: 14490,
+    maxPowerKw: 14.49,
+    accessTariff: "2.0TD",
+    electrificationGrade: "elevada",
+    shortLabel: "IGA 63 A · 14,49 kW · Máx. 1F (2.0TD)",
+    label: "IGA 63 A — 14.490 W (14,49 kW) · Máx. Monofásico España · Tarifa 2.0TD",
+    rebtCitation: "ITC-BT-25 §2.2 (Tope monofásico 63 A) · Tarifa 2.0TD (≤ 15 kW)",
+  },
+];
+
+export const REBT_SPAIN_IGA_TRI_STEPS: RebtSpainIgaStep[] = [
+  {
+    igaAmps: 16,
+    poles: 4,
+    supplyType: "trifasico_400v",
+    maxPowerWatts: 11085,
+    maxPowerKw: 11.09,
+    accessTariff: "2.0TD",
+    electrificationGrade: "elevada",
+    shortLabel: "IGA 16 A (4P) · 11,09 kW · Elevada (2.0TD)",
+    label: "IGA 16 A (4P) — 11.085 W (11,09 kW) · Trifásico Elevada · Tarifa 2.0TD",
+    rebtCitation: "ITC-BT-10 / BT-25 · Tarifa 2.0TD (≤ 15 kW)",
+  },
+  {
+    igaAmps: 20,
+    poles: 4,
+    supplyType: "trifasico_400v",
+    maxPowerWatts: 13856,
+    maxPowerKw: 13.86,
+    accessTariff: "2.0TD",
+    electrificationGrade: "elevada",
+    shortLabel: "IGA 20 A (4P) · 13,86 kW · Elevada (2.0TD)",
+    label: "IGA 20 A (4P) — 13.856 W (13,86 kW) · Trifásico Elevada · Tarifa 2.0TD",
+    rebtCitation: "ITC-BT-10 / BT-25 · Tarifa 2.0TD (≤ 15 kW)",
+  },
+  {
+    igaAmps: 25,
+    poles: 4,
+    supplyType: "trifasico_400v",
+    maxPowerWatts: 17321,
+    maxPowerKw: 17.32,
+    accessTariff: "3.0TD",
+    electrificationGrade: "elevada",
+    shortLabel: "IGA 25 A (4P) · 17,32 kW (3.0TD)",
+    label: "IGA 25 A (4P) — 17.321 W (17,32 kW) · Trifásico · Tarifa 3.0TD (> 15 kW)",
+    rebtCitation: "ITC-BT-17 · Circular 3/2020 CNMC Tarifa 3.0TD (> 15 kW · 6 periodos)",
+  },
+  {
+    igaAmps: 32,
+    poles: 4,
+    supplyType: "trifasico_400v",
+    maxPowerWatts: 22170,
+    maxPowerKw: 22.17,
+    accessTariff: "3.0TD",
+    electrificationGrade: "elevada",
+    shortLabel: "IGA 32 A (4P) · 22,17 kW (3.0TD)",
+    label: "IGA 32 A (4P) — 22.170 W (22,17 kW) · Trifásico · Tarifa 3.0TD (> 15 kW)",
+    rebtCitation: "ITC-BT-17 · Circular 3/2020 CNMC Tarifa 3.0TD (> 15 kW)",
+  },
+  {
+    igaAmps: 40,
+    poles: 4,
+    supplyType: "trifasico_400v",
+    maxPowerWatts: 27713,
+    maxPowerKw: 27.71,
+    accessTariff: "3.0TD",
+    electrificationGrade: "elevada",
+    shortLabel: "IGA 40 A (4P) · 27,71 kW (3.0TD)",
+    label: "IGA 40 A (4P) — 27.713 W (27,71 kW) · Trifásico · Tarifa 3.0TD (> 15 kW)",
+    rebtCitation: "ITC-BT-17 · Circular 3/2020 CNMC Tarifa 3.0TD (> 15 kW)",
+  },
+  {
+    igaAmps: 50,
+    poles: 4,
+    supplyType: "trifasico_400v",
+    maxPowerWatts: 34641,
+    maxPowerKw: 34.64,
+    accessTariff: "3.0TD",
+    electrificationGrade: "elevada",
+    shortLabel: "IGA 50 A (4P) · 34,64 kW (3.0TD)",
+    label: "IGA 50 A (4P) — 34.641 W (34,64 kW) · Trifásico · Tarifa 3.0TD (> 15 kW)",
+    rebtCitation: "ITC-BT-17 · Circular 3/2020 CNMC Tarifa 3.0TD (> 15 kW)",
+  },
+  {
+    igaAmps: 63,
+    poles: 4,
+    supplyType: "trifasico_400v",
+    maxPowerWatts: 43648,
+    maxPowerKw: 43.65,
+    accessTariff: "3.0TD",
+    electrificationGrade: "elevada",
+    shortLabel: "IGA 63 A (4P) · 43,65 kW · Máx. Med. Directa (3.0TD)",
+    label: "IGA 63 A (4P) — 43.648 W (43,65 kW) · Máx. Medida Directa · Tarifa 3.0TD",
+    rebtCitation: "ITC-BT-16 (Medida directa ≤ 63 A) · Tarifa 3.0TD (> 15 kW)",
+  },
+  {
+    igaAmps: 80,
+    poles: 4,
+    supplyType: "trifasico_400v",
+    maxPowerWatts: 55426,
+    maxPowerKw: 55.43,
+    accessTariff: "3.0TD",
+    electrificationGrade: "elevada",
+    shortLabel: "IGA 80 A (4P) · 55,43 kW · Med. Indirecta (3.0TD)",
+    label: "IGA 80 A (4P) — 55.426 W (55,43 kW) · Medida Indirecta TI · Tarifa 3.0TD",
+    rebtCitation: "ITC-BT-16 (Transformadores de intensidad) · Tarifa 3.0TD",
+  },
+  {
+    igaAmps: 100,
+    poles: 4,
+    supplyType: "trifasico_400v",
+    maxPowerWatts: 69282,
+    maxPowerKw: 69.28,
+    accessTariff: "3.0TD",
+    electrificationGrade: "elevada",
+    shortLabel: "IGA 100 A (4P) · 69,28 kW (3.0TD)",
+    label: "IGA 100 A (4P) — 69.282 W (69,28 kW) · Terciario / Industrial · Tarifa 3.0TD",
+    rebtCitation: "ITC-BT-16 / BT-17 · Tarifa 3.0TD (> 15 kW)",
+  },
+  {
+    igaAmps: 125,
+    poles: 4,
+    supplyType: "trifasico_400v",
+    maxPowerWatts: 86603,
+    maxPowerKw: 86.6,
+    accessTariff: "3.0TD",
+    electrificationGrade: "elevada",
+    shortLabel: "IGA 125 A (4P) · 86,60 kW (3.0TD)",
+    label: "IGA 125 A (4P) — 86.603 W (86,60 kW) · Industrial · Tarifa 3.0TD",
+    rebtCitation: "ITC-BT-16 / BT-17 · Tarifa 3.0TD (> 15 kW)",
+  },
+  {
+    igaAmps: 160,
+    poles: 4,
+    supplyType: "trifasico_400v",
+    maxPowerWatts: 110851,
+    maxPowerKw: 110.85,
+    accessTariff: "3.0TD",
+    electrificationGrade: "elevada",
+    shortLabel: "IGA 160 A (4P) · 110,85 kW (3.0TD)",
+    label: "IGA 160 A (4P) — 110.851 W (110,85 kW) · Gran Potencia > 100 kW · Tarifa 3.0TD",
+    rebtCitation: "ITC-BT-04 (> 100 kW Proyecto) · Tarifa 3.0TD",
+  },
+];
+
+export function getSpanishIgaStepsForSupply(
+  supplyType: SystemSupplyType
+): RebtSpainIgaStep[] {
+  return supplyType === "trifasico_400v"
+    ? REBT_SPAIN_IGA_TRI_STEPS
+    : REBT_SPAIN_IGA_MONO_STEPS;
+}
+
+export function sanitizeSpanishIgaAmps(
+  rawAmps: number,
+  supplyType: SystemSupplyType
+): number {
+  const steps = getSpanishIgaStepsForSupply(supplyType);
+  const exact = steps.find((s) => s.igaAmps === rawAmps);
+  if (exact) return exact.igaAmps;
+  if (supplyType === "monofasico_230v" && rawAmps > 63) {
+    return 63;
+  }
+  const nextUp = steps.find((s) => s.igaAmps >= rawAmps);
+  return nextUp ? nextUp.igaAmps : steps[steps.length - 1].igaAmps;
+}
+
+export interface SpanishRebtIgaResolution {
+  igaAmps: number;
+  autoIgaAmps: number;
+  poles: 2 | 4;
+  maxAdmissibleWatts: number;
+  maxAdmissibleKw: number;
+  simultaneousDemandWatts: number;
+  accessTariff: SpanishAccessTariff;
+  tariffBadgeLabel: string;
+  tariffDetail: string;
+  effectiveElectrificationGrade: "basica" | "elevada";
+  electrificationLabel: string;
+  rebtCitation: string;
+  exceedsSinglePhaseLimit: boolean;
+  step: RebtSpainIgaStep;
+}
+
+/**
+ * Determina el calibre oficial del IGA, la Potencia Máxima Admisible (PMA),
+ * el Grado de Electrificación REBT (ITC-BT-10 / ITC-BT-25) y la Tarifa de Acceso
+ * en España (2.0TD ≤ 15 kW / 3.0TD > 15 kW, Circular 3/2020 CNMC).
+ *
+ * En viviendas evita el error de sumar aritméticamente los circuitos nominales
+ * (C1..C5 = 18.050 W → 80 A), aplicando los escalones reglamentarios españoles:
+ * - Básica (C1..C5, ≤ 160 m²): 5.750 W → IGA 25 A (o 7.360 W → IGA 32 A)
+ * - Elevada (> 5 circuitos, > 160 m², C8/C9/C10/C11/C13): 9.200 W → IGA 40 A
+ *   (o 11.500 W → IGA 50 A / 14.490 W → IGA 63 A máx. monofásico con recarga VE).
+ */
+export function resolveSpanishRebtIgaAndTariff(params: {
+  supplyType: SystemSupplyType;
+  electrificationGrade: "basica" | "elevada";
+  circuits: RebtCalculatedCircuit[];
+  areaM2?: number;
+  overrideIgaAmps?: number | null;
+}): SpanishRebtIgaResolution {
+  const { supplyType, electrificationGrade, circuits, areaM2 = 0, overrideIgaAmps } = params;
+  const steps = getSpanishIgaStepsForSupply(supplyType);
+
+  const isHousingProfile =
+    circuits.length === 0 ||
+    circuits.every(
+      (c) => c.usageType === "vivienda_interior" || c.usageType === "recarga_ve"
+    );
+
+  const interiorCircuits = circuits.filter(
+    (c) => c.usageType !== "recarga_ve" && c.code.toUpperCase() !== "C13"
+  );
+  const evCircuits = circuits.filter(
+    (c) => c.usageType === "recarga_ve" || c.code.toUpperCase() === "C13"
+  );
+  const evPowerWatts = evCircuits.reduce((acc, c) => acc + c.effectivePowerWatts, 0);
+
+  const elevatedCodes = new Set(["C6", "C7", "C8", "C9", "C10", "C11", "C12", "C13"]);
+  const hasElevatedCircuitCode = circuits.some((c) =>
+    elevatedCodes.has(c.code.trim().toUpperCase())
+  );
+
+  const effectiveGrade: "basica" | "elevada" =
+    electrificationGrade === "elevada" ||
+    areaM2 > 160 ||
+    interiorCircuits.length > 5 ||
+    evCircuits.length > 0 ||
+    hasElevatedCircuitCode
+      ? "elevada"
+      : "basica";
+
+  const maxSinglePiaAmps = circuits.reduce((m, c) => Math.max(m, c.piaAmps), 10);
+
+  let simultaneousDemandWatts = 5750;
+  let exceedsSinglePhaseLimit = false;
+
+  if (isHousingProfile) {
+    if (effectiveGrade === "basica") {
+      // ITC-BT-10 §2.1 / ITC-BT-25 §2.2: Electrificación Básica = 5.750 W (IGA 25 A)
+      // Si el usuario elevó manualmente algún PIA a 32 A, sube al escalón de 32 A (7.360 W)
+      simultaneousDemandWatts = maxSinglePiaAmps > 25 ? Math.max(7360, maxSinglePiaAmps * 230) : 5750;
+    } else {
+      // ITC-BT-10 §2.2 / ITC-BT-25 §2.2: Electrificación Elevada = mín. 9.200 W (IGA 40 A)
+      // Si existe circuito C13 de Recarga de Vehículo Eléctrico (ITC-BT-52), ponderamos
+      // vivienda simultánea base (7.360 W) + potencia VE para seleccionar 50 A (11,5 kW) o 63 A (14,49 kW)
+      const withEvSimultaneous = evPowerWatts > 0 ? 7360 + evPowerWatts : 9200;
+      simultaneousDemandWatts = Math.max(9200, withEvSimultaneous);
+    }
+  } else {
+    // Local comercial, oficina o industria: suma de potencias efectivas con simultaneidad de cuadro
+    const rawEffectiveSum = circuits.reduce((acc, c) => acc + c.effectivePowerWatts, 0);
+    const panelGroupFactor = circuits.length > 3 ? 0.8 : 1.0;
+    const minCommercialWatts = effectiveGrade === "elevada" ? 9200 : 5750;
+    simultaneousDemandWatts = Math.max(
+      minCommercialWatts,
+      Math.round(rawEffectiveSum * panelGroupFactor)
+    );
+  }
+
+  if (supplyType === "monofasico_230v" && simultaneousDemandWatts > 14490) {
+    exceedsSinglePhaseLimit = true;
+  }
+
+  const minIgaForGrade =
+    supplyType === "monofasico_230v"
+      ? effectiveGrade === "elevada"
+        ? 40
+        : 25
+      : 16;
+
+  const autoStep =
+    steps.find(
+      (s) =>
+        s.maxPowerWatts >= simultaneousDemandWatts &&
+        s.igaAmps >= minIgaForGrade &&
+        s.igaAmps >= Math.min(maxSinglePiaAmps, supplyType === "monofasico_230v" ? 63 : 160)
+    ) || steps[steps.length - 1];
+
+  // Validar override manual: en monofásico 230 V nunca se admite IGA > 63 A (ej. 80 A heredado)
+  const validOverrideStep =
+    typeof overrideIgaAmps === "number" && overrideIgaAmps > 0
+      ? steps.find((s) => s.igaAmps === overrideIgaAmps) ?? null
+      : null;
+
+  const chosenStep = validOverrideStep || autoStep;
+  const resolvedGrade: "basica" | "elevada" =
+    chosenStep.electrificationGrade === "elevada" || effectiveGrade === "elevada"
+      ? "elevada"
+      : "basica";
+
+  const tariffBadgeLabel =
+    chosenStep.accessTariff === "2.0TD"
+      ? "Tarifa 2.0TD (≤ 15 kW)"
+      : "Tarifa 3.0TD (> 15 kW)";
+  const tariffDetail =
+    chosenStep.accessTariff === "2.0TD"
+      ? "Peaje 2.0TD CNMC (≤ 15 kW · 3 periodos energía P1-P3 / 2 periodos potencia)"
+      : "Peaje 3.0TD CNMC (> 15 kW · 6 periodos P1-P6 + control por maxímetro)";
+
+  return {
+    igaAmps: chosenStep.igaAmps,
+    autoIgaAmps: autoStep.igaAmps,
+    poles: chosenStep.poles,
+    maxAdmissibleWatts: chosenStep.maxPowerWatts,
+    maxAdmissibleKw: chosenStep.maxPowerKw,
+    simultaneousDemandWatts: Math.round(simultaneousDemandWatts),
+    accessTariff: chosenStep.accessTariff,
+    tariffBadgeLabel,
+    tariffDetail,
+    effectiveElectrificationGrade: resolvedGrade,
+    electrificationLabel:
+      resolvedGrade === "elevada"
+        ? "Electrificación Elevada (ITC-BT-10 / BT-25)"
+        : "Electrificación Básica (ITC-BT-10 / BT-25)",
+    rebtCitation: chosenStep.rebtCitation,
+    exceedsSinglePhaseLimit,
+    step: chosenStep,
+  };
+}
+
 interface IzRow {
   sectionMm2: number;
   pvc2xB: number;
@@ -284,8 +717,8 @@ export function getMaxAllowedVoltageDropPct(usageType: CircuitUsageType): number
     case "recarga_ve":
       return 5.0;
     case "lga_centralizada":
-    case "di_concentrada":
       return 0.5;
+    case "di_concentrada":
     case "lga_parcial":
       return 1.0;
     case "di_unico":

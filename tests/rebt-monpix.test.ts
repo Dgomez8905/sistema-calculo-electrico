@@ -7,6 +7,7 @@ import {
   calculateBuildingLoadForecastItc10,
   evaluateItc04Documentation,
   calculateEarthingItc18,
+  resolveSpanishRebtIgaAndTariff,
 } from "../src/lib/electrical-calculations.ts";
 import {
   explainRebtCircuitStepByStep,
@@ -313,7 +314,8 @@ test("Detección automática de formato de circuito (Monofásico 2P vs Trifásic
   assert.ok(mono.formatLabel.includes("Monofásico 230 V"));
   assert.ok(mono.formatLabel.includes("Básica"));
   assert.equal(mono.circuits.length, 5);
-  assert.equal(mono.circuits[0].simultaneityFactor, 0.75);
+  assert.equal(mono.circuits[0].simultaneityFactor, 1);
+  assert.ok(mono.formatLabel.includes("2.0TD"));
 
   const tri = parseUnifilarFromSpeechOrText(
     "Cuadro detectado (Trifásico 400V 4 polos): IGA 40A con sobretensiones T2+POP, 2 diferenciales de 40A 30mA, 6 automáticos y recarga coche 32A"
@@ -349,4 +351,97 @@ test("Detección automática de formato de circuito (Monofásico 2P vs Trifásic
   });
   assert.ok(svgTri.includes("4P"));
   assert.ok(svgTri.includes("C13"));
+});
+
+test("Escalones oficiales IGA REBT y Tarifas 2.0TD / 3.0TD en España (evita IGA 80A en vivienda)", () => {
+  // 1. Vivienda Electrificación Básica C1..C5 (suma bruta 18.050 W -> REBT 5.750 W / IGA 25 A / Tarifa 2.0TD)
+  const basicCircuits = ITC_BT_25_TEMPLATES.slice(0, 5).map((c) => calculateRebtCircuit(c));
+  const basicRes = resolveSpanishRebtIgaAndTariff({
+    supplyType: "monofasico_230v",
+    electrificationGrade: "basica",
+    circuits: basicCircuits,
+    areaM2: 90,
+  });
+  assert.equal(basicRes.igaAmps, 25);
+  assert.equal(basicRes.maxAdmissibleWatts, 5750);
+  assert.equal(basicRes.accessTariff, "2.0TD");
+  assert.equal(basicRes.effectiveElectrificationGrade, "basica");
+
+  const basicDi = calculateRebtCircuit({
+    code: "DI",
+    description: "Derivación Individual",
+    usageType: "di_concentrada",
+    phaseSystem: "monofasico",
+    phaseAssigned: "L1",
+    voltage: 230,
+    powerWatts: basicRes.maxAdmissibleWatts,
+    cosPhi: 1,
+    simultaneityFactor: 1,
+    utilizationFactor: 1,
+    lengthMeters: 18,
+    installationMethod: "B1",
+    insulationType: "XLPE_90",
+    material: "Cu",
+    minSectionMm2: 6,
+    fixedPiaAmps: basicRes.igaAmps,
+  });
+  assert.equal(basicDi.sectionMm2, 10);
+
+  // 2. Si viene un override heredado inválido de 80 A en monofásico, se autocorrige al escalón REBT (25 A)
+  const healedBasic = resolveSpanishRebtIgaAndTariff({
+    supplyType: "monofasico_230v",
+    electrificationGrade: "basica",
+    circuits: basicCircuits,
+    overrideIgaAmps: 80,
+  });
+  assert.equal(healedBasic.igaAmps, 25);
+
+  // 3. Vivienda Electrificación Elevada sin VE (C1..C5 + C9) -> 9.200 W / IGA 40 A / Tarifa 2.0TD
+  const elevCircuits = [
+    ...ITC_BT_25_TEMPLATES.slice(0, 5),
+    ITC_BT_25_TEMPLATES.find((c) => c.code === "C9")!,
+  ].map((c) => calculateRebtCircuit(c));
+  const elevRes = resolveSpanishRebtIgaAndTariff({
+    supplyType: "monofasico_230v",
+    electrificationGrade: "elevada",
+    circuits: elevCircuits,
+  });
+  assert.equal(elevRes.igaAmps, 40);
+  assert.equal(elevRes.maxAdmissibleWatts, 9200);
+  assert.equal(elevRes.accessTariff, "2.0TD");
+
+  // 4. Plantilla completa Elevada + VE (C1..C13) -> IGA 50 A (11.500 W · Tarifa 2.0TD), nunca 80 A
+  const fullElevVe = ITC_BT_25_TEMPLATES.map((c) => calculateRebtCircuit(c));
+  const fullElevVeRes = resolveSpanishRebtIgaAndTariff({
+    supplyType: "monofasico_230v",
+    electrificationGrade: "elevada",
+    circuits: fullElevVe,
+  });
+  assert.equal(fullElevVeRes.igaAmps, 50);
+  assert.equal(fullElevVeRes.maxAdmissibleWatts, 11500);
+  assert.equal(fullElevVeRes.accessTariff, "2.0TD");
+
+  // 5. Trifásico 400 V con IGA 25 A (4P) -> 17.321 W (> 15 kW) -> Tarifa 3.0TD
+  const tri30Td = resolveSpanishRebtIgaAndTariff({
+    supplyType: "trifasico_400v",
+    electrificationGrade: "elevada",
+    circuits: fullElevVe,
+    overrideIgaAmps: 25,
+  });
+  assert.equal(tri30Td.igaAmps, 25);
+  assert.equal(tri30Td.maxAdmissibleWatts, 17321);
+  assert.equal(tri30Td.accessTariff, "3.0TD");
+
+  // 6. Validador DIN detecta IGA > 63 A en monofásico 2P como error REBT
+  const dinMods = buildDinModulesFromProject({
+    supplyType: "monofasico_230v",
+    igaAmps: 25,
+    rcdCount: 1,
+    hasCombiSurge: true,
+    meta: DEFAULT_MTD_METADATA,
+    circuits: basicCircuits,
+  });
+  dinMods[0].ratingAmps = 80;
+  const issues = validateDinPanelInstallation(dinMods, 18);
+  assert.ok(issues.some((i) => i.code === "IGA-FUERA-REBT"));
 });

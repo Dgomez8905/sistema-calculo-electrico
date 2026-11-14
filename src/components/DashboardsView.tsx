@@ -50,6 +50,9 @@ interface TechnicianDashboardProps {
     contractDesignWatts: number;
     designCurrentAmps: number;
     igaAmps: number;
+    accessTariff?: string;
+    tariffBadgeLabel?: string;
+    electrificationLabel?: string;
     rcd30mACount: number;
     diCalculation: RebtCalculatedCircuit;
     nonCompliantCircuits: number;
@@ -193,8 +196,13 @@ export function TechnicianDashboard({
             {(cgmpSummary.contractDesignWatts / 1000).toFixed(2)} kW
           </p>
           <p className="mt-1 text-xs text-slate-500">
-            IGA: <strong>{cgmpSummary.igaAmps} A</strong> · D.I.:{" "}
-            <strong>{cgmpSummary.diCalculation.sectionMm2} mm² Cu</strong>
+            IGA: <strong>{cgmpSummary.igaAmps} A</strong> ·{" "}
+            <strong className="text-emerald-700">
+              {cgmpSummary.accessTariff
+                ? `Tarifa ${cgmpSummary.accessTariff}`
+                : "Tarifa 2.0TD"}
+            </strong>{" "}
+            · D.I.: <strong>{cgmpSummary.diCalculation.sectionMm2} mm² Cu</strong>
           </p>
         </div>
 

@@ -26,6 +26,8 @@ import {
 } from "lucide-react";
 import {
   calculateRebtCircuit,
+  getSpanishIgaStepsForSupply,
+  sanitizeSpanishIgaAmps,
   type RebtCalculatedCircuit,
   type RebtCircuitInput,
   type MtdFormMetadata,
@@ -118,9 +120,16 @@ export default function UnifilarCuadroView({
   // ============================================================================
   // Estado Interactivo del Simulador de Cuadro Eléctrico DIN (Persistente por Obra)
   // ============================================================================
+  const sanitizeSavedModules = (mods: DinModule[]) =>
+    mods.map((m) =>
+      m.kind === "IGA" && m.poles <= 2 && m.ratingAmps > 63
+        ? { ...m, ratingAmps: sanitizeSpanishIgaAmps(igaAmps, "monofasico_230v") }
+        : m
+    );
+
   const [dinModules, setDinModules] = useState<DinModule[]>(() =>
     savedDinModules && savedDinModules.length > 0
-      ? savedDinModules
+      ? sanitizeSavedModules(savedDinModules)
       : buildDinModulesFromProject({
           supplyType,
           igaAmps,
@@ -193,7 +202,7 @@ export default function UnifilarCuadroView({
     }
 
     if (isExpedienteSwitch && savedDinModules && savedDinModules.length > 0) {
-      setDinModules(savedDinModules);
+      setDinModules(sanitizeSavedModules(savedDinModules));
     } else {
       setDinModules(
         buildDinModulesFromProject({
@@ -946,7 +955,28 @@ export default function UnifilarCuadroView({
           ...prev.filter((m) => m.kind === "PIA").map((p) => p.ratingAmps)
         );
         return prev.map((m) =>
-          m.id === moduleId ? { ...m, ratingAmps: maxPia } : m
+          m.id === moduleId
+            ? {
+                ...m,
+                ratingAmps: sanitizeSpanishIgaAmps(
+                  maxPia,
+                  m.poles === 4 ? "trifasico_400v" : "monofasico_230v"
+                ),
+              }
+            : m
+        );
+      }
+      if (autoFixType === "normalize_iga" && moduleId) {
+        return prev.map((m) =>
+          m.id === moduleId
+            ? {
+                ...m,
+                ratingAmps: sanitizeSpanishIgaAmps(
+                  igaAmps,
+                  m.poles === 4 ? "trifasico_400v" : "monofasico_230v"
+                ),
+              }
+            : m
         );
       }
       return prev;
@@ -1399,9 +1429,9 @@ export default function UnifilarCuadroView({
                       }}
                       className="mt-0.5 w-full rounded border border-slate-300 px-2 py-1 text-xs font-semibold"
                     >
-                      {[16, 20, 25, 32, 40, 50, 63].map((a) => (
-                        <option key={a} value={a}>
-                          IGA {a} A
+                      {getSpanishIgaStepsForSupply(pendingDraft.supplyType).map((st) => (
+                        <option key={st.igaAmps} value={st.igaAmps}>
+                          {st.shortLabel}
                         </option>
                       ))}
                     </select>
@@ -1578,8 +1608,8 @@ export default function UnifilarCuadroView({
                               voltage: 230,
                               powerWatts: 3450,
                               cosPhi: 1,
-                              simultaneityFactor: 0.5,
-                              utilizationFactor: 0.5,
+                              simultaneityFactor: 1,
+                              utilizationFactor: 1,
                               lengthMeters: 15,
                               installationMethod: "B1",
                               insulationType: "PVC_70",
@@ -2156,11 +2186,17 @@ export default function UnifilarCuadroView({
                         onChange={(e) => setNewModAmps(Number(e.target.value))}
                         className="mt-1 w-full px-2.5 py-1.5 text-xs"
                       >
-                        {[10, 16, 20, 25, 32, 40, 50, 63, 80].map((a) => (
-                          <option key={a} value={a}>
-                            {a} A
-                          </option>
-                        ))}
+                        {newModKind === "IGA"
+                          ? getSpanishIgaStepsForSupply(supplyType).map((st) => (
+                              <option key={st.igaAmps} value={st.igaAmps}>
+                                {st.shortLabel}
+                              </option>
+                            ))
+                          : [10, 16, 20, 25, 32, 40, 50, 63].map((a) => (
+                              <option key={a} value={a}>
+                                {a} A
+                              </option>
+                            ))}
                       </select>
                     </div>
                     {newModKind === "PIA" && (
@@ -2253,11 +2289,21 @@ export default function UnifilarCuadroView({
                           }
                           className="mt-1 w-full px-2.5 py-1.5 text-xs"
                         >
-                          {[10, 16, 20, 25, 32, 40, 50, 63, 80].map((a) => (
-                            <option key={a} value={a}>
-                              {a} A
-                            </option>
-                          ))}
+                          {selectedModule.kind === "IGA"
+                            ? getSpanishIgaStepsForSupply(
+                                selectedModule.poles === 4
+                                  ? "trifasico_400v"
+                                  : "monofasico_230v"
+                              ).map((st) => (
+                                <option key={st.igaAmps} value={st.igaAmps}>
+                                  {st.shortLabel}
+                                </option>
+                              ))
+                            : [10, 16, 20, 25, 32, 40, 50, 63].map((a) => (
+                                <option key={a} value={a}>
+                                  {a} A
+                                </option>
+                              ))}
                         </select>
                       </div>
 
