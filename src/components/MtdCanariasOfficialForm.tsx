@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Printer,
   Sparkles,
@@ -22,6 +22,12 @@ import {
   PenTool,
   Shield,
   Check,
+  Camera,
+  Upload,
+  ExternalLink,
+  Navigation,
+  Trash2,
+  Crosshair,
 } from "lucide-react";
 
 const MTD_SHEETS_CATALOG: {
@@ -109,6 +115,7 @@ const MTD_SHEETS_CATALOG: {
   },
 ];
 import {
+  latLonToUtmSpain,
   MtdFormMetadata,
   RebtCalculatedCircuit,
   SystemSupplyType,
@@ -199,6 +206,182 @@ export default function MtdCanariasOfficialForm({
   ) => {
     setMeta((prev) => ({ ...prev, [key]: value }));
   };
+
+  // ============================================================================
+  // Georreferenciación de Coordenadas y Carga de Fachada de Google (Hoja 9/11)
+  // ============================================================================
+  const [isGeocoding, setIsGeocoding] = useState(false);
+  const [geoFeedback, setGeoFeedback] = useState<string>("");
+  const [streetViewUrlInput, setStreetViewUrlInput] = useState<string>("");
+  const fachadaFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const applyLatLonWithUtm = (latRaw: string, lonRaw: string) => {
+    const latClean = latRaw.trim();
+    const lonClean = lonRaw.trim();
+    const latNum = Number(latClean.replace(",", "."));
+    const lonNum = Number(lonClean.replace(",", "."));
+    const valid =
+      latClean !== "" &&
+      lonClean !== "" &&
+      Number.isFinite(latNum) &&
+      Number.isFinite(lonNum) &&
+      Math.abs(latNum) <= 90 &&
+      Math.abs(lonNum) <= 180;
+    const utmStr = valid ? latLonToUtmSpain(latNum, lonNum).formatted : "";
+    setMeta((prev) => ({
+      ...prev,
+      coordenadasLat: latClean,
+      coordenadasLng: lonClean,
+      coordenadasUtm: valid ? utmStr : prev.coordenadasUtm,
+    }));
+  };
+
+  const handleGeocodeAddress = async () => {
+    setIsGeocoding(true);
+    setGeoFeedback("Buscando coordenadas GPS y UTM de la dirección del suministro...");
+    try {
+      const queries = [
+        `${meta.direccionCalle} ${meta.direccionNum}, ${meta.codigoPostal} ${meta.terminoMunicipal}, ${meta.isla}, España`,
+        `${meta.direccionCalle}, ${meta.terminoMunicipal}, ${meta.isla}, España`,
+        `${meta.terminoMunicipal}, ${meta.isla}, España`,
+      ];
+      let found: { lat: string; lon: string; display_name?: string } | null = null;
+      for (const q of queries) {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=es&q=${encodeURIComponent(
+            q
+          )}`
+        );
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0 && data[0].lat && data[0].lon) {
+            found = data[0];
+            break;
+          }
+        }
+      }
+      if (found) {
+        const latFixed = Number(found.lat).toFixed(6);
+        const lonFixed = Number(found.lon).toFixed(6);
+        const utm = latLonToUtmSpain(Number(latFixed), Number(lonFixed)).formatted;
+        setMeta((prev) => ({
+          ...prev,
+          coordenadasLat: latFixed,
+          coordenadasLng: lonFixed,
+          coordenadasUtm: utm,
+        }));
+        setGeoFeedback(
+          `✅ Coordenadas localizadas: ${latFixed}, ${lonFixed} (${utm}). Ya puedes abrir Google Street View o subir/pegar la foto de la fachada.`
+        );
+      } else {
+        setGeoFeedback(
+          "⚠️ No se encontró la calle exacta automáticamente. Puedes escribir Latitud/Longitud o pulsar «Usar mi GPS»."
+        );
+      }
+    } catch {
+      setGeoFeedback(
+        "⚠️ Sin respuesta del geocodificador externo. Introduce las coordenadas manualmente o usa el GPS del dispositivo."
+      );
+    } finally {
+      setIsGeocoding(false);
+    }
+  };
+
+  const handleUseDeviceGps = () => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setGeoFeedback("⚠️ Tu navegador no dispone de sensor GPS.");
+      return;
+    }
+    setGeoFeedback("Capturando posición GPS actual en obra...");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const latFixed = pos.coords.latitude.toFixed(6);
+        const lonFixed = pos.coords.longitude.toFixed(6);
+        const utm = latLonToUtmSpain(
+          pos.coords.latitude,
+          pos.coords.longitude
+        ).formatted;
+        setMeta((prev) => ({
+          ...prev,
+          coordenadasLat: latFixed,
+          coordenadasLng: lonFixed,
+          coordenadasUtm: utm,
+        }));
+        setGeoFeedback(
+          `✅ GPS en obra fijado: ${latFixed}, ${lonFixed} · UTM ${utm}.`
+        );
+      },
+      () => {
+        setGeoFeedback("⚠️ Permiso de ubicación denegado o sin cobertura GPS.");
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
+
+  const compressAndSaveFacadeImage = (file: File | Blob) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const rawUrl = String(reader.result || "");
+      const img = new window.Image();
+      img.onload = () => {
+        const maxWidth = 1080;
+        const scale = img.width > maxWidth ? maxWidth / img.width : 1;
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(img.width * scale));
+        canvas.height = Math.max(1, Math.round(img.height * scale));
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          const jpegUrl = canvas.toDataURL("image/jpeg", 0.84);
+          updateField("fachadaFotoDataUrl", jpegUrl);
+        } else {
+          updateField("fachadaFotoDataUrl", rawUrl);
+        }
+        setGeoFeedback(
+          "✅ Fotografía de fachada cargada en la Hoja 9/11. Haz clic en cualquier punto de la foto para situar el indicador de CGP y coordenadas."
+        );
+      };
+      img.onerror = () => {
+        updateField("fachadaFotoDataUrl", rawUrl);
+      };
+      img.src = rawUrl;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handlePasteFacadeClipboard = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.startsWith("image/")) {
+        const blob = items[i].getAsFile();
+        if (blob) {
+          e.preventDefault();
+          compressAndSaveFacadeImage(blob);
+          return;
+        }
+      }
+    }
+  };
+
+  const openGoogleStreetViewFacade = () => {
+    const latStr = (meta.coordenadasLat || "").trim();
+    const lonStr = (meta.coordenadasLng || "").trim();
+    const hasCoords = Boolean(latStr) && Boolean(lonStr);
+    const url = hasCoords
+      ? `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${encodeURIComponent(
+          `${latStr},${lonStr}`
+        )}`
+      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+          `${meta.direccionCalle} ${meta.direccionNum}, ${meta.codigoPostal} ${meta.terminoMunicipal}, ${meta.isla}, España`
+        )}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  const googleMapsEmbedQuery =
+    meta.coordenadasLat?.trim() && meta.coordenadasLng?.trim()
+      ? `${meta.coordenadasLat.trim()},${meta.coordenadasLng.trim()}`
+      : `${meta.direccionCalle} ${meta.direccionNum}, ${meta.codigoPostal} ${meta.terminoMunicipal}, ${meta.isla}, España`;
 
   // Generación automática de la Memoria Descriptiva (Página 5/11)
   const generatedMemoriaDescriptiva = `1. OBJETO DE LA MEMORIA TÉCNICA DE DISEÑO:
@@ -2694,144 +2877,618 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
       )}
 
       {/* =====================================================================
-          PÁGINA 9/11: CROQUIS DE SITUACIÓN Y EMPLAZAMIENTO
+          PÁGINA 9/11: CROQUIS DE SITUACIÓN, FACHADA GOOGLE Y COORDENADAS
          ===================================================================== */}
       {shouldShowPage(9) && (
-        <div className="mtd-print-page mx-auto max-w-[210mm] rounded-sm border border-slate-400 bg-white p-6 text-[11px] leading-tight text-black shadow-2xl">
-          <OfficialHeader isBtBox={false} />
-
-          <div className="flex min-h-[215mm] flex-col justify-between border-2 border-black p-3">
-            <div>
-              <div className="font-bold">
-                CROQUIS DE SITUACIÓN Y EMPLAZAMIENTO
+        <div onPaste={handlePasteFacadeClipboard} className="space-y-4">
+          {/* Panel interactivo (no se imprime en PDF) para cargar fachada de Google y coordenadas */}
+          <div className="no-print mx-auto max-w-[210mm] rounded-2xl border border-blue-200 bg-blue-50/70 p-4 text-xs shadow-sm space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h4 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                  <Camera className="h-4 w-4 text-[#0f6cbd]" />
+                  Hoja 9/11 · Fotografía de Fachada (Google Street View) e Ilustración de Coordenadas
+                </h4>
+                <p className="text-[11px] text-slate-600">
+                  Obtén las coordenadas de la dirección, abre la fachada en Google Street View y sube o pega (<kbd className="rounded border border-slate-300 bg-white px-1 font-mono">Ctrl+V</kbd>) la captura de la fachada para ilustrar el punto exacto de las coordenadas y la CGP.
+                </p>
               </div>
-              <p className="mt-0.5 text-[9.5px]">
-                <span className="underline">Nota:</span> deberá incorporar referencias geográficas nítidas (calles, cruces, edificios singulares, etc...)
-              </p>
+              <input
+                ref={fachadaFileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) compressAndSaveFacadeImage(f);
+                  e.target.value = "";
+                }}
+              />
+            </div>
 
-              {/* Plano Esquemático de Situación y Emplazamiento */}
-              <div className="mt-4 flex justify-center">
-                <svg
-                  viewBox="0 0 680 430"
-                  className="w-full max-w-[650px] border border-slate-400 bg-slate-50"
+            {/* Botonera rápida de georreferenciación y Street View */}
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={handleGeocodeAddress}
+                disabled={isGeocoding}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-[#0f6cbd] px-3.5 py-2 font-semibold text-white hover:bg-[#115ea3] disabled:opacity-60"
+              >
+                <MapPin className="h-3.5 w-3.5" />
+                {isGeocoding ? "Localizando..." : "1. Obtener Coordenadas de Dirección"}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleUseDeviceGps}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 font-semibold text-slate-800 hover:bg-slate-50"
+              >
+                <Navigation className="h-3.5 w-3.5 text-emerald-600" />
+                Usar mi GPS actual
+              </button>
+
+              <button
+                type="button"
+                onClick={openGoogleStreetViewFacade}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-2 font-semibold text-amber-950 hover:bg-amber-100"
+              >
+                <ExternalLink className="h-3.5 w-3.5 text-amber-700" />
+                2. Abrir Fachada en Google Street View
+              </button>
+
+              <button
+                type="button"
+                onClick={() => fachadaFileInputRef.current?.click()}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 font-semibold text-white hover:bg-emerald-700"
+              >
+                <Upload className="h-3.5 w-3.5" />
+                3. Subir Foto de Fachada / Google
+              </button>
+
+              {meta.fachadaFotoDataUrl && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    updateField("fachadaFotoDataUrl", "");
+                    setGeoFeedback("🗑️ Fotografía de fachada retirada de la Hoja 9/11.");
+                  }}
+                  className="inline-flex items-center gap-1 rounded-xl border border-rose-300 bg-white px-3 py-2 font-semibold text-rose-700 hover:bg-rose-50"
                 >
-                  {/* Calles y manzanas */}
-                  <rect
-                    x="40"
-                    y="40"
-                    width="220"
-                    height="130"
-                    fill="#e2e8f0"
-                    stroke="#475569"
-                    strokeWidth="1.5"
-                  />
-                  <rect
-                    x="340"
-                    y="40"
-                    width="290"
-                    height="130"
-                    fill="#e2e8f0"
-                    stroke="#475569"
-                    strokeWidth="1.5"
-                  />
-                  <rect
-                    x="40"
-                    y="240"
-                    width="220"
-                    height="140"
-                    fill="#e2e8f0"
-                    stroke="#475569"
-                    strokeWidth="1.5"
-                  />
-                  <rect
-                    x="340"
-                    y="240"
-                    width="290"
-                    height="140"
-                    fill="#e2e8f0"
-                    stroke="#475569"
-                    strokeWidth="1.5"
-                  />
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Quitar foto
+                </button>
+              )}
+            </div>
 
-                  {/* Parcela / Edificio Objeto de la Instalación */}
-                  <rect
-                    x="355"
-                    y="240"
-                    width="140"
-                    height="90"
-                    fill="#fde68a"
-                    stroke="#000"
-                    strokeWidth="2.5"
+            {/* Campos de Coordenadas Lat/Lon, UTM, Catastro y URL directa */}
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-4 rounded-xl border border-blue-200 bg-white p-3">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-600">
+                  Latitud WGS84
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej: 28.458912"
+                  value={meta.coordenadasLat || ""}
+                  onChange={(e) =>
+                    applyLatLonWithUtm(e.target.value, meta.coordenadasLng || "")
+                  }
+                  className="mt-0.5 w-full rounded border border-slate-300 px-2 py-1 font-mono text-xs"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-600">
+                  Longitud WGS84
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej: -16.254610"
+                  value={meta.coordenadasLng || ""}
+                  onChange={(e) =>
+                    applyLatLonWithUtm(meta.coordenadasLat || "", e.target.value)
+                  }
+                  className="mt-0.5 w-full rounded border border-slate-300 px-2 py-1 font-mono text-xs"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-600">
+                  Coordenadas UTM (REGCAN95 / ETRS89)
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej: 28R X:377145 Y:3148920"
+                  value={meta.coordenadasUtm || ""}
+                  onChange={(e) => updateField("coordenadasUtm", e.target.value)}
+                  className="mt-0.5 w-full rounded border border-slate-300 px-2 py-1 font-mono text-xs"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-600">
+                  Referencia Catastral (20 díg.)
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej: 9402801CS7490S0001WX"
+                  value={meta.referenciaCatastral || ""}
+                  onChange={(e) =>
+                    updateField("referenciaCatastral", e.target.value.toUpperCase())
+                  }
+                  className="mt-0.5 w-full rounded border border-slate-300 px-2 py-1 font-mono text-xs"
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="block text-[10px] font-bold text-slate-600">
+                  Etiqueta del Punto de Suministro en Fachada
+                </label>
+                <input
+                  type="text"
+                  value={meta.fachadaNotaPuntoSuministro || ""}
+                  onChange={(e) =>
+                    updateField("fachadaNotaPuntoSuministro", e.target.value)
+                  }
+                  placeholder="CGP / Punto de Suministro en fachada principal"
+                  className="mt-0.5 w-full rounded border border-slate-300 px-2 py-1 text-xs"
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="block text-[10px] font-bold text-slate-600">
+                  O pegar URL de imagen / Google Street View Static API
+                </label>
+                <div className="mt-0.5 flex gap-1.5">
+                  <input
+                    type="url"
+                    value={streetViewUrlInput}
+                    onChange={(e) => setStreetViewUrlInput(e.target.value)}
+                    placeholder="https://maps.googleapis.com/maps/api/streetview?..."
+                    className="flex-1 rounded border border-slate-300 px-2 py-1 text-xs"
                   />
-                  <text x="365" y="268" fontSize="10" fontWeight="bold">
-                    EMPLAZAMIENTO B.T.
-                  </text>
-                  <text x="365" y="284" fontSize="9">
-                    Nº {meta.direccionNum} ({meta.portalPlanta})
-                  </text>
-                  <text x="365" y="298" fontSize="8.5">
-                    Sup. útil: {meta.superficieUtilM2} m²
-                  </text>
-                  <text x="365" y="312" fontSize="8.5" fontWeight="bold">
-                    CGP en fachada principal
-                  </text>
-
-                  {/* Nombre de la Vía Principal */}
-                  <text
-                    x="180"
-                    y="210"
-                    fontSize="13"
-                    fontWeight="bold"
-                    fill="#0f172a"
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const trimmed = streetViewUrlInput.trim();
+                      if (!trimmed) return;
+                      updateField("fachadaFotoDataUrl", trimmed);
+                      setGeoFeedback("✅ Imagen de fachada cargada desde URL de Google.");
+                    }}
+                    className="rounded bg-slate-800 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-slate-900"
                   >
-                    C/ {meta.direccionCalle.toUpperCase()} — T.M.{" "}
-                    {meta.terminoMunicipal.toUpperCase()} ({meta.isla.toUpperCase()})
-                  </text>
-
-                  {/* Rosa de los vientos Norte */}
-                  <g transform="translate(610, 80)">
-                    <circle
-                      cx="0"
-                      cy="0"
-                      r="22"
-                      fill="#fff"
-                      stroke="#000"
-                      strokeWidth="1.5"
-                    />
-                    <polygon points="0,-18 -6,6 0,2 6,6" fill="#000" />
-                    <text x="-4" y="-24" fontSize="10" fontWeight="bold">
-                      N
-                    </text>
-                  </g>
-
-                  {/* Cuadro resumen de localización */}
-                  <rect
-                    x="40"
-                    y="388"
-                    width="590"
-                    height="32"
-                    fill="#fff"
-                    stroke="#000"
-                    strokeWidth="1"
-                  />
-                  <text x="50" y="408" fontSize="9.5" fontWeight="bold">
-                    Dirección: C/ {meta.direccionCalle}, Nº {meta.direccionNum},{" "}
-                    {meta.portalPlanta} · C.P. {meta.codigoPostal} ·{" "}
-                    {meta.terminoMunicipal} (Isla de {meta.isla})
-                  </text>
-                </svg>
+                    Cargar URL
+                  </button>
+                </div>
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 text-[10px]">
-              <span>
-                Se adjuntan hojas complementarias de plano de Situación y Emplazamiento
-              </span>
-              <span className="inline-block h-4 w-4 border border-black"></span>
-            </div>
+            {geoFeedback && (
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-semibold text-emerald-950">
+                {geoFeedback}
+              </div>
+            )}
           </div>
 
-          <OfficialFooter pageNum={9} />
+          {/* HOJA OFICIAL IMPRIMIBLE 9/11 */}
+          <div className="mtd-print-page mx-auto max-w-[210mm] rounded-sm border border-slate-400 bg-white p-6 text-[11px] leading-tight text-black shadow-2xl">
+            <OfficialHeader isBtBox={false} />
+
+            <div className="flex min-h-[215mm] flex-col justify-between border-2 border-black p-3">
+              <div className="space-y-2.5">
+                <div className="flex items-start justify-between gap-2 border-b border-black pb-1.5">
+                  <div>
+                    <div className="font-bold">
+                      CROQUIS DE SITUACIÓN, EMPLAZAMIENTO Y FACHADA GEORREFERENCIADA
+                    </div>
+                    <p className="mt-0.5 text-[9px]">
+                      <span className="underline">Nota:</span> incorpora referencias geográficas nítidas, coordenadas del punto de conexión y vista de fachada del emplazamiento.
+                    </p>
+                  </div>
+                  <span className="border border-black bg-slate-100 px-2 py-0.5 font-mono text-[9px] font-bold">
+                    {meta.coordenadasUtm
+                      ? `UTM: ${meta.coordenadasUtm}`
+                      : "WGS84 / REGCAN95"}
+                  </span>
+                </div>
+
+                {/* Tabla técnica de Coordenadas y Emplazamiento */}
+                <table className="w-full border-collapse border border-black text-[9.5px]">
+                  <tbody>
+                    <tr>
+                      <td className="border border-black bg-slate-100 px-2 py-1 font-bold w-[22%]">
+                        DIRECCIÓN EMPLAZAMIENTO:
+                      </td>
+                      <td className="border border-black px-2 py-1 font-semibold" colSpan={3}>
+                        C/ {meta.direccionCalle}, Nº {meta.direccionNum},{" "}
+                        {meta.portalPlanta} · C.P. {meta.codigoPostal} — T.M.{" "}
+                        {meta.terminoMunicipal} (Isla de {meta.isla})
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="border border-black bg-slate-100 px-2 py-1 font-bold">
+                        COORD. WGS84 (LAT / LON):
+                      </td>
+                      <td className="border border-black px-2 py-1 font-mono font-bold">
+                        {meta.coordenadasLat && meta.coordenadasLng
+                          ? `${meta.coordenadasLat}°, ${meta.coordenadasLng}°`
+                          : "Pendiente de georreferenciar"}
+                      </td>
+                      <td className="border border-black bg-slate-100 px-2 py-1 font-bold w-[20%]">
+                        COORDENADAS UTM:
+                      </td>
+                      <td className="border border-black px-2 py-1 font-mono font-bold">
+                        {meta.coordenadasUtm || "Huso 28R / 30T (según provincia)"}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="border border-black bg-slate-100 px-2 py-1 font-bold">
+                        REFERENCIA CATASTRAL:
+                      </td>
+                      <td className="border border-black px-2 py-1 font-mono">
+                        {meta.referenciaCatastral || "—"}
+                      </td>
+                      <td className="border border-black bg-slate-100 px-2 py-1 font-bold">
+                        PUNTO DE SUMINISTRO:
+                      </td>
+                      <td className="border border-black px-2 py-1 font-semibold">
+                        {meta.fachadaNotaPuntoSuministro ||
+                          "CGP / Punto de Suministro en fachada principal"}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                {/* BLOQUE 1: PLANO DE SITUACIÓN (GOOGLE MAPS SATÉLITE + CROQUIS PARCELARIO CON COORDENADAS) */}
+                <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
+                  {/* Mapa Google Maps Satélite / Callejero de las Coordenadas */}
+                  <div className="border border-black bg-slate-50 flex flex-col">
+                    <div className="border-b border-black bg-slate-100 px-2 py-1 text-[9px] font-bold flex items-center justify-between">
+                      <span>1A. PLANO DE LOCALIZACIÓN GOOGLE MAPS</span>
+                      <span className="font-mono text-[8.5px]">
+                        {meta.coordenadasLat && meta.coordenadasLng
+                          ? `${meta.coordenadasLat}, ${meta.coordenadasLng}`
+                          : meta.terminoMunicipal}
+                      </span>
+                    </div>
+                    <div className="relative h-[205px] w-full overflow-hidden bg-slate-100">
+                      <iframe
+                        title="Plano Google Maps Emplazamiento"
+                        src={`https://maps.google.com/maps?q=${encodeURIComponent(
+                          googleMapsEmbedQuery
+                        )}&t=h&z=19&output=embed`}
+                        className="h-full w-full border-0"
+                        loading="lazy"
+                        referrerPolicy="no-referrer-when-downgrade"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Croquis Esquemático Vectorial Oficial (garantiza nitidez total en impresión PDF) */}
+                  <div className="border border-black bg-white flex flex-col">
+                    <div className="border-b border-black bg-slate-100 px-2 py-1 text-[9px] font-bold flex items-center justify-between">
+                      <span>1B. CROQUIS PARCELARIO Y PUNTO DE ACOMETIDA</span>
+                      <span>ESCALA S/E · NORTE ↑</span>
+                    </div>
+                    <div className="flex-1 flex items-center justify-center p-1">
+                      <svg
+                        viewBox="0 0 680 385"
+                        className="h-[197px] w-full bg-slate-50"
+                      >
+                        <rect
+                          x="30"
+                          y="28"
+                          width="230"
+                          height="120"
+                          fill="#e2e8f0"
+                          stroke="#475569"
+                          strokeWidth="1.5"
+                        />
+                        <rect
+                          x="330"
+                          y="28"
+                          width="310"
+                          height="120"
+                          fill="#e2e8f0"
+                          stroke="#475569"
+                          strokeWidth="1.5"
+                        />
+                        <rect
+                          x="30"
+                          y="218"
+                          width="230"
+                          height="135"
+                          fill="#e2e8f0"
+                          stroke="#475569"
+                          strokeWidth="1.5"
+                        />
+                        <rect
+                          x="330"
+                          y="218"
+                          width="310"
+                          height="135"
+                          fill="#e2e8f0"
+                          stroke="#475569"
+                          strokeWidth="1.5"
+                        />
+
+                        {/* Parcela Objeto */}
+                        <rect
+                          x="345"
+                          y="218"
+                          width="175"
+                          height="105"
+                          fill="#fde68a"
+                          stroke="#000"
+                          strokeWidth="2.5"
+                        />
+                        <text x="356" y="244" fontSize="11" fontWeight="bold">
+                          EMPLAZAMIENTO B.T.
+                        </text>
+                        <text x="356" y="262" fontSize="10">
+                          Nº {meta.direccionNum} {meta.portalPlanta} · {meta.superficieUtilM2} m²
+                        </text>
+                        <text x="356" y="280" fontSize="9.5" fontWeight="bold" fill="#b91c1c">
+                          ⚡ {meta.fachadaNotaPuntoSuministro || "CGP en fachada"}
+                        </text>
+                        <text x="356" y="298" fontSize="8.5" fontFamily="monospace">
+                          {meta.coordenadasLat && meta.coordenadasLng
+                            ? `GPS: ${meta.coordenadasLat}, ${meta.coordenadasLng}`
+                            : meta.coordenadasUtm || "Punto georreferenciado"}
+                        </text>
+
+                        {/* Diana de coordenadas en fachada */}
+                        <circle
+                          cx="430"
+                          cy="218"
+                          r="9"
+                          fill="#dc2626"
+                          stroke="#fff"
+                          strokeWidth="2"
+                        />
+                        <line
+                          x1="430"
+                          y1="203"
+                          x2="430"
+                          y2="233"
+                          stroke="#dc2626"
+                          strokeWidth="1.8"
+                        />
+                        <line
+                          x1="415"
+                          y1="218"
+                          x2="445"
+                          y2="218"
+                          stroke="#dc2626"
+                          strokeWidth="1.8"
+                        />
+
+                        {/* Vía Principal */}
+                        <text
+                          x="110"
+                          y="188"
+                          fontSize="13"
+                          fontWeight="bold"
+                          fill="#0f172a"
+                        >
+                          C/ {meta.direccionCalle.toUpperCase()} —{" "}
+                          {meta.terminoMunicipal.toUpperCase()}
+                        </text>
+
+                        {/* Norte */}
+                        <g transform="translate(605, 68)">
+                          <circle
+                            cx="0"
+                            cy="0"
+                            r="22"
+                            fill="#fff"
+                            stroke="#000"
+                            strokeWidth="1.5"
+                          />
+                          <polygon points="0,-18 -6,6 0,2 6,6" fill="#000" />
+                          <text x="-4" y="-24" fontSize="10" fontWeight="bold">
+                            N
+                          </text>
+                        </g>
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+
+                {/* BLOQUE 2: FOTOGRAFÍA DE FACHADA DE GOOGLE STREET VIEW / OBRA CON PUNTO DE COORDENADAS */}
+                <div
+                  className="border border-black bg-white"
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const file = e.dataTransfer.files?.[0];
+                    if (file && file.type.startsWith("image/")) {
+                      compressAndSaveFacadeImage(file);
+                    }
+                  }}
+                >
+                  <div className="flex items-center justify-between border-b border-black bg-slate-100 px-2 py-1 text-[9.5px] font-bold">
+                    <span>
+                      2. FOTOGRAFÍA DE FACHADA (GOOGLE STREET VIEW / OBRA) E ILUSTRACIÓN DE COORDENADAS DEL SUMINISTRO
+                    </span>
+                    <span className="no-print font-normal text-[9px] text-[#0f6cbd]">
+                      {meta.fachadaFotoDataUrl
+                        ? "Haz clic sobre la fachada para situar la diana de CGP / Coordenadas"
+                        : "Arrastra aquí la captura de Google Street View o pulsa Subir Foto"}
+                    </span>
+                  </div>
+
+                  {meta.fachadaFotoDataUrl ? (
+                    <div>
+                      <div
+                        onClick={(e) => {
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          const xPct = Math.max(
+                            4,
+                            Math.min(
+                              96,
+                              Math.round(((e.clientX - rect.left) / rect.width) * 100)
+                            )
+                          );
+                          const yPct = Math.max(
+                            6,
+                            Math.min(
+                              94,
+                              Math.round(((e.clientY - rect.top) / rect.height) * 100)
+                            )
+                          );
+                          setMeta((prev) => ({
+                            ...prev,
+                            fachadaPinX: xPct,
+                            fachadaPinY: yPct,
+                          }));
+                        }}
+                        title="Haz clic para colocar el marcador exacto de CGP / Coordenadas sobre la fachada"
+                        className="relative h-[275px] w-full cursor-crosshair overflow-hidden bg-slate-900"
+                      >
+                        <img
+                          src={meta.fachadaFotoDataUrl}
+                          alt="Fachada del emplazamiento Google Street View"
+                          className="h-full w-full object-cover"
+                        />
+
+                        {/* Marcador ilustrativo de coordenadas y punto de suministro sobre la fachada */}
+                        <div
+                          style={{
+                            left: `${meta.fachadaPinX ?? 52}%`,
+                            top: `${meta.fachadaPinY ?? 62}%`,
+                          }}
+                          className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center"
+                        >
+                          <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-rose-600 text-white shadow-lg">
+                            <Crosshair className="h-4 w-4" />
+                          </div>
+                          <div className="mt-1 whitespace-nowrap rounded border border-black bg-amber-300/95 px-2 py-0.5 text-[9px] font-extrabold text-black shadow">
+                            ⚡ {meta.fachadaNotaPuntoSuministro || "CGP / Punto Suministro"}
+                          </div>
+                        </div>
+
+                        {/* Leyenda georreferenciada impresa al pie de la foto */}
+                        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-wrap items-center justify-between gap-2 bg-black/80 px-3 py-1.5 text-[9px] font-mono text-white">
+                          <span>
+                            📍 FACHADA: C/ {meta.direccionCalle} {meta.direccionNum} ({meta.terminoMunicipal})
+                          </span>
+                          <span>
+                            {meta.coordenadasLat && meta.coordenadasLng
+                              ? `WGS84: ${meta.coordenadasLat}, ${meta.coordenadasLng}`
+                              : ""}{" "}
+                            {meta.coordenadasUtm ? `· UTM: ${meta.coordenadasUtm}` : ""}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="relative flex h-[250px] flex-col items-center justify-center bg-slate-50 p-3 text-center">
+                      {/* Alzado esquemático limpio de respaldo para impresión si aún no hay foto */}
+                      <svg
+                        viewBox="0 0 640 185"
+                        className="h-[155px] w-full max-w-[580px]"
+                      >
+                        <line
+                          x1="20"
+                          y1="168"
+                          x2="620"
+                          y2="168"
+                          stroke="#0f172a"
+                          strokeWidth="2.5"
+                        />
+                        <rect
+                          x="170"
+                          y="20"
+                          width="300"
+                          height="148"
+                          fill="#f8fafc"
+                          stroke="#334155"
+                          strokeWidth="2"
+                        />
+                        <rect
+                          x="205"
+                          y="42"
+                          width="55"
+                          height="45"
+                          fill="#e2e8f0"
+                          stroke="#475569"
+                        />
+                        <rect
+                          x="292"
+                          y="42"
+                          width="55"
+                          height="45"
+                          fill="#e2e8f0"
+                          stroke="#475569"
+                        />
+                        <rect
+                          x="380"
+                          y="42"
+                          width="55"
+                          height="45"
+                          fill="#e2e8f0"
+                          stroke="#475569"
+                        />
+                        <rect
+                          x="295"
+                          y="108"
+                          width="50"
+                          height="60"
+                          fill="#cbd5e1"
+                          stroke="#334155"
+                          strokeWidth="1.5"
+                        />
+                        {/* CGP en fachada */}
+                        <rect
+                          x="212"
+                          y="112"
+                          width="32"
+                          height="40"
+                          fill="#fde047"
+                          stroke="#b91c1c"
+                          strokeWidth="2"
+                        />
+                        <text
+                          x="228"
+                          y="135"
+                          fontSize="8.5"
+                          fontWeight="bold"
+                          textAnchor="middle"
+                          fill="#991b1b"
+                        >
+                          CGP
+                        </text>
+                        <text x="320" y="14" fontSize="10" fontWeight="bold" textAnchor="middle">
+                          VISTA FRONTAL DE FACHADA — C/ {meta.direccionCalle.toUpperCase()} Nº {meta.direccionNum}
+                        </text>
+                      </svg>
+
+                      <button
+                        type="button"
+                        onClick={() => fachadaFileInputRef.current?.click()}
+                        className="no-print mt-1 inline-flex items-center gap-1.5 rounded-xl border border-dashed border-[#0f6cbd] bg-white px-4 py-1.5 text-[11px] font-bold text-[#0f6cbd] shadow-xs hover:bg-blue-50"
+                      >
+                        <Camera className="h-3.5 w-3.5" />
+                        Cargar foto de fachada de Google Street View (o pulsa Ctrl+V para pegar captura)
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-2 pt-2 text-[9.5px]">
+                <span className="font-mono text-[9px] text-slate-700">
+                  {meta.referenciaCatastral
+                    ? `Ref. Catastral: ${meta.referenciaCatastral}`
+                    : ""}
+                </span>
+                <div className="flex items-center gap-2">
+                  <span>
+                    Se adjuntan hojas complementarias de plano de Situación y Emplazamiento
+                  </span>
+                  <span className="inline-block h-4 w-4 border border-black"></span>
+                </div>
+              </div>
+            </div>
+
+            <OfficialFooter pageNum={9} />
+          </div>
         </div>
       )}
 

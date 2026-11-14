@@ -1330,6 +1330,16 @@ export interface MtdFormMetadata {
   // Página 5: Memoria Descriptiva (si está vacío se autogenera)
   memoriaDescriptivaTexto: string;
 
+  // Página 9: Coordenadas Geográficas / UTM, Catastro y Fotografía de Fachada (Google Street View / Obra)
+  coordenadasLat?: string;
+  coordenadasLng?: string;
+  coordenadasUtm?: string;
+  referenciaCatastral?: string;
+  fachadaFotoDataUrl?: string;
+  fachadaNotaPuntoSuministro?: string;
+  fachadaPinX?: number;
+  fachadaPinY?: number;
+
   // Página 11: Autor de la M.T.D. (Instalador Autorizado PH / Técnico Competente)
   autorTipo: "instalador_ph" | "tecnico_competente";
   instaladorNombrePh: string;
@@ -1439,6 +1449,14 @@ export const DEFAULT_MTD_METADATA: MtdFormMetadata = {
   receptoresSingularesFuerza: [],
 
   memoriaDescriptivaTexto: "",
+  coordenadasLat: "28.458920",
+  coordenadasLng: "-16.254680",
+  coordenadasUtm: "28R · X: 377.145 m · Y: 3.148.920 m",
+  referenciaCatastral: "9402801CS7490S0001WX",
+  fachadaFotoDataUrl: "",
+  fachadaNotaPuntoSuministro: "CGP / CPM en fachada principal accesible desde vía pública",
+  fachadaPinX: 50,
+  fachadaPinY: 62,
 
   autorTipo: "instalador_ph",
   instaladorNombrePh: "Daniel Gómez Rojas",
@@ -1469,3 +1487,77 @@ export const DEFAULT_MTD_METADATA: MtdFormMetadata = {
   mesFirma: "Noviembre",
   anioFirma: "26",
 };
+
+/**
+ * Convierte coordenadas geográficas (WGS84 / ETRS89 / REGCAN95) a cadena UTM oficial
+ * con huso y banda (ej. 28R en Canarias, 29T/30T/30S/31T en Península y Baleares).
+ */
+export function latLonToUtmSpain(
+  lat: number,
+  lon: number
+): {
+  zone: number;
+  band: string;
+  easting: number;
+  northing: number;
+  formatted: string;
+} {
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+    return { zone: 30, band: "T", easting: 0, northing: 0, formatted: "" };
+  }
+  const a = 6378137.0;
+  const f = 1 / 298.257223563;
+  const k0 = 0.9996;
+  const e2 = f * (2 - f);
+  const ep2 = e2 / (1 - e2);
+
+  const zone = Math.max(1, Math.min(60, Math.floor((lon + 180) / 6) + 1));
+  const bands = "CDEFGHJKLMNPQRSTUVWXX";
+  const bandIdx = Math.max(0, Math.min(bands.length - 1, Math.floor((lat + 80) / 8)));
+  const band = bands[bandIdx] || "R";
+
+  const latRad = (lat * Math.PI) / 180;
+  const lonRad = (lon * Math.PI) / 180;
+  const lon0Rad = (((zone - 1) * 6 - 180 + 3) * Math.PI) / 180;
+
+  const sinLat = Math.sin(latRad);
+  const cosLat = Math.cos(latRad);
+  const tanLat = Math.tan(latRad);
+
+  const N = a / Math.sqrt(1 - e2 * sinLat * sinLat);
+  const T = tanLat * tanLat;
+  const C = ep2 * cosLat * cosLat;
+  const A = cosLat * (lonRad - lon0Rad);
+
+  const M =
+    a *
+    ((1 - e2 / 4 - (3 * e2 * e2) / 64 - (5 * e2 * e2 * e2) / 256) * latRad -
+      ((3 * e2) / 8 + (3 * e2 * e2) / 32 + (45 * e2 * e2 * e2) / 1024) *
+        Math.sin(2 * latRad) +
+      ((15 * e2 * e2) / 256 + (45 * e2 * e2 * e2) / 1024) *
+        Math.sin(4 * latRad) -
+      ((35 * e2 * e2 * e2) / 3072) * Math.sin(6 * latRad));
+
+  const easting = Math.round(
+    500000 +
+      k0 *
+        N *
+        (A +
+          ((1 - T + C) * Math.pow(A, 3)) / 6 +
+          ((5 - 18 * T + T * T + 72 * C - 58 * ep2) * Math.pow(A, 5)) / 120)
+  );
+  let northing = Math.round(
+    k0 *
+      (M +
+        N *
+          tanLat *
+          ((A * A) / 2 +
+            ((5 - T + 9 * C + 4 * C * C) * Math.pow(A, 4)) / 24 +
+            ((61 - 58 * T + T * T + 600 * C - 330 * ep2) * Math.pow(A, 6)) /
+              720))
+  );
+  if (lat < 0) northing += 10000000;
+
+  const formatted = `${zone}${band} · X: ${easting} m · Y: ${northing} m`;
+  return { zone, band, easting, northing, formatted };
+}

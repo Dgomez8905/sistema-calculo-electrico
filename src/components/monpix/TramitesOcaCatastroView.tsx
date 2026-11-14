@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import {
   evaluateItc04Documentation,
+  latLonToUtmSpain,
   type Itc04GroupCode,
 } from "@/lib/electrical-calculations";
 import {
@@ -28,7 +29,11 @@ interface TramitesOcaCatastroViewProps {
     calle: string;
     municipio: string;
     refCatastralNote: string;
+    lat?: string;
+    lon?: string;
+    utm?: string;
   }) => void;
+  onOpenMtdPage9?: () => void;
 }
 
 interface OcaCheckItem {
@@ -51,6 +56,7 @@ const INITIAL_OCA_CHECKLIST: OcaCheckItem[] = [
 export default function TramitesOcaCatastroView({
   defaultIsla,
   onApplyLocationToMtd,
+  onOpenMtdPage9,
 }: TramitesOcaCatastroViewProps) {
   const [tab, setTab] = useState<"tramites_ccaa" | "inspeccion_oca" | "catastro">(
     "tramites_ccaa"
@@ -510,10 +516,16 @@ export default function TramitesOcaCatastroView({
               <button
                 type="button"
                 onClick={() => {
+                  const utmStr = gpsCoords
+                    ? latLonToUtmSpain(gpsCoords.lat, gpsCoords.lon).formatted
+                    : undefined;
                   onApplyLocationToMtd({
                     calle: catastroStreet,
                     municipio: catastroMunicipio,
                     refCatastralNote: cleanRef,
+                    lat: gpsCoords ? String(gpsCoords.lat) : undefined,
+                    lon: gpsCoords ? String(gpsCoords.lon) : undefined,
+                    utm: utmStr,
                   });
                   setAppliedCatastroToast(true);
                   setTimeout(() => setAppliedCatastroToast(false), 3000);
@@ -523,6 +535,29 @@ export default function TramitesOcaCatastroView({
                 <CheckCircle2 className="h-4 w-4" />
                 Pasar datos al Boletín / M.T.D.
               </button>
+              {onOpenMtdPage9 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const utmStr = gpsCoords
+                      ? latLonToUtmSpain(gpsCoords.lat, gpsCoords.lon).formatted
+                      : undefined;
+                    onApplyLocationToMtd({
+                      calle: catastroStreet,
+                      municipio: catastroMunicipio,
+                      refCatastralNote: cleanRef,
+                      lat: gpsCoords ? String(gpsCoords.lat) : undefined,
+                      lon: gpsCoords ? String(gpsCoords.lon) : undefined,
+                      utm: utmStr,
+                    });
+                    onOpenMtdPage9();
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-400 bg-emerald-50 px-3.5 py-2 font-semibold text-emerald-900 hover:bg-emerald-100"
+                >
+                  <MapPin className="h-4 w-4 text-emerald-700" />
+                  Cargar Fachada Google en Hoja 9/11
+                </button>
+              )}
             </div>
 
             {appliedCatastroToast && (

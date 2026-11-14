@@ -43,8 +43,21 @@ const PIECE_LABELS: Record<
     template: Omit<DinModule, "id" | "isOn" | "isTripped" | "parentRcdId">;
   }
 > = {
+  DPS_COMBI: {
+    short: "Combi 40A (IGA+DPS)",
+    color: "bg-amber-500 text-white",
+    template: {
+      kind: "COMBI",
+      label: "COMBI IGA",
+      sublabel: "IGA 40A + T2+POP",
+      ratingAmps: 40,
+      curve: "C",
+      poles: 2,
+      modulesWidth: 3,
+    },
+  },
   IGA_40A: {
-    short: "IGA 40A",
+    short: "IGA 40A (suelto)",
     color: "bg-slate-900 text-white",
     template: {
       kind: "IGA",
@@ -52,18 +65,6 @@ const PIECE_LABELS: Record<
       sublabel: "Corte Gral.",
       ratingAmps: 40,
       curve: "C",
-      poles: 2,
-      modulesWidth: 2,
-    },
-  },
-  DPS_COMBI: {
-    short: "Combi DPS",
-    color: "bg-amber-500 text-white",
-    template: {
-      kind: "COMBI",
-      label: "DPS+POP",
-      sublabel: "Sobretensiones",
-      ratingAmps: 40,
       poles: 2,
       modulesWidth: 2,
     },
@@ -288,7 +289,12 @@ export default function AprenderSimuladorView() {
   };
 
   const checkPanelSolution = () => {
-    const hasIgaFirst = rail[0]?.piece === "IGA_40A";
+    const hasCombiFirst = rail[0]?.piece === "DPS_COMBI";
+    const hasStandaloneIgaFirst = rail[0]?.piece === "IGA_40A";
+    const hasHeaderFirst = hasCombiFirst || hasStandaloneIgaFirst;
+    const hasBothCombiAndIga =
+      rail.some((p) => p.piece === "DPS_COMBI") &&
+      rail.some((p) => p.piece === "IGA_40A");
     const difCount = rail.filter((p) => p.piece === "DIF_40A_30MA").length;
     const pias = rail.filter((p) => p.piece.startsWith("PIA_"));
     const requiredPias: SimPiece[] = [
@@ -303,10 +309,17 @@ export default function AprenderSimuladorView() {
       pias.some((item) => item.piece === req)
     );
 
-    if (!hasIgaFirst) {
+    if (hasBothCombiAndIga) {
       setFeedback({
         ok: false,
-        msg: "Fallo en cabecera: lo primero a la izquierda debe ser el IGA de 40 A (corte general omnipolar, ITC-BT-17).",
+        msg: "IGA duplicado: actualmente el bloque Combi 40A (IGA + Sobretensiones T2+POP) sustituye al IGA suelto en cabecera. Quita el IGA suelto.",
+      });
+      return;
+    }
+    if (!hasHeaderFirst) {
+      setFeedback({
+        ok: false,
+        msg: "Fallo en cabecera: lo primero a la izquierda debe ser el Combi 40A (IGA+DPS integrado) o el IGA de 40 A (ITC-BT-17 / ITC-BT-23).",
       });
       return;
     }
@@ -327,12 +340,14 @@ export default function AprenderSimuladorView() {
 
     setFeedback({
       ok: true,
-      msg: "¡Cuadro perfecto según REBT! Llevas IGA 40A en cabecera, al menos 2 diferenciales para 6 circuitos (≤5 por diferencial) y todos los calibres C1–C5 + C9 correctos.",
+      msg: hasCombiFirst
+        ? "¡Cuadro perfecto según REBT! El Combi 40A sustituye al IGA integrando corte general + sobretensiones (T2+POP), llevas 2 diferenciales para 6 circuitos (≤5 por DIF) y todos los calibres C1–C5 + C9 correctos."
+        : "¡Cuadro válido en calibres y diferenciales! Consejo profesional: en instalaciones actuales se monta un bloque Combi 40A (IGA + Sobretensiones T2+POP) que sustituye al IGA suelto en cabecera.",
     });
   };
 
   const hints = [
-    "Pista 1: Empieza siempre colocando a la izquierda el IGA 40A y las sobretensiones.",
+    "Pista 1: Empieza colocando a la izquierda el Combi 40A (integra IGA + Sobretensiones T2+POP y sustituye al IGA suelto).",
     "Pista 2: Como hay 6 circuitos (C1, C2, C3, C4, C5 y C9 Aire), la ITC-BT-25 obliga a poner 2 diferenciales de 30 mA.",
     "Pista 3: Coloca máx. 5 PIAs detrás del primer diferencial y el resto detrás del segundo diferencial.",
   ];
@@ -410,14 +425,22 @@ export default function AprenderSimuladorView() {
                 key={p}
                 type="button"
                 onClick={() => {
-                  setRail((prev) => [
-                    ...prev,
-                    {
-                      uid: `${p}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-                      piece: p,
-                      isOn: true,
-                    },
-                  ]);
+                  const newItem: SimRailItem = {
+                    uid: `${p}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                    piece: p,
+                    isOn: true,
+                  };
+                  setRail((prev) => {
+                    // Si añade Combi 40A, sustituye automáticamente al IGA suelto en cabecera (y viceversa)
+                    if (p === "DPS_COMBI" || p === "IGA_40A") {
+                      const withoutOldHeader = prev.filter(
+                        (item) =>
+                          item.piece !== "IGA_40A" && item.piece !== "DPS_COMBI"
+                      );
+                      return [newItem, ...withoutOldHeader];
+                    }
+                    return [...prev, newItem];
+                  });
                   setFeedback(null);
                 }}
                 className="rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 font-semibold text-slate-800 hover:bg-blue-50 hover:border-blue-300"
@@ -507,7 +530,6 @@ export default function AprenderSimuladorView() {
               type="button"
               onClick={() => {
                 const sol: SimPiece[] = [
-                  "IGA_40A",
                   "DPS_COMBI",
                   "DIF_40A_30MA",
                   "PIA_10A_C1",
@@ -527,7 +549,7 @@ export default function AprenderSimuladorView() {
                 );
                 setFeedback({
                   ok: true,
-                  msg: "Solución cargada: fíjate cómo C1 (alumbrado) y C2 (enchufes/frigorífico) quedan repartidos en diferenciales distintos. Puedes pulsar cada palanca I-ON / 0-OFF o el botón TEST.",
+                  msg: "Solución cargada: el bloque Combi 40A sustituye al IGA en cabecera integrando corte general + sobretensiones (T2+POP), y C1/C2 quedan repartidos en diferenciales distintos.",
                 });
               }}
               className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3.5 py-2 font-semibold text-slate-700"

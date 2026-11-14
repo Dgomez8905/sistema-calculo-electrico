@@ -62,7 +62,8 @@ export interface PanelDiagnostic {
     | "fix_neutral"
     | "fix_pe"
     | "upsize_iga"
-    | "normalize_iga";
+    | "normalize_iga"
+    | "remove_redundant_iga";
 }
 
 export interface FaultChallengeScenario {
@@ -149,37 +150,29 @@ export function buildDinModulesFromProject(params: {
   const isThreePhase = supplyType === "trifasico_400v";
   const modules: DinModule[] = [];
 
-  modules.push({
-    id: "mod-iga",
-    kind: "IGA",
-    label: "IGA",
-    sublabel: isThreePhase ? "4P" : "2P",
-    ratingAmps: igaAmps,
-    curve: "C",
-    poles: isThreePhase ? 4 : 2,
-    modulesWidth: isThreePhase ? 4 : 2,
-    isOn: true,
-  });
-
   if (hasCombiSurge) {
+    // El bloque Combi integra IGA + Sobretensiones Permanentes (POP) + Transitorias (DPS T2), sustituyendo al IGA suelto
     modules.push({
-      id: "mod-dps",
-      kind: "DPS",
-      label: "DPS",
-      sublabel: "Transitorias",
-      ratingAmps: 15,
+      id: "mod-combi-iga",
+      kind: "COMBI",
+      label: "COMBI IGA",
+      sublabel: isThreePhase ? "4P IGA+T2+POP" : "2P IGA+T2+POP",
+      ratingAmps: igaAmps,
+      curve: "C",
       poles: isThreePhase ? 4 : 2,
-      modulesWidth: 2,
+      modulesWidth: isThreePhase ? 4 : 3,
       isOn: true,
     });
+  } else {
     modules.push({
-      id: "mod-pop",
-      kind: "POP",
-      label: "POP",
-      sublabel: "Permanentes",
+      id: "mod-iga",
+      kind: "IGA",
+      label: "IGA",
+      sublabel: isThreePhase ? "4P" : "2P",
       ratingAmps: igaAmps,
-      poles: 1,
-      modulesWidth: 1,
+      curve: "C",
+      poles: isThreePhase ? 4 : 2,
+      modulesWidth: isThreePhase ? 4 : 2,
       isOn: true,
     });
   }
@@ -270,28 +263,45 @@ export function validateDinPanelInstallation(
 ): PanelDiagnostic[] {
   const issues: PanelDiagnostic[] = [];
 
-  const igas = modules.filter((m) => m.kind === "IGA");
+  const igas = modules.filter((m) => m.kind === "IGA" || m.kind === "COMBI");
+  const standaloneIga = modules.find((m) => m.kind === "IGA");
+  const combiBlock = modules.find((m) => m.kind === "COMBI");
   const rcds = modules.filter((m) => m.kind === "DIF");
   const pias = modules.filter((m) => m.kind === "PIA");
   const hasDps = modules.some((m) => m.kind === "DPS" || m.kind === "COMBI");
   const hasPop = modules.some((m) => m.kind === "POP" || m.kind === "COMBI");
 
-  // 1. Verificar existencia de IGA
+  // 1. Verificar existencia de IGA o Combi (IGA + Sobretensiones)
   if (igas.length === 0) {
     issues.push({
       id: "err-no-iga",
       severity: "error",
       code: "SIN-IGA",
-      title: "Falta Interruptor General Automático (IGA)",
+      title: "Falta Combi IGA o Interruptor General Automático (IGA)",
       detail:
         "No hay corte general omnipolar en la cabecera del cuadro para proteger la Derivación Individual.",
       itc: "ITC-BT-17 / ITC-BT-25",
       solution:
-        "Agrega un IGA 2P o 4P en la primera posición del carril DIN (mínimo 25 A en vivienda básica).",
+        "Agrega un bloque Combi (IGA + Sobretensiones) o un IGA 2P/4P en la primera posición del carril DIN (mínimo 25 A en vivienda básica).",
       autoFixType: "add_iga",
     });
   } else {
-    const iga = igas[0];
+    if (standaloneIga && combiBlock) {
+      issues.push({
+        id: "warn-duplicate-iga-combi",
+        severity: "warning",
+        code: "IGA-DUPLICADO-COMBI",
+        title: "IGA suelto redundante: el bloque Combi ya sustituye al IGA en cabecera",
+        detail:
+          "Actualmente el bloque Combi integra el IGA de corte general junto con las sobretensiones permanentes (POP) y transitorias (DPS Tipo 2), por lo que no debe duplicarse con un IGA suelto.",
+        itc: "ITC-BT-17 / ITC-BT-23",
+        solution:
+          "Retira el IGA suelto y conserva únicamente el bloque Combi en la primera posición del carril DIN.",
+        moduleId: standaloneIga.id,
+        autoFixType: "remove_redundant_iga",
+      });
+    }
+    const iga = combiBlock || igas[0];
     if (iga.poles <= 2 && iga.ratingAmps > 63) {
       issues.push({
         id: "err-iga-over63-mono",
@@ -494,27 +504,36 @@ export function computePanelLiveState(
   modules: DinModule[],
   earthFaultModuleId: string | null
 ): Record<string, ModuleLiveStatus> {
-  const iga = modules.find((m) => m.kind === "IGA");
-  const pop = modules.find((m) => m.kind === "POP" || m.kind === "COMBI");
+  const headerBreakers = modules.filter(
+    (m) => m.kind === "COMBI" || m.kind === "IGA"
+  );
+  const pop = modules.find((m) => m.kind === "POP");
   const rcds = modules.filter((m) => m.kind === "DIF");
 
   const gridSupply = true;
-  const afterIga = gridSupply && Boolean(iga && iga.isOn && !iga.isTripped);
+  const afterIga =
+    gridSupply &&
+    headerBreakers.length > 0 &&
+    headerBreakers.every((b) => b.isOn && !b.isTripped);
   const afterPop = pop ? afterIga && pop.isOn && !pop.isTripped : afterIga;
 
   const statusMap: Record<string, ModuleLiveStatus> = {};
 
   modules.forEach((m) => {
-    if (m.kind === "IGA") {
+    if (m.kind === "IGA" || m.kind === "COMBI") {
       statusMap[m.id] = {
         supplyLive: gridSupply,
-        loadLive: afterIga,
-        reason: m.isOn ? "Alimentando cabecera" : "Corte general abierto (0 V)",
+        loadLive: afterIga && m.isOn && !m.isTripped,
+        reason: m.isOn
+          ? m.kind === "COMBI"
+            ? "Cabecera Combi (IGA + T2 + POP) activa"
+            : "Alimentando cabecera"
+          : "Corte general abierto (0 V)",
       };
       return;
     }
 
-    if (m.kind === "DPS" || m.kind === "COMBI") {
+    if (m.kind === "DPS") {
       statusMap[m.id] = {
         supplyLive: afterIga,
         loadLive: afterIga && m.isOn,

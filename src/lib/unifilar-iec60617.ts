@@ -119,7 +119,9 @@ export function buildUnifilarIec60617Svg(input: UnifilarSvgInput): string {
     centerX - Math.round(((branchCount - 1) * branchSpacing) / 2)
   );
   const endX = startX + (branchCount - 1) * branchSpacing;
-  const igaNode = dinModules.find((m) => m.kind === "IGA");
+  const igaNode = dinModules.find(
+    (m) => m.kind === "COMBI" || m.kind === "IGA"
+  );
   const activeIgaAmps = igaNode?.ratingAmps || igaAmps;
   const totalPowerKw = (
     useCircuits.reduce((s, c) => s + c.powerWatts, 0) / 1000
@@ -189,8 +191,8 @@ export function buildUnifilarIec60617Svg(input: UnifilarSvgInput): string {
   <line x1="${centerX}" y1="170" x2="${centerX}" y2="205" stroke="#0f172a" stroke-width="2.2"/>
 
   ${renderIecBreakerGlyph(centerX, 205, igaNode ? igaNode.isOn : true)}
-  <text x="${centerX + 18}" y="227" font-family="Arial" font-size="11" font-weight="bold" fill="#0f172a">IGA · In: ${activeIgaAmps} A</text>
-  <text x="${centerX + 18}" y="241" font-family="Arial" font-size="9.5" fill="#0f6cbd">${supplyType === "trifasico_400v" ? "4P Curva C" : "2P Curva C"} · Icu: ${icuKa} kA</text>
+  <text x="${centerX + 18}" y="227" font-family="Arial" font-size="11" font-weight="bold" fill="#0f172a">${igaNode?.kind === "COMBI" ? "COMBI " : ""}IGA · In: ${activeIgaAmps} A</text>
+  <text x="${centerX + 18}" y="241" font-family="Arial" font-size="9.5" fill="#0f6cbd">${supplyType === "trifasico_400v" ? "4P Curva C" : "2P Curva C"} · Icu: ${icuKa} kA${igaNode?.kind === "COMBI" ? " · Combi T2+POP" : ""}</text>
   <line x1="${centerX}" y1="253" x2="${centerX}" y2="${busY}" stroke="#0f172a" stroke-width="2.4"/>
 
   ${

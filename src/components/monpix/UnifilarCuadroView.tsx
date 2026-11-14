@@ -122,7 +122,9 @@ export default function UnifilarCuadroView({
   // ============================================================================
   const sanitizeSavedModules = (mods: DinModule[]) =>
     mods.map((m) =>
-      m.kind === "IGA" && m.poles <= 2 && m.ratingAmps > 63
+      (m.kind === "IGA" || m.kind === "COMBI") &&
+      m.poles <= 2 &&
+      m.ratingAmps > 63
         ? { ...m, ratingAmps: sanitizeSpanishIgaAmps(igaAmps, "monofasico_230v") }
         : m
     );
@@ -686,20 +688,32 @@ export default function UnifilarCuadroView({
         kind: "IGA",
         label: "IGA",
         sublabel: isThreePhase ? "4P" : "2P",
-        ratingAmps: newModAmps,
+        ratingAmps: sanitizeSpanishIgaAmps(newModAmps, supplyType),
         curve: "C",
         poles: isThreePhase ? 4 : 2,
         modulesWidth: isThreePhase ? 4 : 2,
         isOn: true,
       };
-    } else if (newModKind === "DPS" || newModKind === "COMBI") {
+    } else if (newModKind === "COMBI") {
       mod = {
         id,
-        kind: newModKind,
-        label: newModKind === "COMBI" ? "COMBI" : "DPS",
-        sublabel: newModKind === "COMBI" ? "Perm+Trans" : "Transitorias",
+        kind: "COMBI",
+        label: "COMBI IGA",
+        sublabel: isThreePhase ? "4P IGA+T2+POP" : "2P IGA+T2+POP",
+        ratingAmps: sanitizeSpanishIgaAmps(newModAmps, supplyType),
+        curve: "C",
+        poles: isThreePhase ? 4 : 2,
+        modulesWidth: isThreePhase ? 4 : 3,
+        isOn: true,
+      };
+    } else if (newModKind === "DPS") {
+      mod = {
+        id,
+        kind: "DPS",
+        label: "DPS",
+        sublabel: "Transitorias",
         ratingAmps: 15,
-        poles: 2,
+        poles: isThreePhase ? 4 : 2,
         modulesWidth: 2,
         isOn: true,
       };
@@ -771,9 +785,26 @@ export default function UnifilarCuadroView({
       };
     }
 
-    setDinModules((prev) => [...prev, mod]);
+    setDinModules((prev) => {
+      if (mod.kind === "COMBI") {
+        // El Combi sustituye al IGA suelto y a DPS/POP separados en cabecera
+        const cleaned = prev.filter(
+          (m) => m.kind !== "IGA" && m.kind !== "COMBI" && m.kind !== "DPS" && m.kind !== "POP"
+        );
+        return [mod, ...cleaned];
+      }
+      if (mod.kind === "IGA") {
+        const cleaned = prev.filter((m) => m.kind !== "IGA" && m.kind !== "COMBI");
+        return [mod, ...cleaned];
+      }
+      return [...prev, mod];
+    });
     setSelectedModId(mod.id);
-    setSimFeedback(`➕ Añadido ${mod.label} (${mod.sublabel}) al carril DIN.`);
+    setSimFeedback(
+      mod.kind === "COMBI"
+        ? `➕ Cabecera actualizada con ${mod.label} (${mod.ratingAmps} A + T2 + POP), sustituyendo al IGA suelto.`
+        : `➕ Añadido ${mod.label} (${mod.sublabel}) al carril DIN.`
+    );
   };
 
   const handleRemoveModule = (id: string) => {
@@ -872,51 +903,59 @@ export default function UnifilarCuadroView({
         };
         return [...prev, newRcd];
       }
+      if (autoFixType === "remove_redundant_iga" && moduleId) {
+        return prev.filter((m) => m.id !== moduleId);
+      }
       if (autoFixType === "add_iga") {
-        const newIga: DinModule = {
-          id: `mod-iga-fix-${Date.now()}`,
-          kind: "IGA",
-          label: "IGA",
-          sublabel: "2P",
-          ratingAmps: igaAmps,
+        const isTri = supplyType === "trifasico_400v";
+        const newCombi: DinModule = {
+          id: `mod-combi-fix-${Date.now()}`,
+          kind: "COMBI",
+          label: "COMBI IGA",
+          sublabel: isTri ? "4P IGA+T2+POP" : "2P IGA+T2+POP",
+          ratingAmps: sanitizeSpanishIgaAmps(igaAmps, supplyType),
           curve: "C",
-          poles: 2,
-          modulesWidth: 2,
+          poles: isTri ? 4 : 2,
+          modulesWidth: isTri ? 4 : 3,
           isOn: true,
         };
-        return [newIga, ...prev];
+        return [newCombi, ...prev];
       }
       if (autoFixType === "add_surge") {
         setHasCombiSurge(true);
-        const toAdd: DinModule[] = [];
-        if (!prev.some((m) => m.kind === "DPS" || m.kind === "COMBI")) {
-          toAdd.push({
-            id: `mod-dps-fix-${Date.now()}`,
-            kind: "DPS",
-            label: "DPS",
-            sublabel: "Transitorias",
-            ratingAmps: 15,
-            poles: 2,
-            modulesWidth: 2,
-            isOn: true,
-          });
+        const existingIga = prev.find((m) => m.kind === "IGA");
+        if (existingIga) {
+          // Sustituimos el IGA suelto por el bloque Combi integrado (IGA + T2 + POP)
+          return prev
+            .filter((m) => m.kind !== "DPS" && m.kind !== "POP")
+            .map((m) =>
+              m.id === existingIga.id
+                ? {
+                    ...m,
+                    kind: "COMBI" as const,
+                    label: "COMBI IGA",
+                    sublabel: m.poles === 4 ? "4P IGA+T2+POP" : "2P IGA+T2+POP",
+                    modulesWidth: m.poles === 4 ? 4 : 3,
+                  }
+                : m
+            );
         }
-        if (!prev.some((m) => m.kind === "POP" || m.kind === "COMBI")) {
-          toAdd.push({
-            id: `mod-pop-fix-${Date.now() + 1}`,
-            kind: "POP",
-            label: "POP",
-            sublabel: "Permanentes",
-            ratingAmps: igaAmps,
-            poles: 1,
-            modulesWidth: 1,
-            isOn: true,
-          });
-        }
-        const igaIndex = prev.findIndex((m) => m.kind === "IGA");
-        const next = [...prev];
-        next.splice(igaIndex >= 0 ? igaIndex + 1 : 0, 0, ...toAdd);
-        return next;
+        const isTri = supplyType === "trifasico_400v";
+        const newCombi: DinModule = {
+          id: `mod-combi-fix-${Date.now()}`,
+          kind: "COMBI",
+          label: "COMBI IGA",
+          sublabel: isTri ? "4P IGA+T2+POP" : "2P IGA+T2+POP",
+          ratingAmps: sanitizeSpanishIgaAmps(igaAmps, supplyType),
+          curve: "C",
+          poles: isTri ? 4 : 2,
+          modulesWidth: isTri ? 4 : 3,
+          isOn: true,
+        };
+        return [
+          newCombi,
+          ...prev.filter((m) => m.kind !== "DPS" && m.kind !== "POP"),
+        ];
       }
       if (autoFixType === "split_rcd") {
         const extraRcdId = `mod-dif-split-${Date.now()}`;
@@ -1001,7 +1040,9 @@ export default function UnifilarCuadroView({
       } else {
         counts.set(key, {
           item:
-            m.kind === "IGA"
+            m.kind === "COMBI"
+              ? `Combinado IGA + Sobretensiones Permanentes y Transitorias T2 (${m.poles}P ${m.ratingAmps} A)`
+              : m.kind === "IGA"
               ? `Interruptor General Automático (IGA) ${m.poles}P ${m.ratingAmps} A`
               : m.kind === "DPS"
               ? `Descargador Sobretensiones Transitorias DPS Tipo 2 (${m.poles}P)`
@@ -1474,7 +1515,7 @@ export default function UnifilarCuadroView({
                         }
                         className="h-4 w-4 rounded border-slate-300"
                       />
-                      Con DPS+POP
+                      Combi (IGA+DPS+POP)
                     </label>
                   </div>
                 </div>
@@ -1691,7 +1732,7 @@ export default function UnifilarCuadroView({
                 onChange={(e) => setHasCombiSurge(e.target.checked)}
                 className="h-4 w-4 rounded border-slate-300 text-[#0f6cbd]"
               />
-              Incluir Sobretensiones Transitorias (DPS T2) + Permanentes (POP) junto al IGA
+              Cabecera con Combi integrado (IGA + Sobretensiones T2 + POP — sustituye al IGA suelto)
             </label>
 
             <div className="border-t border-slate-200 pt-3">
@@ -2170,10 +2211,10 @@ export default function UnifilarCuadroView({
                       >
                         <option value="PIA">PIA Magnetotérmico</option>
                         <option value="DIF">Diferencial 30 mA</option>
-                        <option value="IGA">IGA Corte General</option>
+                        <option value="COMBI">Combi IGA + T2 + POP (sustituye IGA)</option>
+                        <option value="IGA">IGA Corte General (suelto)</option>
                         <option value="DPS">DPS Transitorias T2</option>
                         <option value="POP">POP Permanentes</option>
-                        <option value="COMBI">Combi T2 + POP</option>
                         <option value="CONTACTOR">Contactor Modular</option>
                         <option value="TIMER">Reloj Horario DIN</option>
                         <option value="METER">Medidor kWh DIN</option>
@@ -2186,7 +2227,7 @@ export default function UnifilarCuadroView({
                         onChange={(e) => setNewModAmps(Number(e.target.value))}
                         className="mt-1 w-full px-2.5 py-1.5 text-xs"
                       >
-                        {newModKind === "IGA"
+                        {newModKind === "IGA" || newModKind === "COMBI"
                           ? getSpanishIgaStepsForSupply(supplyType).map((st) => (
                               <option key={st.igaAmps} value={st.igaAmps}>
                                 {st.shortLabel}
@@ -2289,7 +2330,8 @@ export default function UnifilarCuadroView({
                           }
                           className="mt-1 w-full px-2.5 py-1.5 text-xs"
                         >
-                          {selectedModule.kind === "IGA"
+                          {selectedModule.kind === "IGA" ||
+                          selectedModule.kind === "COMBI"
                             ? getSpanishIgaStepsForSupply(
                                 selectedModule.poles === 4
                                   ? "trifasico_400v"

@@ -119,24 +119,25 @@ export default function DinModularDeviceVisual({
 
   const isEnergizedOut = liveStatus.loadLive;
   const isTripped = Boolean(mod.isTripped);
-  const isDps = mod.kind === "DPS" || mod.kind === "COMBI";
+  const isDps = mod.kind === "DPS";
+  const isCombi = mod.kind === "COMBI";
   const isPop = mod.kind === "POP";
   const isDif = mod.kind === "DIF";
-  const isIga = mod.kind === "IGA";
+  const isIga = mod.kind === "IGA" || mod.kind === "COMBI";
   const isSwitchable = mod.kind !== "DPS";
 
-  // Etiqueta principal tipo aparato real
+  // Etiqueta principal tipo aparato real (el Combi integra IGA + T2 + POP)
   const mainMarking =
     mod.kind === "IGA"
       ? `${mod.curve || "C"}${mod.ratingAmps}`
+      : mod.kind === "COMBI"
+      ? `${mod.curve || "C"}${mod.ratingAmps} · T2+POP`
       : mod.kind === "DIF"
       ? `${mod.ratingAmps}A · ${mod.sensitivityMa || 30}mA`
       : mod.kind === "DPS"
       ? "T2 · 15kA"
       : mod.kind === "POP"
       ? "POP"
-      : mod.kind === "COMBI"
-      ? "T2+POP"
       : mod.kind === "PIA"
       ? `${mod.curve || "C"}${mod.ratingAmps}`
       : mod.kind === "CONTACTOR"
@@ -244,7 +245,9 @@ export default function DinModularDeviceVisual({
           {/* Banda distintiva de fabricante o función */}
           <div
             className={`h-1 w-full rounded-full ${
-              isDps || isPop
+              isCombi
+                ? "bg-gradient-to-r from-slate-800 via-amber-500 to-emerald-600"
+                : isDps || isPop
                 ? "bg-amber-500"
                 : isIga
                 ? "bg-slate-800"
@@ -252,9 +255,22 @@ export default function DinModularDeviceVisual({
             }`}
           />
 
-          <div className="text-center font-mono text-[10px] font-black text-slate-900 leading-tight">
+          <div className="text-center font-mono text-[9.5px] font-black text-slate-900 leading-tight">
             {mainMarking}
           </div>
+
+          {/* Si es COMBI: ventanilla integrada T2+POP encima de la maneta del IGA */}
+          {isCombi && (
+            <div className="flex items-center gap-1 text-[7px] font-bold text-emerald-700">
+              <span
+                className={`inline-block h-2 w-3 rounded-xs border border-slate-400 ${
+                  liveStatus.supplyLive ? "bg-emerald-500" : "bg-slate-300"
+                }`}
+                title="Estado protector sobretensiones integrado"
+              />
+              <span>Up≤1,5kV</span>
+            </div>
+          )}
 
           {/* Si es DPS (sin maneta): cartucho indicador verde/rojo */}
           {isDps ? (

@@ -4198,19 +4198,39 @@ export default function SistemaCalculoRebtPage() {
           {activeSection === "tramites_oca" && (
             <TramitesOcaCatastroView
               defaultIsla={mtdMeta.isla || currentTenant?.isla || "Tenerife"}
-              onApplyLocationToMtd={({ calle, municipio, refCatastralNote }) => {
+              onApplyLocationToMtd={({
+                calle,
+                municipio,
+                refCatastralNote,
+                lat,
+                lon,
+                utm,
+              }) => {
                 setMtdMeta((prev) => ({
                   ...prev,
                   direccionCalle: calle || prev.direccionCalle,
                   terminoMunicipal: municipio || prev.terminoMunicipal,
+                  referenciaCatastral:
+                    refCatastralNote || prev.referenciaCatastral,
+                  coordenadasLat: lat || prev.coordenadasLat,
+                  coordenadasLng: lon || prev.coordenadasLng,
+                  coordenadasUtm: utm || prev.coordenadasUtm,
                   memoriaDescriptivaTexto: prev.memoriaDescriptivaTexto
-                    ? `${prev.memoriaDescriptivaTexto}\n${refCatastralNote}`
-                    : refCatastralNote,
+                    ? `${prev.memoriaDescriptivaTexto}\nRef. Catastral: ${refCatastralNote}${
+                        utm ? ` · UTM: ${utm}` : ""
+                      }`
+                    : `Ref. Catastral: ${refCatastralNote}${
+                        utm ? ` · UTM: ${utm}` : ""
+                      }`,
                 }));
                 setStatusBanner({
                   type: "success",
-                  text: "Ubicación y Referencia Catastral aplicadas a los datos del expediente M.T.D.",
+                  text: "Ubicación, Coordenadas GPS/UTM y Referencia Catastral aplicadas al expediente y Hoja 9/11 M.T.D.",
                 });
+              }}
+              onOpenMtdPage9={() => {
+                setTargetMtdPage(9);
+                setActiveSection("ficha_mtd");
               }}
             />
           )}

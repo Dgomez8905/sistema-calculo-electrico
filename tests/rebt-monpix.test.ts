@@ -8,6 +8,7 @@ import {
   evaluateItc04Documentation,
   calculateEarthingItc18,
   resolveSpanishRebtIgaAndTariff,
+  latLonToUtmSpain,
 } from "../src/lib/electrical-calculations.ts";
 import {
   explainRebtCircuitStepByStep,
@@ -210,8 +211,12 @@ test("Simulador DIN: valida mala conexión (neutro cruzado, cable fino, sin DIF)
   const okDiag = validateDinPanelInstallation(mods, 18);
   assert.equal(okDiag[0].severity, "ok");
 
-  // 2. Apagar IGA corta la tensión en los PIAs aguas abajo
-  const modsIgaOff = mods.map((m) => (m.kind === "IGA" ? { ...m, isOn: false } : m));
+  // 2. El bloque Combi sustituye al IGA suelto en cabecera y apagarlo corta la tensión aguas abajo
+  assert.equal(mods[0].kind, "COMBI");
+  assert.equal(mods.some((m) => m.kind === "IGA"), false);
+  const modsIgaOff = mods.map((m) =>
+    m.kind === "COMBI" || m.kind === "IGA" ? { ...m, isOn: false } : m
+  );
   const liveOff = computePanelLiveState(modsIgaOff, null);
   const firstPia = mods.find((m) => m.kind === "PIA")!;
   assert.equal(liveOff[firstPia.id].loadLive, false);
@@ -335,7 +340,10 @@ test("Detección automática de formato de circuito (Monofásico 2P vs Trifásic
     meta: { ...DEFAULT_MTD_METADATA, diferencialClase: tri.diferencialClase },
     circuits: calcTri,
   });
-  assert.equal(dinTri.find((m) => m.kind === "IGA")?.poles, 4);
+  assert.equal(
+    dinTri.find((m) => m.kind === "COMBI" || m.kind === "IGA")?.poles,
+    4
+  );
 
   const svgTri = buildUnifilarIec60617Svg({
     meta: DEFAULT_MTD_METADATA,
@@ -444,4 +452,44 @@ test("Escalones oficiales IGA REBT y Tarifas 2.0TD / 3.0TD en España (evita IGA
   dinMods[0].ratingAmps = 80;
   const issues = validateDinPanelInstallation(dinMods, 18);
   assert.ok(issues.some((i) => i.code === "IGA-FUERA-REBT"));
+});
+
+test("Combi sustituye al IGA + Georreferenciación UTM España para Fachada Google (Hoja 9/11)", () => {
+  const circuits = ITC_BT_25_TEMPLATES.slice(0, 5).map((c) => calculateRebtCircuit(c));
+  const combiPanel = buildDinModulesFromProject({
+    supplyType: "monofasico_230v",
+    igaAmps: 40,
+    rcdCount: 1,
+    hasCombiSurge: true,
+    meta: DEFAULT_MTD_METADATA,
+    circuits,
+  });
+
+  // Si se añade un IGA suelto junto al Combi, avisa de duplicidad (IGA-DUPLICADO-COMBI)
+  const duplicated = [
+    {
+      id: "extra-iga",
+      kind: "IGA" as const,
+      label: "IGA",
+      sublabel: "2P",
+      ratingAmps: 40,
+      poles: 2 as const,
+      modulesWidth: 2,
+      isOn: true,
+    },
+    ...combiPanel,
+  ];
+  const dupIssues = validateDinPanelInstallation(duplicated, 24);
+  assert.ok(dupIssues.some((i) => i.code === "IGA-DUPLICADO-COMBI"));
+
+  // Conversión WGS84 -> UTM España (Canarias Huso 28R y Península Huso 30T)
+  const tenerifeUtm = latLonToUtmSpain(28.4636, -16.2518);
+  assert.equal(tenerifeUtm.zone, 28);
+  assert.equal(tenerifeUtm.band, "R");
+  assert.ok(tenerifeUtm.easting > 370000 && tenerifeUtm.easting < 385000);
+  assert.ok(tenerifeUtm.northing > 3140000 && tenerifeUtm.northing < 3160000);
+
+  const madridUtm = latLonToUtmSpain(40.4168, -3.7038);
+  assert.equal(madridUtm.zone, 30);
+  assert.equal(madridUtm.band, "T");
 });
