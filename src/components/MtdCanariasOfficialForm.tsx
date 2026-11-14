@@ -217,6 +217,9 @@ export default function MtdCanariasOfficialForm({
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [geoFeedback, setGeoFeedback] = useState<string>("");
   const [streetViewUrlInput, setStreetViewUrlInput] = useState<string>("");
+  const [photoFitMode, setPhotoFitMode] = useState<"contain" | "cover">(
+    "contain"
+  );
   const fachadaFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const applyLatLonWithUtm = (latRaw: string, lonRaw: string) => {
@@ -573,22 +576,22 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
   const hasCircuitCode = (code: string) =>
     calculatedCircuits.some((c) => c.code.toUpperCase() === code.toUpperCase());
 
-  // Cabecera oficial repetida en las 11 páginas
+  // Cabecera oficial repetida en las 11 páginas (calibrada para encajar en A4 sin recorte lateral)
   const OfficialHeader = ({ isBtBox = true }: { isBtBox?: boolean }) => (
-    <div className="mb-3 flex items-start justify-between border-b-2 border-black pb-2 text-black">
-      <div className="flex flex-col items-start">
+    <div className="mb-2 flex items-start justify-between gap-2 border-b-2 border-black pb-1.5 text-black shrink-0">
+      <div className="flex flex-col items-start min-w-0">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/logo-gobierno-canarias.png"
           alt="Gobierno de Canarias - Consejería de Empleo, Industria y Comercio - Dirección General de Energía"
-          className="h-14 w-auto object-contain"
+          className="h-11 w-auto object-contain"
         />
-        <span className="mt-1 text-sm font-extrabold tracking-tight text-black">
+        <span className="mt-0.5 text-xs font-extrabold tracking-tight text-black">
           INSTALACIÓN DE BAJA TENSIÓN
         </span>
       </div>
 
-      <div className="flex items-stretch gap-2 text-[10px]">
+      <div className="flex items-stretch gap-1.5 text-[9.5px] shrink-0">
         <div className="flex flex-col justify-between text-right pr-1">
           <div className="font-bold leading-tight">
             Memoria Técnica
@@ -598,8 +601,8 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
           <div>Nº. de Instalación</div>
           <div>Nº. de Expediente</div>
         </div>
-        <div className="w-28 border border-black">
-          <div className="border-b border-black bg-slate-100 py-1 text-center text-xs font-extrabold">
+        <div className="w-28 shrink-0 border border-black">
+          <div className="border-b border-black bg-slate-100 py-0.5 text-center text-[11px] font-extrabold leading-tight">
             M.T.D.
             {isBtBox && (
               <>
@@ -608,20 +611,20 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
               </>
             )}
           </div>
-          <div className="border-b border-black p-1">
+          <div className="border-b border-black px-1 py-0.5">
             <input
               type="text"
               value={meta.instalacionNum}
               onChange={(e) => updateField("instalacionNum", e.target.value)}
-              className="w-full bg-transparent text-center font-mono text-[10px] font-semibold text-black focus:outline-none"
+              className="w-full bg-transparent text-center font-mono text-[9.5px] font-semibold text-black focus:outline-none"
             />
           </div>
-          <div className="p-1">
+          <div className="px-1 py-0.5">
             <input
               type="text"
               value={meta.expedienteNum}
               onChange={(e) => updateField("expedienteNum", e.target.value)}
-              className="w-full bg-transparent text-center font-mono text-[10px] font-semibold text-black focus:outline-none"
+              className="w-full bg-transparent text-center font-mono text-[9.5px] font-semibold text-black focus:outline-none"
             />
           </div>
         </div>
@@ -629,12 +632,12 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
     </div>
   );
 
-  // Pie de firma oficial (Páginas 1 a 10)
+  // Pie de firma oficial (Páginas 1 a 10 — calibrado para A4 sin desborde derecho)
   const OfficialFooter = ({ pageNum }: { pageNum: number }) => (
-    <div className="mt-3 pt-1 text-[10px] text-black">
+    <div className="mt-2 pt-1 text-[9.5px] text-black shrink-0">
       <div className="flex items-end justify-between gap-2">
-        <div className="grid flex-1 grid-cols-12 border border-black">
-          <div className="col-span-5 border-b border-r border-black p-1">
+        <div className="grid flex-1 min-w-0 grid-cols-12 border border-black">
+          <div className="col-span-5 border-b border-r border-black px-1.5 py-0.5 truncate">
             <span className="font-semibold">Nombre: </span>
             <span>
               {meta.autorTipo === "instalador_ph"
@@ -642,38 +645,40 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
                 : meta.tecnicoNombre}
             </span>
           </div>
-          <div className="col-span-3 border-b border-r border-black p-1">
+          <div className="col-span-3 border-b border-r border-black px-1.5 py-0.5 truncate">
             <span className="font-semibold">D.O.I.: </span>
             <span>{meta.instaladorDoi}</span>
           </div>
-          <div className="col-span-4 border-b border-black p-1">
+          <div className="col-span-4 border-b border-black px-1.5 py-0.5 truncate">
             <span className="font-semibold">Fecha: </span>
             <span>
               {meta.diaFirma}/{meta.mesFirma}/20{meta.anioFirma}
             </span>
           </div>
 
-          <div className="col-span-5 row-span-2 border-r border-black p-1 min-h-[38px]">
+          <div className="col-span-5 row-span-2 border-r border-black px-1.5 py-0.5 min-h-[30px]">
             <span className="font-semibold">Firma y sello:</span>
           </div>
-          <div className="col-span-4 border-b border-r border-black p-1">
+          <div className="col-span-4 border-b border-r border-black px-1.5 py-0.5">
             <span className="font-semibold">Empresa Instaladora nº:</span>
           </div>
-          <div className="col-span-3 border-b border-black p-1 font-mono">
+          <div className="col-span-3 border-b border-black px-1.5 py-0.5 font-mono truncate">
             {meta.empresaInstaladoraNum}
           </div>
-          <div className="col-span-4 border-r border-black p-1">
+          <div className="col-span-4 border-r border-black px-1.5 py-0.5">
             <span className="font-semibold">Colegiado nº:</span>
           </div>
-          <div className="col-span-3 p-1 font-mono">
+          <div className="col-span-3 px-1.5 py-0.5 font-mono truncate">
             {meta.autorTipo === "tecnico_competente"
               ? meta.tecnicoColegiadoNum
               : "—"}
           </div>
         </div>
-        <div className="w-12 text-right text-sm font-bold">{pageNum}/11</div>
+        <div className="w-11 shrink-0 whitespace-nowrap pr-0.5 text-right text-xs font-extrabold">
+          {pageNum}/11
+        </div>
       </div>
-      <div className="mt-0.5 italic text-[9px]">
+      <div className="mt-0.5 italic text-[8.5px]">
         D.O.I.: Documento Oficial de Identidad
       </div>
     </div>
@@ -701,7 +706,7 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
       : 0;
 
   return (
-    <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+    <div className="mtd-layout-root flex flex-col gap-6 lg:flex-row lg:items-start print:block">
       {/* =====================================================================
           COLUMNA IZQUIERDA (FIJA): SELECCIÓN DE APARTADO Y DESCARGA OPCIONAL
          ===================================================================== */}
@@ -1107,15 +1112,15 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
       </div>
 
       {/* =====================================================================
-          COLUMNA DERECHA: DOCUMENTO OFICIAL M.T.D. B.T. (RESPONSIVE EN MÓVIL Y ESCRITORIO)
+          COLUMNA DERECHA: DOCUMENTO OFICIAL M.T.D. B.T. (FORMATO A4 VERTICAL EXACTO)
          ===================================================================== */}
-      <div className="min-w-0 flex-1 space-y-6 overflow-x-auto pb-4">
+      <div className="mtd-sheets-container min-w-0 flex-1 space-y-6 overflow-x-auto pb-4 print:space-y-0 print:overflow-visible print:pb-0">
 
       {/* =====================================================================
           PÁGINA 1/11: DATOS TITULAR, UBICACIÓN Y CARACTERÍSTICAS ELÉCTRICAS
          ===================================================================== */}
       {shouldShowPage(1) && (
-        <div className="mtd-print-page mx-auto max-w-[210mm] rounded-sm border border-slate-400 bg-white p-6 text-[11px] leading-tight text-black shadow-2xl">
+        <div className="mtd-print-page mx-auto max-w-[210mm] rounded-sm border border-slate-400 bg-white p-4 sm:p-5 text-[11px] leading-tight text-black shadow-2xl">
           <OfficialHeader isBtBox={true} />
 
           {/* DATOS DEL TITULAR Y UBICACIÓN */}
@@ -1751,7 +1756,7 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
           PÁGINA 2/11: EDIFICIOS DESTINADOS PRINCIPALMENTE A VIVIENDAS (ITC-BT-10)
          ===================================================================== */}
       {shouldShowPage(2) && (
-        <div className="mtd-print-page mx-auto max-w-[210mm] rounded-sm border border-slate-400 bg-white p-6 text-[11px] leading-tight text-black shadow-2xl">
+        <div className="mtd-print-page mx-auto max-w-[210mm] rounded-sm border border-slate-400 bg-white p-4 sm:p-5 text-[11px] leading-tight text-black shadow-2xl">
           <OfficialHeader isBtBox={true} />
 
           <div className="border-2 border-black">
@@ -2042,7 +2047,7 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
           PÁGINA 3/11: LOCALES COMERCIALES, OFICINAS E INDUSTRIAS (ITC-BT-10 apdo. 4)
          ===================================================================== */}
       {shouldShowPage(3) && (
-        <div className="mtd-print-page mx-auto max-w-[210mm] rounded-sm border border-slate-400 bg-white p-6 text-[11px] leading-tight text-black shadow-2xl">
+        <div className="mtd-print-page mx-auto max-w-[210mm] rounded-sm border border-slate-400 bg-white p-4 sm:p-5 text-[11px] leading-tight text-black shadow-2xl">
           <OfficialHeader isBtBox={true} />
 
           {/* Locales comerciales cuando no se conocen receptores */}
@@ -2229,7 +2234,7 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
           PÁGINA 4/11: ALMACENES (CIRCULAR BT05/04) Y SUMINISTROS SINGULARES
          ===================================================================== */}
       {shouldShowPage(4) && (
-        <div className="mtd-print-page mx-auto max-w-[210mm] rounded-sm border border-slate-400 bg-white p-6 text-[11px] leading-tight text-black shadow-2xl">
+        <div className="mtd-print-page mx-auto max-w-[210mm] rounded-sm border border-slate-400 bg-white p-4 sm:p-5 text-[11px] leading-tight text-black shadow-2xl">
           <OfficialHeader isBtBox={true} />
 
           {/* Almacenes sin uso definido */}
@@ -2375,12 +2380,12 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
           PÁGINA 5/11: MEMORIA DESCRIPTIVA
          ===================================================================== */}
       {shouldShowPage(5) && (
-        <div className="mtd-print-page mx-auto max-w-[210mm] rounded-sm border border-slate-400 bg-white p-6 text-[11px] leading-tight text-black shadow-2xl">
+        <div className="mtd-print-page mx-auto max-w-[210mm] rounded-sm border border-slate-400 bg-white p-4 sm:p-5 text-[11px] leading-tight text-black shadow-2xl">
           <OfficialHeader isBtBox={true} />
 
-          <div className="flex min-h-[215mm] flex-col justify-between border-2 border-black p-3">
-            <div className="flex flex-1 flex-col">
-              <div className="flex items-center justify-between border-b border-black pb-1">
+          <div className="my-1 flex min-h-[215mm] print:min-h-0 flex-1 flex-col justify-between border-2 border-black p-2.5 overflow-hidden">
+            <div className="flex min-h-0 flex-1 flex-col">
+              <div className="flex shrink-0 items-center justify-between border-b border-black pb-1">
                 <span className="font-bold">MEMORIA DESCRIPTIVA</span>
                 <button
                   type="button"
@@ -2400,15 +2405,15 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
                   updateField("memoriaDescriptivaTexto", e.target.value)
                 }
                 style={{ fieldSizing: "content" } as React.CSSProperties}
-                className="mt-2 w-full flex-1 resize-none overflow-hidden bg-transparent font-serif text-[10.5px] leading-[1.45] text-black focus:outline-none"
+                className="mt-1.5 w-full min-h-0 flex-1 resize-none overflow-hidden bg-transparent font-serif text-[10.5px] leading-[1.42] print:h-full print:text-[9.5px] print:leading-[1.32] text-black focus:outline-none"
               />
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 text-[10px]">
+            <div className="flex shrink-0 items-center justify-end gap-2 pt-1.5 text-[10px]">
               <span>
                 Se adjuntan hojas complementarias para Memoria Descriptiva
               </span>
-              <span className="inline-block h-4 w-4 border border-black text-center font-bold">
+              <span className="inline-block h-4 w-4 shrink-0 border border-black text-center font-bold">
                 {" "}
               </span>
             </div>
@@ -2422,16 +2427,17 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
           PÁGINA 6/11: CUADRO RESUMEN DE CÁLCULO (15 COLUMNAS OFICIALES)
          ===================================================================== */}
       {shouldShowPage(6) && (
-        <div className="mtd-print-page mx-auto max-w-[210mm] rounded-sm border border-slate-400 bg-white p-6 text-[10px] leading-tight text-black shadow-2xl">
+        <div className="mtd-print-page mx-auto max-w-[210mm] rounded-sm border border-slate-400 bg-white p-4 sm:p-5 text-[10px] leading-tight text-black shadow-2xl">
           <OfficialHeader isBtBox={true} />
 
-          <div className="border-2 border-black">
+          <div className="my-1 min-h-0 flex-1 flex flex-col justify-between overflow-hidden">
+          <div className="border-2 border-black overflow-hidden">
             <div className="border-b border-black bg-slate-100 py-1 text-center text-xs font-extrabold">
               CUADRO RESUMEN DE CÁLCULO
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-[8.5px]">
+            <div className="overflow-x-auto print:overflow-visible">
+              <table className="w-full border-collapse text-[8px] print:text-[7px] [&_th]:px-0.5 [&_td]:px-0.5 [&_th]:py-0.5 [&_td]:py-0.5">
                 <thead>
                   <tr className="border-b border-black bg-slate-50 font-bold text-center">
                     <th className="border-r border-black p-1 text-left w-36">
@@ -2695,7 +2701,7 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
             </div>
           </div>
 
-          <div className="mt-2 space-y-0.5 text-[8.5px] text-slate-800">
+          <div className="mt-1.5 space-y-0.5 text-[8px] text-slate-800">
             <p>
               Nota 1: Acometida prevista por la Compañía suministradora, si se conoce.
             </p>
@@ -2706,6 +2712,7 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
               Nota 3: Derivaciones individuales con mayor caída de tensión a las viviendas tipo según grado de electrificación, y resto de zonas comunes y locales identificando cada una de ellas.
             </p>
           </div>
+          </div>
 
           <OfficialFooter pageNum={6} />
         </div>
@@ -2715,11 +2722,11 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
           PÁGINA 7/11: CROQUIS DEL TRAZADO DE LA INSTALACIÓN
          ===================================================================== */}
       {shouldShowPage(7) && (
-        <div className="mtd-print-page mx-auto max-w-[210mm] rounded-sm border border-slate-400 bg-white p-6 text-[11px] leading-tight text-black shadow-2xl">
+        <div className="mtd-print-page mx-auto max-w-[210mm] rounded-sm border border-slate-400 bg-white p-4 sm:p-5 text-[11px] leading-tight text-black shadow-2xl">
           <OfficialHeader isBtBox={false} />
 
-          <div className="flex min-h-[215mm] flex-col justify-between border-2 border-black p-3">
-            <div>
+          <div className="my-1 flex min-h-[215mm] print:min-h-0 flex-1 flex-col justify-between border-2 border-black p-2.5 overflow-hidden">
+            <div className="flex min-h-0 flex-1 flex-col">
               <div className="font-bold">
                 CROQUIS DEL TRAZADO DE LA INSTALACIÓN
               </div>
@@ -2728,10 +2735,10 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
               </p>
 
               {/* Diagrama SVG Automático del Trazado de la Instalación */}
-              <div className="mt-4 flex justify-center">
+              <div className="mt-3 flex min-h-0 flex-1 items-center justify-center">
                 <svg
                   viewBox="0 0 700 460"
-                  className="w-full max-w-[660px] border border-slate-300 bg-slate-50/40"
+                  className="max-h-[175mm] w-full max-w-[660px] border border-slate-300 bg-slate-50/40 object-contain"
                 >
                   {/* Contorno Edificio / Planta */}
                   <rect
@@ -2933,11 +2940,11 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
           PÁGINA 8/11: ESQUEMA UNIFILAR DE LA INSTALACIÓN (SIMBOLOGÍA UNE)
          ===================================================================== */}
       {shouldShowPage(8) && (
-        <div className="mtd-print-page mx-auto max-w-[210mm] rounded-sm border border-slate-400 bg-white p-6 text-[11px] leading-tight text-black shadow-2xl">
+        <div className="mtd-print-page mx-auto max-w-[210mm] rounded-sm border border-slate-400 bg-white p-4 sm:p-5 text-[11px] leading-tight text-black shadow-2xl">
           <OfficialHeader isBtBox={false} />
 
-          <div className="flex min-h-[215mm] flex-col justify-between border-2 border-black p-3">
-            <div>
+          <div className="my-1 flex min-h-[215mm] print:min-h-0 flex-1 flex-col justify-between border-2 border-black p-2.5 overflow-hidden">
+            <div className="flex min-h-0 flex-1 flex-col">
               <div className="font-bold">
                 ESQUEMA UNIFILAR DE LA INSTALACIÓN
               </div>
@@ -2946,10 +2953,10 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
               </p>
 
               {/* Esquema Unifilar Normalizado UNE Generado Automáticamente en SVG */}
-              <div className="mt-4 flex justify-center">
+              <div className="mt-3 flex min-h-0 flex-1 items-center justify-center">
                 <svg
                   viewBox="0 0 740 520"
-                  className="w-full border border-slate-300 bg-white"
+                  className="max-h-[175mm] w-full border border-slate-300 bg-white object-contain"
                 >
                   {/* Contador + Fusible + DI */}
                   <rect
@@ -3241,17 +3248,20 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
           PÁGINA 9/11: CROQUIS DE SITUACIÓN, FACHADA GOOGLE Y COORDENADAS
          ===================================================================== */}
       {shouldShowPage(9) && (
-        <div onPaste={handlePasteFacadeClipboard} className="space-y-4">
+        <>
           {/* Panel interactivo (no se imprime en PDF) para cargar fachada de Google y coordenadas */}
-          <div className="no-print mx-auto max-w-[210mm] rounded-2xl border border-blue-200 bg-blue-50/70 p-4 text-xs shadow-sm space-y-3">
+          <div
+            onPaste={handlePasteFacadeClipboard}
+            className="no-print mx-auto max-w-[210mm] rounded-2xl border border-blue-200 bg-blue-50/70 p-4 text-xs shadow-sm space-y-3"
+          >
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <h4 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
                   <Camera className="h-4 w-4 text-[#0f6cbd]" />
-                  Hoja 9/11 · Fotografía de Fachada (Google Street View) e Ilustración de Coordenadas
+                  Hoja 9/11 · Formato A4 Automático · Fachada (Google Street View) y Coordenadas
                 </h4>
                 <p className="text-[11px] text-slate-600">
-                  Obtén las coordenadas de la dirección, abre la fachada en Google Street View y sube o pega (<kbd className="rounded border border-slate-300 bg-white px-1 font-mono">Ctrl+V</kbd>) la captura de la fachada para ilustrar el punto exacto de las coordenadas y la CGP.
+                  Las fotografías de los apartados 1B y 2 se escalan automáticamente a una sola hoja A4 sin recortar bordes. Sube o pega (<kbd className="rounded border border-slate-300 bg-white px-1 font-mono">Ctrl+V</kbd>) tu captura para situar la diana de CGP.
                 </p>
               </div>
               <input
@@ -3267,7 +3277,7 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
               />
             </div>
 
-            {/* Botonera rápida de georreferenciación y Street View */}
+            {/* Botonera rápida de georreferenciación, Street View y Ajuste Automático A4 */}
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
@@ -3304,6 +3314,24 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
               >
                 <Upload className="h-3.5 w-3.5" />
                 3. Subir Foto de Fachada / Google
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setPhotoFitMode((m) => (m === "contain" ? "cover" : "contain"))
+                }
+                className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 font-semibold transition ${
+                  photoFitMode === "contain"
+                    ? "border-indigo-300 bg-indigo-50 text-indigo-950 hover:bg-indigo-100"
+                    : "border-slate-300 bg-white text-slate-800 hover:bg-slate-50"
+                }`}
+                title="Alternar entre mostrar el 100% de la fotografía sin cortar bordes (A4 automático) o rellenar todo el marco"
+              >
+                <LayoutGrid className="h-3.5 w-3.5 text-indigo-700" />
+                {photoFitMode === "contain"
+                  ? "Ajuste A4: Foto completa (sin cortar)"
+                  : "Ajuste A4: Rellenar recuadro"}
               </button>
 
               {meta.fachadaFotoDataUrl && (
@@ -3426,22 +3454,25 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
             )}
           </div>
 
-          {/* HOJA OFICIAL IMPRIMIBLE 9/11 */}
-          <div className="mtd-print-page mx-auto max-w-[210mm] rounded-sm border border-slate-400 bg-white p-6 text-[11px] leading-tight text-black shadow-2xl">
+          {/* HOJA OFICIAL IMPRIMIBLE 9/11 (FORMATO A4 EXACTO EN UNA SOLA HOJA SIN RECORTES) */}
+          <div
+            onPaste={handlePasteFacadeClipboard}
+            className="mtd-print-page mx-auto max-w-[210mm] rounded-sm border border-slate-400 bg-white p-4 sm:p-5 text-[11px] leading-tight text-black shadow-2xl"
+          >
             <OfficialHeader isBtBox={false} />
 
-            <div className="flex min-h-[215mm] flex-col justify-between border-2 border-black p-3">
-              <div className="space-y-2.5">
-                <div className="flex items-start justify-between gap-2 border-b border-black pb-1.5">
-                  <div>
-                    <div className="font-bold">
+            <div className="my-1 flex min-h-0 flex-1 flex-col justify-between border-2 border-black p-2 overflow-hidden">
+              <div className="flex min-h-0 flex-1 flex-col gap-1.5">
+                <div className="flex shrink-0 items-start justify-between gap-2 border-b border-black pb-1">
+                  <div className="min-w-0">
+                    <div className="font-bold text-[10.5px]">
                       CROQUIS DE SITUACIÓN, EMPLAZAMIENTO Y FACHADA GEORREFERENCIADA
                     </div>
-                    <p className="mt-0.5 text-[9px]">
+                    <p className="mt-0.5 text-[8.5px]">
                       <span className="underline">Nota:</span> incorpora referencias geográficas nítidas, coordenadas del punto de conexión y vista de fachada del emplazamiento.
                     </p>
                   </div>
-                  <span className="border border-black bg-slate-100 px-2 py-0.5 font-mono text-[9px] font-bold">
+                  <span className="shrink-0 whitespace-nowrap border border-black bg-slate-100 px-1.5 py-0.5 font-mono text-[8.5px] font-bold">
                     {meta.coordenadasUtm
                       ? `UTM: ${meta.coordenadasUtm}`
                       : "WGS84 / REGCAN95"}
@@ -3449,13 +3480,13 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
                 </div>
 
                 {/* Tabla técnica de Coordenadas y Emplazamiento (100% editable manualmente en hoja) */}
-                <table className="w-full border-collapse border border-black text-[9.5px]">
+                <table className="w-full shrink-0 border-collapse border border-black text-[9px] [&_td]:px-1.5 [&_td]:py-0.5">
                   <tbody>
                     <tr>
-                      <td className="border border-black bg-slate-100 px-2 py-1 font-bold w-[22%]">
+                      <td className="border border-black bg-slate-100 font-bold w-[22%]">
                         DIRECCIÓN EMPLAZAMIENTO:
                       </td>
-                      <td className="border border-black px-2 py-1 font-semibold" colSpan={3}>
+                      <td className="border border-black font-semibold" colSpan={3}>
                         <div className="flex flex-wrap items-center gap-1">
                           <span>C/</span>
                           <input
@@ -3463,7 +3494,7 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
                             value={meta.direccionCalle}
                             onChange={(e) => updateField("direccionCalle", e.target.value)}
                             placeholder="Nombre de vía / calle"
-                            className="min-w-[130px] flex-1 border-b border-dashed border-slate-300 bg-transparent px-1 py-0.5 font-semibold outline-none focus:bg-amber-50 print:border-0"
+                            className="min-w-[110px] flex-1 border-b border-dashed border-slate-300 bg-transparent px-1 py-0 font-semibold outline-none focus:bg-amber-50 print:border-0"
                           />
                           <span>, Nº</span>
                           <input
@@ -3471,7 +3502,7 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
                             value={meta.direccionNum}
                             onChange={(e) => updateField("direccionNum", e.target.value)}
                             placeholder="S/N"
-                            className="w-12 border-b border-dashed border-slate-300 bg-transparent px-1 py-0.5 text-center font-semibold outline-none focus:bg-amber-50 print:border-0"
+                            className="w-11 border-b border-dashed border-slate-300 bg-transparent px-1 py-0 text-center font-semibold outline-none focus:bg-amber-50 print:border-0"
                           />
                           <span>,</span>
                           <input
@@ -3479,7 +3510,7 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
                             value={meta.portalPlanta}
                             onChange={(e) => updateField("portalPlanta", e.target.value)}
                             placeholder="Local / Planta"
-                            className="w-24 border-b border-dashed border-slate-300 bg-transparent px-1 py-0.5 font-semibold outline-none focus:bg-amber-50 print:border-0"
+                            className="w-20 border-b border-dashed border-slate-300 bg-transparent px-1 py-0 font-semibold outline-none focus:bg-amber-50 print:border-0"
                           />
                           <span>· C.P.</span>
                           <input
@@ -3487,7 +3518,7 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
                             value={meta.codigoPostal}
                             onChange={(e) => updateField("codigoPostal", e.target.value)}
                             placeholder="38000"
-                            className="w-14 border-b border-dashed border-slate-300 bg-transparent px-1 py-0.5 text-center font-mono font-semibold outline-none focus:bg-amber-50 print:border-0"
+                            className="w-13 border-b border-dashed border-slate-300 bg-transparent px-1 py-0 text-center font-mono font-semibold outline-none focus:bg-amber-50 print:border-0"
                           />
                           <span>— T.M.</span>
                           <input
@@ -3495,7 +3526,7 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
                             value={meta.terminoMunicipal}
                             onChange={(e) => updateField("terminoMunicipal", e.target.value)}
                             placeholder="Municipio"
-                            className="min-w-[105px] flex-1 border-b border-dashed border-slate-300 bg-transparent px-1 py-0.5 font-semibold outline-none focus:bg-amber-50 print:border-0"
+                            className="min-w-[95px] flex-1 border-b border-dashed border-slate-300 bg-transparent px-1 py-0 font-semibold outline-none focus:bg-amber-50 print:border-0"
                           />
                           <span>(Isla/Prov.:</span>
                           <input
@@ -3503,17 +3534,17 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
                             value={meta.isla}
                             onChange={(e) => updateField("isla", e.target.value)}
                             placeholder="Isla / Provincia"
-                            className="w-24 border-b border-dashed border-slate-300 bg-transparent px-1 py-0.5 font-semibold outline-none focus:bg-amber-50 print:border-0"
+                            className="w-20 border-b border-dashed border-slate-300 bg-transparent px-1 py-0 font-semibold outline-none focus:bg-amber-50 print:border-0"
                           />
                           <span>)</span>
                         </div>
                       </td>
                     </tr>
                     <tr>
-                      <td className="border border-black bg-slate-100 px-2 py-1 font-bold">
+                      <td className="border border-black bg-slate-100 font-bold">
                         COORD. WGS84 (LAT / LON):
                       </td>
-                      <td className="border border-black px-2 py-1 font-mono font-bold">
+                      <td className="border border-black font-mono font-bold">
                         <div className="flex items-center gap-1">
                           <input
                             type="text"
@@ -3525,7 +3556,7 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
                               )
                             }
                             placeholder="Latitud"
-                            className="w-[46%] border-b border-dashed border-slate-300 bg-transparent px-1 py-0.5 font-mono font-bold outline-none focus:bg-amber-50 print:border-0"
+                            className="w-[45%] border-b border-dashed border-slate-300 bg-transparent px-1 py-0 font-mono font-bold outline-none focus:bg-amber-50 print:border-0"
                           />
                           <span>°,</span>
                           <input
@@ -3538,15 +3569,15 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
                               )
                             }
                             placeholder="Longitud"
-                            className="w-[46%] border-b border-dashed border-slate-300 bg-transparent px-1 py-0.5 font-mono font-bold outline-none focus:bg-amber-50 print:border-0"
+                            className="w-[45%] border-b border-dashed border-slate-300 bg-transparent px-1 py-0 font-mono font-bold outline-none focus:bg-amber-50 print:border-0"
                           />
                           <span>°</span>
                         </div>
                       </td>
-                      <td className="border border-black bg-slate-100 px-2 py-1 font-bold w-[20%]">
+                      <td className="border border-black bg-slate-100 font-bold w-[20%]">
                         COORDENADAS UTM:
                       </td>
-                      <td className="border border-black px-2 py-1 font-mono font-bold">
+                      <td className="border border-black font-mono font-bold">
                         <input
                           type="text"
                           value={meta.coordenadasUtm || ""}
@@ -3554,15 +3585,15 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
                             updateField("coordenadasUtm", e.target.value)
                           }
                           placeholder="Huso 28R / 30T · X / Y"
-                          className="w-full border-b border-dashed border-slate-300 bg-transparent px-1 py-0.5 font-mono font-bold outline-none focus:bg-amber-50 print:border-0"
+                          className="w-full border-b border-dashed border-slate-300 bg-transparent px-1 py-0 font-mono font-bold outline-none focus:bg-amber-50 print:border-0"
                         />
                       </td>
                     </tr>
                     <tr>
-                      <td className="border border-black bg-slate-100 px-2 py-1 font-bold">
+                      <td className="border border-black bg-slate-100 font-bold">
                         REFERENCIA CATASTRAL:
                       </td>
-                      <td className="border border-black px-2 py-1 font-mono">
+                      <td className="border border-black font-mono">
                         <input
                           type="text"
                           value={meta.referenciaCatastral || ""}
@@ -3573,13 +3604,13 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
                             )
                           }
                           placeholder="Referencia Catastral (20 díg.)"
-                          className="w-full border-b border-dashed border-slate-300 bg-transparent px-1 py-0.5 font-mono outline-none focus:bg-amber-50 print:border-0"
+                          className="w-full border-b border-dashed border-slate-300 bg-transparent px-1 py-0 font-mono outline-none focus:bg-amber-50 print:border-0"
                         />
                       </td>
-                      <td className="border border-black bg-slate-100 px-2 py-1 font-bold">
+                      <td className="border border-black bg-slate-100 font-bold">
                         PUNTO DE SUMINISTRO:
                       </td>
-                      <td className="border border-black px-2 py-1 font-semibold">
+                      <td className="border border-black font-semibold">
                         <input
                           type="text"
                           value={meta.fachadaNotaPuntoSuministro || ""}
@@ -3590,111 +3621,108 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
                             )
                           }
                           placeholder="CGP / Punto de Suministro en fachada principal"
-                          className="w-full border-b border-dashed border-slate-300 bg-transparent px-1 py-0.5 font-semibold outline-none focus:bg-amber-50 print:border-0"
+                          className="w-full border-b border-dashed border-slate-300 bg-transparent px-1 py-0 font-semibold outline-none focus:bg-amber-50 print:border-0"
                         />
                       </td>
                     </tr>
                   </tbody>
                 </table>
 
-                {/* BLOQUE 1: PLANO DE SITUACIÓN (GOOGLE MAPS SATÉLITE + CROQUIS PARCELARIO EDITABLE MANUALMENTE) */}
-                <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
-                  {/* Mapa Google Maps Satélite / Callejero de las Coordenadas */}
-                  <div className="border border-black bg-slate-50 flex flex-col">
-                    <div className="border-b border-black bg-slate-100 px-2 py-1 text-[9px] font-bold flex items-center justify-between gap-1">
-                      <span>1A. PLANO DE LOCALIZACIÓN GOOGLE MAPS</span>
-                      <span className="font-mono text-[8.5px] truncate">
-                        {meta.coordenadasLat && meta.coordenadasLng
-                          ? `${meta.coordenadasLat}, ${meta.coordenadasLng}`
-                          : meta.terminoMunicipal}
-                      </span>
-                    </div>
-                    <div className="no-print border-b border-slate-200 bg-white px-2 py-1 flex items-center gap-1.5 text-[9px]">
-                      <span className="font-semibold text-slate-600 whitespace-nowrap">
-                        Ubicación mapa:
-                      </span>
-                      <input
-                        type="text"
-                        value={meta.croquisMapaQuery || ""}
-                        onChange={(e) =>
-                          updateField("croquisMapaQuery", e.target.value)
-                        }
-                        placeholder="Automático (coordenadas/dirección) o escribe dirección manual..."
-                        className="w-full rounded border border-slate-200 px-1.5 py-0.5 text-[9.5px] outline-none focus:border-blue-500"
-                      />
-                    </div>
-                    <div className="relative min-h-[205px] flex-1 w-full overflow-hidden bg-slate-100">
-                      <iframe
-                        title="Plano Google Maps Emplazamiento"
-                        src={`https://maps.google.com/maps?q=${encodeURIComponent(
-                          googleMapsEmbedQuery
-                        )}&t=h&z=19&output=embed`}
-                        className="h-full min-h-[205px] w-full border-0"
-                        loading="lazy"
-                        referrerPolicy="no-referrer-when-downgrade"
-                      />
-                    </div>
-                  </div>
-
-                  {/* APARTADO 1B: FOTOGRAFÍA DE FACHADA / ACOMETIDA (GOOGLE + CARGA LOCAL — HEREDA COMPORTAMIENTO DEL APARTADO 2) */}
-                  <div
-                    tabIndex={0}
-                    onPaste={handlePasteCroquis1BClipboard}
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      setIsDragOver1B(true);
-                    }}
-                    onDragLeave={() => setIsDragOver1B(false)}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      setIsDragOver1B(false);
-                      const file = e.dataTransfer.files?.[0];
-                      if (file && file.type.startsWith("image/")) {
-                        compressAndSaveCroquisImage(file);
-                      }
-                    }}
-                    className={`border border-black bg-white flex flex-col outline-none transition ${
-                      isDragOver1B ? "ring-2 ring-[#0f6cbd] bg-blue-50/40" : ""
-                    }`}
-                  >
-                    <input
-                      ref={croquisFileInputRef}
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp,image/*"
-                      className="hidden"
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        if (f) compressAndSaveCroquisImage(f);
-                        e.target.value = "";
-                      }}
-                    />
-
-                    {/* Cabecera idéntica al Apartado 2 */}
-                    <div className="border-b border-black bg-slate-100 px-2 py-1 text-[9px] font-bold flex items-center justify-between gap-1">
-                      <span className="truncate">
-                        1B. FOTOGRAFÍA DE FACHADA Y PUNTO DE ACOMETIDA (GOOGLE / LOCAL)
-                      </span>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <span className="no-print font-normal text-[8.5px] text-[#0f6cbd] hidden sm:inline">
-                          {meta.croquisImagenDataUrl && !isCroquisManualOpen
-                            ? "Clic en la foto para situar CGP"
-                            : "Importa de Google o sube archivo"}
+                {/* CONTENEDOR AUTO-ESCALABLE A4 PARA 1A + 1B Y 2 (SIEMPRE EN UNA SOLA HOJA) */}
+                <div className="flex min-h-0 flex-1 flex-col gap-1.5">
+                  {/* BLOQUE 1: PLANO DE SITUACIÓN (1A GOOGLE MAPS + 1B FACHADA / CROQUIS — LADO A LADO EN PANTALLA Y PDF) */}
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 print:min-h-0 print:flex-[45] print:grid-cols-2 print:grid-rows-1">
+                    {/* Mapa Google Maps Satélite / Callejero de las Coordenadas */}
+                    <div className="flex min-h-0 flex-col border border-black bg-slate-50 overflow-hidden">
+                      <div className="flex shrink-0 items-center justify-between gap-1 border-b border-black bg-slate-100 px-2 py-0.5 text-[8.5px] font-bold">
+                        <span className="truncate">1A. PLANO DE LOCALIZACIÓN GOOGLE MAPS</span>
+                        <span className="font-mono text-[8px] truncate shrink-0">
+                          {meta.coordenadasLat && meta.coordenadasLng
+                            ? `${meta.coordenadasLat}, ${meta.coordenadasLng}`
+                            : meta.terminoMunicipal}
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => setIsCroquisManualOpen((v) => !v)}
-                          className={`no-print inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[8px] font-semibold transition ${
-                            isCroquisManualOpen
-                              ? "bg-slate-800 text-white"
-                              : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-200"
-                          }`}
-                          title="Alternar entre Fotografía Interactiva (modo Apartado 2) y Croquis Vectorial Manual"
-                        >
-                          <Pencil className="h-2.5 w-2.5" />
-                          {isCroquisManualOpen ? "Ver Foto 1B" : "Croquis manual"}
-                        </button>
+                      </div>
+                      <div className="no-print flex shrink-0 items-center gap-1.5 border-b border-slate-200 bg-white px-2 py-1 text-[9px]">
+                        <span className="font-semibold text-slate-600 whitespace-nowrap">
+                          Ubicación mapa:
+                        </span>
+                        <input
+                          type="text"
+                          value={meta.croquisMapaQuery || ""}
+                          onChange={(e) =>
+                            updateField("croquisMapaQuery", e.target.value)
+                          }
+                          placeholder="Automático (coordenadas/dirección) o escribe dirección manual..."
+                          className="w-full rounded border border-slate-200 px-1.5 py-0.5 text-[9.5px] outline-none focus:border-blue-500"
+                        />
+                      </div>
+                      <div className="relative h-[186px] w-full flex-1 overflow-hidden bg-slate-100 print:h-auto print:min-h-0">
+                        <iframe
+                          title="Plano Google Maps Emplazamiento"
+                          src={`https://maps.google.com/maps?q=${encodeURIComponent(
+                            googleMapsEmbedQuery
+                          )}&t=h&z=19&output=embed`}
+                          className="absolute inset-0 h-full w-full border-0"
+                          loading="lazy"
+                          referrerPolicy="no-referrer-when-downgrade"
+                        />
                       </div>
                     </div>
+
+                    {/* APARTADO 1B: FOTOGRAFÍA DE FACHADA / ACOMETIDA (GOOGLE + CARGA LOCAL — HEREDA COMPORTAMIENTO DEL APARTADO 2) */}
+                    <div
+                      tabIndex={0}
+                      onPaste={handlePasteCroquis1BClipboard}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        setIsDragOver1B(true);
+                      }}
+                      onDragLeave={() => setIsDragOver1B(false)}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        setIsDragOver1B(false);
+                        const file = e.dataTransfer.files?.[0];
+                        if (file && file.type.startsWith("image/")) {
+                          compressAndSaveCroquisImage(file);
+                        }
+                      }}
+                      className={`flex min-h-0 flex-col border border-black bg-white outline-none overflow-hidden transition ${
+                        isDragOver1B ? "ring-2 ring-[#0f6cbd] bg-blue-50/40" : ""
+                      }`}
+                    >
+                      <input
+                        ref={croquisFileInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) compressAndSaveCroquisImage(f);
+                          e.target.value = "";
+                        }}
+                      />
+
+                      {/* Cabecera idéntica al Apartado 2 */}
+                      <div className="flex shrink-0 items-center justify-between gap-1 border-b border-black bg-slate-100 px-2 py-0.5 text-[8.5px] font-bold">
+                        <span className="truncate">
+                          1B. FOTOGRAFÍA DE FACHADA Y ACOMETIDA (GOOGLE / LOCAL)
+                        </span>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setIsCroquisManualOpen((v) => !v)}
+                            className={`no-print inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[8px] font-semibold transition ${
+                              isCroquisManualOpen
+                                ? "bg-slate-800 text-white"
+                                : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-200"
+                            }`}
+                            title="Alternar entre Fotografía Interactiva (modo Apartado 2) y Croquis Vectorial Manual"
+                          >
+                            <Pencil className="h-2.5 w-2.5" />
+                            {isCroquisManualOpen ? "Ver Foto 1B" : "Croquis manual"}
+                          </button>
+                        </div>
+                      </div>
 
                     {/* Barra dual de inserción en 1B: 1) Importación desde Google y 2) Carga local desde el ordenador (no se imprime) */}
                     {!isCroquisManualOpen && (
@@ -3790,10 +3818,10 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
                       </div>
                     )}
 
-                    {/* MODO PRINCIPAL DE 1B: CONTENEDOR INTERACTIVO DE FACHADA (HEREDA 100% EL APARTADO 2) */}
+                    {/* MODO PRINCIPAL DE 1B: CONTENEDOR INTERACTIVO DE FACHADA (AUTO-AJUSTADO A4 SIN CORTAR) */}
                     {!isCroquisManualOpen ? (
                       meta.croquisImagenDataUrl ? (
-                        <div className="flex-1 flex flex-col">
+                        <div className="flex min-h-0 flex-1 flex-col">
                           <div
                             onClick={(e) => {
                               const rect =
@@ -3823,12 +3851,16 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
                               }));
                             }}
                             title="Haz clic para situar la diana de CGP / Punto de Acometida sobre la fachada en 1B"
-                            className="relative min-h-[205px] flex-1 w-full cursor-crosshair overflow-hidden bg-slate-900"
+                            className="relative h-[168px] w-full flex-1 cursor-crosshair overflow-hidden bg-slate-50 print:h-auto print:min-h-0"
                           >
                             <img
                               src={meta.croquisImagenDataUrl}
                               alt="Fotografía de fachada y acometida en Apartado 1B"
-                              className="h-full min-h-[205px] w-full object-cover"
+                              className={`absolute inset-0 h-full w-full ${
+                                photoFitMode === "contain"
+                                  ? "object-contain"
+                                  : "object-cover"
+                              }`}
                             />
 
                             {/* Marcador ilustrativo idéntico al Apartado 2 */}
@@ -3839,36 +3871,36 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
                               }}
                               className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center"
                             >
-                              <div className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-rose-600 text-white shadow-lg">
-                                <Crosshair className="h-3.5 w-3.5" />
+                              <div className="flex h-5 w-5 items-center justify-center rounded-full border-2 border-rose-800 bg-rose-600 text-white shadow">
+                                <Crosshair className="h-3 w-3 stroke-[2.5]" />
                               </div>
-                              <div className="mt-0.5 max-w-[210px] truncate rounded border border-black bg-amber-300/95 px-1.5 py-0.5 text-[8.5px] font-extrabold text-black shadow">
+                              <div className="mt-0.5 max-w-[190px] truncate rounded border border-black bg-amber-300 px-1.5 py-0.5 text-[8px] font-extrabold text-black shadow">
                                 ⚡{" "}
                                 {meta.fachadaNotaPuntoSuministro ||
                                   "CGP / Punto Suministro"}
                               </div>
                             </div>
+                          </div>
 
-                            {/* Leyenda georreferenciada inferior idéntica al Apartado 2 */}
-                            <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-wrap items-center justify-between gap-1 bg-black/80 px-2 py-1 text-[8px] font-mono text-white">
-                              <span className="truncate">
-                                📍 1B: C/ {meta.direccionCalle}{" "}
-                                {meta.direccionNum} ({meta.terminoMunicipal})
-                              </span>
-                              <span className="truncate">
-                                {meta.coordenadasLat && meta.coordenadasLng
-                                  ? `${meta.coordenadasLat}, ${meta.coordenadasLng}`
-                                  : meta.coordenadasUtm || ""}
-                              </span>
-                            </div>
+                          {/* Leyenda georreferenciada inferior nítida en pantalla e impresión */}
+                          <div className="flex shrink-0 items-center justify-between gap-1 border-t border-black bg-slate-100 px-1.5 py-0.5 text-[7.5px] font-mono font-bold text-black">
+                            <span className="truncate">
+                              📍 1B: C/ {meta.direccionCalle}{" "}
+                              {meta.direccionNum} ({meta.terminoMunicipal})
+                            </span>
+                            <span className="truncate shrink-0">
+                              {meta.coordenadasLat && meta.coordenadasLng
+                                ? `${meta.coordenadasLat}, ${meta.coordenadasLng}`
+                                : meta.coordenadasUtm || ""}
+                            </span>
                           </div>
                         </div>
                       ) : (
-                        /* Estado vacío idéntico visual y funcionalmente al Apartado 2 */
-                        <div className="relative flex min-h-[205px] flex-1 flex-col items-center justify-center bg-slate-50 p-2 text-center">
+                        /* Estado vacío auto-ajustado a A4 */
+                        <div className="relative flex h-[186px] w-full flex-1 flex-col items-center justify-center overflow-hidden bg-slate-50 p-2 text-center print:h-auto print:min-h-0">
                           <svg
                             viewBox="0 0 640 185"
-                            className="h-[132px] w-full max-w-[460px]"
+                            className="max-h-[115px] w-full max-w-[440px] object-contain"
                           >
                             <line
                               x1="20"
@@ -4067,7 +4099,7 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
                           )}
                         </div>
 
-                        <div className="flex-1 flex items-center justify-center p-1">
+                        <div className="relative flex h-[186px] w-full flex-1 items-center justify-center overflow-hidden bg-slate-50 p-1 print:h-auto print:min-h-0">
                           {(() => {
                             const parcelaX = meta.croquisParcelaX ?? 345;
                             const parcelaY = meta.croquisParcelaY ?? 218;
@@ -4184,7 +4216,7 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
                                     }
                                   }
                                 }}
-                                className="h-[197px] w-full cursor-crosshair select-none bg-slate-50 touch-none"
+                                className="h-full max-h-full w-full cursor-crosshair select-none bg-slate-50 object-contain touch-none"
                               >
                                 <defs>
                                   <clipPath id="croquis-parcela-clip">
@@ -4363,87 +4395,92 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
                       </>
                     )}
                   </div>
-                </div>
-
-                {/* BLOQUE 2: FOTOGRAFÍA DE FACHADA DE GOOGLE STREET VIEW / OBRA CON PUNTO DE COORDENADAS */}
-                <div
-                  className="border border-black bg-white"
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    const file = e.dataTransfer.files?.[0];
-                    if (file && file.type.startsWith("image/")) {
-                      compressAndSaveFacadeImage(file);
-                    }
-                  }}
-                >
-                  <div className="flex items-center justify-between border-b border-black bg-slate-100 px-2 py-1 text-[9.5px] font-bold">
-                    <span>
-                      2. FOTOGRAFÍA DE FACHADA (GOOGLE STREET VIEW / OBRA) E ILUSTRACIÓN DE COORDENADAS DEL SUMINISTRO
-                    </span>
-                    <span className="no-print font-normal text-[9px] text-[#0f6cbd]">
-                      {meta.fachadaFotoDataUrl
-                        ? "Haz clic sobre la fachada para situar la diana de CGP / Coordenadas"
-                        : "Arrastra aquí la captura de Google Street View o pulsa Subir Foto"}
-                    </span>
                   </div>
 
-                  {meta.fachadaFotoDataUrl ? (
-                    <div>
-                      <div
-                        onClick={(e) => {
-                          const rect = e.currentTarget.getBoundingClientRect();
-                          const xPct = Math.max(
-                            4,
-                            Math.min(
-                              96,
-                              Math.round(((e.clientX - rect.left) / rect.width) * 100)
-                            )
-                          );
-                          const yPct = Math.max(
-                            6,
-                            Math.min(
-                              94,
-                              Math.round(((e.clientY - rect.top) / rect.height) * 100)
-                            )
-                          );
-                          setMeta((prev) => ({
-                            ...prev,
-                            fachadaPinX: xPct,
-                            fachadaPinY: yPct,
-                          }));
-                        }}
-                        title="Haz clic para colocar el marcador exacto de CGP / Coordenadas sobre la fachada"
-                        className="relative h-[275px] w-full cursor-crosshair overflow-hidden bg-slate-900"
-                      >
-                        <img
-                          src={meta.fachadaFotoDataUrl}
-                          alt="Fachada del emplazamiento Google Street View"
-                          className="h-full w-full object-cover"
-                        />
+                  {/* BLOQUE 2: FOTOGRAFÍA DE FACHADA DE GOOGLE STREET VIEW / OBRA CON PUNTO DE COORDENADAS (AUTO-AJUSTE A4 SIN CORTAR) */}
+                  <div
+                    className="flex min-h-0 flex-col border border-black bg-white overflow-hidden print:flex-[55]"
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const file = e.dataTransfer.files?.[0];
+                      if (file && file.type.startsWith("image/")) {
+                        compressAndSaveFacadeImage(file);
+                      }
+                    }}
+                  >
+                    <div className="flex shrink-0 items-center justify-between gap-2 border-b border-black bg-slate-100 px-2 py-0.5 text-[9px] font-bold">
+                      <span className="truncate">
+                        2. FOTOGRAFÍA DE FACHADA (GOOGLE STREET VIEW / OBRA) E ILUSTRACIÓN DE COORDENADAS DEL SUMINISTRO
+                      </span>
+                      <span className="no-print shrink-0 font-normal text-[8.5px] text-[#0f6cbd] hidden sm:inline">
+                        {meta.fachadaFotoDataUrl
+                          ? "Haz clic sobre la fachada para situar la diana de CGP / Coordenadas"
+                          : "Arrastra aquí la captura de Google Street View o pulsa Subir Foto"}
+                      </span>
+                    </div>
 
-                        {/* Marcador ilustrativo de coordenadas y punto de suministro sobre la fachada */}
+                    {meta.fachadaFotoDataUrl ? (
+                      <div className="flex min-h-0 flex-1 flex-col">
                         <div
-                          style={{
-                            left: `${meta.fachadaPinX ?? 52}%`,
-                            top: `${meta.fachadaPinY ?? 62}%`,
+                          onClick={(e) => {
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            const xPct = Math.max(
+                              4,
+                              Math.min(
+                                96,
+                                Math.round(((e.clientX - rect.left) / rect.width) * 100)
+                              )
+                            );
+                            const yPct = Math.max(
+                              6,
+                              Math.min(
+                                94,
+                                Math.round(((e.clientY - rect.top) / rect.height) * 100)
+                              )
+                            );
+                            setMeta((prev) => ({
+                              ...prev,
+                              fachadaPinX: xPct,
+                              fachadaPinY: yPct,
+                            }));
                           }}
-                          className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center"
+                          title="Haz clic para colocar el marcador exacto de CGP / Coordenadas sobre la fachada"
+                          className="relative h-[220px] w-full flex-1 cursor-crosshair overflow-hidden bg-slate-50 print:h-auto print:min-h-0"
                         >
-                          <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-rose-600 text-white shadow-lg">
-                            <Crosshair className="h-4 w-4" />
-                          </div>
-                          <div className="mt-1 whitespace-nowrap rounded border border-black bg-amber-300/95 px-2 py-0.5 text-[9px] font-extrabold text-black shadow">
-                            ⚡ {meta.fachadaNotaPuntoSuministro || "CGP / Punto Suministro"}
+                          <img
+                            src={meta.fachadaFotoDataUrl}
+                            alt="Fachada del emplazamiento Google Street View"
+                            className={`absolute inset-0 h-full w-full ${
+                              photoFitMode === "contain"
+                                ? "object-contain"
+                                : "object-cover"
+                            }`}
+                          />
+
+                          {/* Marcador ilustrativo de coordenadas y punto de suministro sobre la fachada */}
+                          <div
+                            style={{
+                              left: `${meta.fachadaPinX ?? 52}%`,
+                              top: `${meta.fachadaPinY ?? 62}%`,
+                            }}
+                            className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center"
+                          >
+                            <div className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-rose-800 bg-rose-600 text-white shadow">
+                              <Crosshair className="h-3.5 w-3.5 stroke-[2.5]" />
+                            </div>
+                            <div className="mt-0.5 max-w-[320px] truncate rounded border border-black bg-amber-300 px-2 py-0.5 text-[8.5px] font-extrabold text-black shadow">
+                              ⚡ {meta.fachadaNotaPuntoSuministro || "CGP / Punto Suministro"}
+                            </div>
                           </div>
                         </div>
 
-                        {/* Leyenda georreferenciada impresa al pie de la foto */}
-                        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-wrap items-center justify-between gap-2 bg-black/80 px-3 py-1.5 text-[9px] font-mono text-white">
-                          <span>
+                        {/* Leyenda georreferenciada impresa al pie de la foto (sin tapar la imagen y nítida en impresión) */}
+                        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-black bg-slate-100 px-2 py-0.5 text-[8px] font-mono font-bold text-black">
+                          <span className="truncate">
                             📍 FACHADA: C/ {meta.direccionCalle} {meta.direccionNum} ({meta.terminoMunicipal})
                           </span>
-                          <span>
+                          <span className="truncate shrink-0">
                             {meta.coordenadasLat && meta.coordenadasLng
                               ? `WGS84: ${meta.coordenadasLat}, ${meta.coordenadasLng}`
                               : ""}{" "}
@@ -4451,134 +4488,135 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
                           </span>
                         </div>
                       </div>
-                    </div>
-                  ) : (
-                    <div className="relative flex h-[250px] flex-col items-center justify-center bg-slate-50 p-3 text-center">
-                      {/* Alzado esquemático limpio de respaldo para impresión si aún no hay foto */}
-                      <svg
-                        viewBox="0 0 640 185"
-                        className="h-[155px] w-full max-w-[580px]"
-                      >
-                        <line
-                          x1="20"
-                          y1="168"
-                          x2="620"
-                          y2="168"
-                          stroke="#0f172a"
-                          strokeWidth="2.5"
-                        />
-                        <rect
-                          x="170"
-                          y="20"
-                          width="300"
-                          height="148"
-                          fill="#f8fafc"
-                          stroke="#334155"
-                          strokeWidth="2"
-                        />
-                        <rect
-                          x="205"
-                          y="42"
-                          width="55"
-                          height="45"
-                          fill="#e2e8f0"
-                          stroke="#475569"
-                        />
-                        <rect
-                          x="292"
-                          y="42"
-                          width="55"
-                          height="45"
-                          fill="#e2e8f0"
-                          stroke="#475569"
-                        />
-                        <rect
-                          x="380"
-                          y="42"
-                          width="55"
-                          height="45"
-                          fill="#e2e8f0"
-                          stroke="#475569"
-                        />
-                        <rect
-                          x="295"
-                          y="108"
-                          width="50"
-                          height="60"
-                          fill="#cbd5e1"
-                          stroke="#334155"
-                          strokeWidth="1.5"
-                        />
-                        {/* CGP en fachada */}
-                        <rect
-                          x="212"
-                          y="112"
-                          width="32"
-                          height="40"
-                          fill="#fde047"
-                          stroke="#b91c1c"
-                          strokeWidth="2"
-                        />
-                        <text
-                          x="228"
-                          y="135"
-                          fontSize="8.5"
-                          fontWeight="bold"
-                          textAnchor="middle"
-                          fill="#991b1b"
+                    ) : (
+                      <div className="relative flex h-[215px] w-full flex-1 flex-col items-center justify-center overflow-hidden bg-slate-50 p-2 text-center print:h-auto print:min-h-0">
+                        {/* Alzado esquemático limpio de respaldo para impresión si aún no hay foto */}
+                        <svg
+                          viewBox="0 0 640 185"
+                          className="max-h-[135px] w-full max-w-[540px] object-contain"
                         >
-                          CGP
-                        </text>
-                        <text x="320" y="14" fontSize="10" fontWeight="bold" textAnchor="middle">
-                          VISTA FRONTAL DE FACHADA — C/ {meta.direccionCalle.toUpperCase()} Nº {meta.direccionNum}
-                        </text>
-                      </svg>
+                          <line
+                            x1="20"
+                            y1="168"
+                            x2="620"
+                            y2="168"
+                            stroke="#0f172a"
+                            strokeWidth="2.5"
+                          />
+                          <rect
+                            x="170"
+                            y="20"
+                            width="300"
+                            height="148"
+                            fill="#f8fafc"
+                            stroke="#334155"
+                            strokeWidth="2"
+                          />
+                          <rect
+                            x="205"
+                            y="42"
+                            width="55"
+                            height="45"
+                            fill="#e2e8f0"
+                            stroke="#475569"
+                          />
+                          <rect
+                            x="292"
+                            y="42"
+                            width="55"
+                            height="45"
+                            fill="#e2e8f0"
+                            stroke="#475569"
+                          />
+                          <rect
+                            x="380"
+                            y="42"
+                            width="55"
+                            height="45"
+                            fill="#e2e8f0"
+                            stroke="#475569"
+                          />
+                          <rect
+                            x="295"
+                            y="108"
+                            width="50"
+                            height="60"
+                            fill="#cbd5e1"
+                            stroke="#334155"
+                            strokeWidth="1.5"
+                          />
+                          {/* CGP en fachada */}
+                          <rect
+                            x="212"
+                            y="112"
+                            width="32"
+                            height="40"
+                            fill="#fde047"
+                            stroke="#b91c1c"
+                            strokeWidth="2"
+                          />
+                          <text
+                            x="228"
+                            y="135"
+                            fontSize="8.5"
+                            fontWeight="bold"
+                            textAnchor="middle"
+                            fill="#991b1b"
+                          >
+                            CGP
+                          </text>
+                          <text x="320" y="14" fontSize="10" fontWeight="bold" textAnchor="middle">
+                            VISTA FRONTAL DE FACHADA — C/ {meta.direccionCalle.toUpperCase()} Nº {meta.direccionNum}
+                          </text>
+                        </svg>
 
-                      <button
-                        type="button"
-                        onClick={() => fachadaFileInputRef.current?.click()}
-                        className="no-print mt-1 inline-flex items-center gap-1.5 rounded-xl border border-dashed border-[#0f6cbd] bg-white px-4 py-1.5 text-[11px] font-bold text-[#0f6cbd] shadow-xs hover:bg-blue-50"
-                      >
-                        <Camera className="h-3.5 w-3.5" />
-                        Cargar foto de fachada de Google Street View (o pulsa Ctrl+V para pegar captura)
-                      </button>
-                    </div>
-                  )}
+                        <button
+                          type="button"
+                          onClick={() => fachadaFileInputRef.current?.click()}
+                          className="no-print mt-1 inline-flex items-center gap-1.5 rounded-xl border border-dashed border-[#0f6cbd] bg-white px-4 py-1 text-[10.5px] font-bold text-[#0f6cbd] shadow-xs hover:bg-blue-50"
+                        >
+                          <Camera className="h-3.5 w-3.5" />
+                          Cargar foto de fachada de Google Street View (o pulsa Ctrl+V para pegar captura)
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              <div className="flex items-center justify-between gap-2 pt-2 text-[9.5px]">
-                <span className="font-mono text-[9px] text-slate-700">
+              <div className="flex shrink-0 items-center justify-between gap-2 pt-1.5 text-[9px]">
+                <span className="truncate font-mono text-[8.5px] text-slate-700">
                   {meta.referenciaCatastral
                     ? `Ref. Catastral: ${meta.referenciaCatastral}`
                     : ""}
                 </span>
-                <div className="flex items-center gap-2">
-                  <span>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <span className="whitespace-nowrap">
                     Se adjuntan hojas complementarias de plano de Situación y Emplazamiento
                   </span>
-                  <span className="inline-block h-4 w-4 border border-black"></span>
+                  <span className="inline-block h-3.5 w-3.5 shrink-0 border border-black"></span>
                 </div>
               </div>
             </div>
 
             <OfficialFooter pageNum={9} />
           </div>
-        </div>
+        </>
       )}
 
       {/* =====================================================================
           PÁGINA 10/11: PÁGINA COMPLEMENTARIA (CÁLCULOS JUSTIFICATIVOS REBT)
          ===================================================================== */}
       {shouldShowPage(10) && (
-        <div className="mtd-print-page mx-auto max-w-[210mm] rounded-sm border border-slate-400 bg-white p-6 text-[11px] leading-tight text-black shadow-2xl">
+        <div className="mtd-print-page mx-auto max-w-[210mm] rounded-sm border border-slate-400 bg-white p-4 sm:p-5 text-[11px] leading-tight text-black shadow-2xl">
           <OfficialHeader isBtBox={false} />
 
-          <div className="border-2 border-black">
-            <div className="border-b border-black bg-slate-100 py-1 text-center font-bold">
+          <div className="my-1 flex min-h-0 flex-1 flex-col justify-between overflow-hidden">
+          <div className="flex min-h-0 flex-1 flex-col border-2 border-black overflow-hidden">
+            <div className="shrink-0 border-b border-black bg-slate-100 py-1 text-center font-bold">
               PÁGINA COMPLEMENTARIA
             </div>
-            <div className="border-b border-black p-2 text-[9.5px]">
+            <div className="shrink-0 border-b border-black p-2 text-[9.5px]">
               <div className="font-semibold">SEÑALAR LA OPCIÓN:</div>
               <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
                 <span>[ ] Memoria Descriptiva</span>
@@ -4589,7 +4627,7 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
               </div>
             </div>
 
-            <div className="min-h-[185mm] p-3 text-[10px] leading-relaxed space-y-3">
+            <div className="min-h-[175mm] print:min-h-0 flex-1 p-3 text-[10px] leading-relaxed space-y-3">
               <h4 className="font-bold underline">
                 ANEXO DE FÓRMULAS Y CÁLCULOS JUSTIFICATIVOS REGLAMENTARIOS (REBT RD 842/2002):
               </h4>
@@ -4650,17 +4688,18 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
             </div>
           </div>
 
-          <div className="mt-2 flex justify-end">
+          <div className="mt-1.5 flex shrink-0 justify-end">
             <div className="flex border border-black text-[10px]">
               <div className="border-r border-black p-1.5 font-semibold">
                 Nº de páginas
                 <br />
                 complementarias
               </div>
-              <div className=" flex w-20 items-center justify-center font-mono font-bold">
+              <div className="flex w-20 items-center justify-center font-mono font-bold">
                 1
               </div>
             </div>
+          </div>
           </div>
 
           <OfficialFooter pageNum={10} />
@@ -4671,10 +4710,10 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
           PÁGINA 11/11: DECLARACIÓN DEL INSTALADOR PH / TÉCNICO COMPETENTE Y FIRMA
          ===================================================================== */}
       {shouldShowPage(11) && (
-        <div className="mtd-print-page mx-auto max-w-[210mm] rounded-sm border border-slate-400 bg-white p-6 text-[11px] leading-tight text-black shadow-2xl">
+        <div className="mtd-print-page mx-auto max-w-[210mm] rounded-sm border border-slate-400 bg-white p-4 sm:p-5 text-[11px] leading-tight text-black shadow-2xl">
           <OfficialHeader isBtBox={false} />
 
-          <div className="mt-4 border-2 border-black p-3 space-y-3">
+          <div className="mt-2 border-2 border-black p-2.5 space-y-2.5">
             {/* Opción 1: Instalador Autorizado PH */}
             <div>
               <div className="flex items-center gap-2 font-bold">
@@ -4914,7 +4953,7 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
             </p>
           </div>
 
-          <div className="mt-8 flex flex-col items-center space-y-10 text-center text-xs">
+          <div className="mt-4 flex flex-1 flex-col items-center justify-center space-y-5 text-center text-xs">
             <div>
               En{" "}
               <input
@@ -4948,14 +4987,14 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
 
             <div>El autor de la Memoria Técnica de Diseño</div>
 
-            <div className="pt-6 text-slate-600">(Firma)</div>
+            <div className="pt-4 text-slate-600">(Firma)</div>
 
-            <div className="pt-8 text-slate-700">
+            <div className="pt-4 text-slate-700">
               (Sello de la Empresa Instaladora o Visado del Colegio Oficial)
             </div>
           </div>
 
-          <div className="mt-16 text-right text-sm font-bold">11/11</div>
+          <div className="mt-auto pt-2 text-right text-xs font-extrabold whitespace-nowrap">11/11</div>
         </div>
       )}
       </div>

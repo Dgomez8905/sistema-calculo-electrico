@@ -204,9 +204,21 @@ select:not(.mtd-raw-select):focus {
   }
 }
 
-@media (max-width: 768px) {
+@media screen and (max-width: 768px) {
   .mtd-print-page {
     min-width: 720px;
+  }
+}
+
+@media screen and (min-width: 769px) {
+  .mtd-print-page {
+    width: 210mm;
+    max-width: 210mm;
+    min-height: 297mm;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
   }
 }
 
@@ -316,12 +328,34 @@ select:not(.mtd-raw-select):focus {
 @media print {
   @page {
     size: A4 portrait;
-    margin: 8mm;
+    margin: 6mm 7mm;
   }
 
   @page unifilar-a3 {
     size: A3 landscape;
     margin: 6mm;
+  }
+
+  html,
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  main,
+  .mtd-layout-root,
+  .mtd-sheets-container {
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+    display: block !important;
   }
 
   .print-a3-sheet {
@@ -333,27 +367,40 @@ select:not(.mtd-raw-select):focus {
     width: 100% !important;
   }
 
-  body {
-    background: #ffffff !important;
-    color: #000000 !important;
-  }
-
   .no-print {
     display: none !important;
+  }
+
+  .mtd-print-page,
+  .mtd-print-page * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   .mtd-print-page {
     box-shadow: none !important;
     border: none !important;
     margin: 0 !important;
-    padding: 4mm !important;
+    padding: 2.5mm 3mm !important;
     width: 100% !important;
-    page-break-after: always;
-    break-after: page;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: 283mm !important;
+    max-height: 283mm !important;
+    min-height: 0 !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    overflow: hidden !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    page-break-after: always !important;
+    break-after: page !important;
   }
 
-  .mtd-print-page:last-child {
-    page-break-after: auto;
-    break-after: auto;
+  .mtd-sheets-container > .mtd-print-page:last-child {
+    page-break-after: auto !important;
+    break-after: auto !important;
   }
 }
