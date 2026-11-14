@@ -1445,6 +1445,16 @@ export interface MtdFormMetadata {
   croquisNorteGrados?: number;
   croquisDibujoJson?: string;
   croquisImagenDataUrl?: string;
+  croquisFotoPinX?: number;
+  croquisFotoPinY?: number;
+
+  // Campos clave Sede Electrónica Gobierno de Canarias / Edistribución NRZ103 (Tenerife)
+  cupsCodigo?: string;
+  resistenciaTierraMedidaOhm?: number;
+  tipoActuacion?:
+    | "Nueva instalación"
+    | "Ampliación / Modificación"
+    | "Reforma de importancia";
 
   // Página 11: Autor de la M.T.D. (Instalador Autorizado PH / Técnico Competente)
   autorTipo: "instalador_ph" | "tecnico_competente";
@@ -1582,6 +1592,11 @@ export const DEFAULT_MTD_METADATA: MtdFormMetadata = {
   croquisNorteGrados: 0,
   croquisDibujoJson: "[]",
   croquisImagenDataUrl: "",
+  croquisFotoPinX: 50,
+  croquisFotoPinY: 62,
+  cupsCodigo: "ES0031600000000001AB",
+  resistenciaTierraMedidaOhm: 18,
+  tipoActuacion: "Nueva instalación",
 
   autorTipo: "instalador_ph",
   instaladorNombrePh: "Daniel Gómez Rojas",

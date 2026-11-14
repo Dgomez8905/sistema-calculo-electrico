@@ -30,6 +30,11 @@ import {
   IEC_60617_LEGEND,
 } from "../src/components/monpix/dinPanelHelpers.ts";
 import { buildUnifilarIec60617Svg } from "../src/lib/unifilar-iec60617.ts";
+import {
+  buildCanariasVisionFromProject,
+  parseCanariasVisionJsonToSummary,
+} from "../src/lib/rebt-vision-canarias.ts";
+import { generateUnifilarDxf } from "../src/lib/unifilar-dxf.ts";
 
 test("ITC-BT-25: circuitos básicos C1 a C5 cumplen secciones y PIAs reglamentarios", () => {
   const results = ITC_BT_25_TEMPLATES.slice(0, 5).map((c) => calculateRebtCircuit(c));
@@ -548,4 +553,53 @@ test("Rangos comerciales de potencia e IGA: ≤ 63 A Combi DIN compacto vs > 63 
 
   const mccbDiag = validateDinPanelInstallation(mccbMods, 36);
   assert.equal(mccbDiag[0].severity, "ok");
+});
+
+test("Visión estructurada Canarias (NRZ103 Tenerife): inventario C1-01, Mermaid, H07Z1-K (AS) y exportación AutoCAD DXF", () => {
+  const circuits = ITC_BT_25_TEMPLATES.slice(0, 5);
+  const vision = buildCanariasVisionFromProject({
+    supplyType: "monofasico_230v",
+    igaAmps: 25,
+    hasSurgeProtection: false,
+    rcdCount: 1,
+    diferencialCalibreAmps: 40,
+    diferencialClase: "AC",
+    circuits,
+    meta: DEFAULT_MTD_METADATA,
+    brandName: "Merlin Gerin multi 9",
+    icuKa: 4.5,
+  });
+
+  assert.equal(vision.inventario_componentes[0].id, "C1-01");
+  assert.ok(vision.contexto_canarias.distribuidora.includes("NRZ103"));
+  assert.ok(
+    vision.contexto_canarias.alertas_inspeccion_canarias.some((a) =>
+      a.includes("ITC-BT-23")
+    )
+  );
+  assert.ok(
+    vision.contexto_canarias.alertas_inspeccion_canarias.some((a) =>
+      a.includes("Clase AC")
+    )
+  );
+  assert.ok(vision.esquema_unifilar_mermaid.startsWith("graph TD"));
+  assert.equal(
+    vision.memoria_tecnica_gobierno_canarias.tabla_circuitos_mtd[0].conductor,
+    "H07Z1-K (AS) 450/750V"
+  );
+
+  const parsed = parseCanariasVisionJsonToSummary(vision);
+  assert.equal(parsed.brandDetected, "Schneider");
+  assert.equal(parsed.diferencialClase, "AC");
+  assert.equal(parsed.circuits.length, 5);
+
+  const dxf = generateUnifilarDxf({
+    vision,
+    meta: DEFAULT_MTD_METADATA,
+    sheetNumber: "01",
+  });
+  assert.ok(dxf.includes("SECTION"));
+  assert.ok(dxf.includes("APARAMENTA_IEC60617"));
+  assert.ok(dxf.includes("H07Z1-K(AS)"));
+  assert.ok(dxf.endsWith("EOF"));
 });

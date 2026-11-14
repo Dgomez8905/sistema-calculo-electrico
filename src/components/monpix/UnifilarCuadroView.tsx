@@ -45,6 +45,12 @@ import {
   type UnifiedMaterialOrderItem,
 } from "@/lib/monpix-store";
 import { buildUnifilarIec60617Svg } from "@/lib/unifilar-iec60617";
+import {
+  buildCanariasVisionFromProject,
+  parseCanariasVisionJsonToSummary,
+  type CanariasPanelVisionResult,
+} from "@/lib/rebt-vision-canarias";
+import { generateUnifilarDxf } from "@/lib/unifilar-dxf";
 import DinModularDeviceVisual, {
   DIN_BRAND_STYLES,
   type DinBrandId,
@@ -88,6 +94,7 @@ interface UnifilarCuadroViewProps {
     }
   ) => void;
   onOpenFichaMtd?: () => void;
+  onApplyMemoriaCanarias?: (texto: string) => void;
   onSaveDiagramRecord: (item: SavedUnifilarDiagram) => void;
 }
 
@@ -106,6 +113,7 @@ export default function UnifilarCuadroView({
   onAddToUnifiedOrder,
   onApplyDraftCircuits,
   onOpenFichaMtd,
+  onApplyMemoriaCanarias,
   onSaveDiagramRecord,
 }: UnifilarCuadroViewProps) {
   const [stepTab, setStepTab] = useState<
@@ -174,6 +182,8 @@ export default function UnifilarCuadroView({
   );
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string>("");
   const [photoVisionNote, setPhotoVisionNote] = useState<string>("");
+  const [visionReport, setVisionReport] =
+    useState<CanariasPanelVisionResult | null>(null);
   const [pendingDraft, setPendingDraft] = useState<ParsedPanelDraft | null>(null);
   const [lastGeneratedDraft, setLastGeneratedDraft] =
     useState<ParsedPanelDraft | null>(null);
@@ -395,8 +405,49 @@ export default function UnifilarCuadroView({
           ok?: boolean;
           mode?: string;
           extractedText?: string;
+          structuredAnalysis?: CanariasPanelVisionResult;
           note?: string;
         };
+
+        if (json?.ok && json.structuredAnalysis) {
+          setVisionReport(json.structuredAnalysis);
+          const parsedVis = parseCanariasVisionJsonToSummary(
+            json.structuredAnalysis
+          );
+          if (
+            parsedVis.brandDetected &&
+            parsedVis.brandDetected in DIN_BRAND_STYLES
+          ) {
+            setDinBrand(parsedVis.brandDetected as DinBrandId);
+          }
+          const baseDraft = parseUnifilarFromSpeechOrText(
+            parsedVis.summarySentence
+          );
+          const richDraft: ParsedPanelDraft = {
+            ...baseDraft,
+            supplyType: parsedVis.supplyType,
+            igaAmps: sanitizeSpanishIgaAmps(
+              parsedVis.igaAmps,
+              parsedVis.supplyType
+            ),
+            hasSurgeProtection: parsedVis.hasSurgeProtection,
+            rcdCount: parsedVis.rcdCount,
+            diferencialCalibreAmps: parsedVis.diferencialCalibreAmps,
+            diferencialClase:
+              parsedVis.diferencialClase === "AC" ? "AC" : "A",
+            circuits:
+              parsedVis.circuits.length > 0
+                ? parsedVis.circuits
+                : baseDraft.circuits,
+          };
+          setSpeechText(parsedVis.summarySentence);
+          setPendingDraft(richDraft);
+          applyDraftEverywhere(richDraft, { isAutoFromPhoto: true });
+          setPhotoVisionNote(
+            `✅ Visión Estructurada REBT Canarias (${json.mode}): ${json.structuredAnalysis.inventario_componentes.length} componentes identificados (C1-01..), Simulador DIN, Unifilar IEC 60617 / DXF y Ficha M.T.D. actualizados.`
+          );
+          return;
+        }
 
         let textToParse = "";
         let sourceTag = "Escáner visual local";
@@ -412,6 +463,7 @@ export default function UnifilarCuadroView({
           textToParse = await analyzePanelPhotoLocally(dataUrl);
         }
         const detectedDraft = parseUnifilarFromSpeechOrText(textToParse);
+        setVisionReport(null);
         setSpeechText(textToParse);
         setPendingDraft(detectedDraft);
         applyDraftEverywhere(detectedDraft, { isAutoFromPhoto: true });
@@ -421,6 +473,7 @@ export default function UnifilarCuadroView({
       } catch {
         const localText = await analyzePanelPhotoLocally(dataUrl);
         const detectedDraft = parseUnifilarFromSpeechOrText(localText);
+        setVisionReport(null);
         setSpeechText(localText);
         setPendingDraft(detectedDraft);
         applyDraftEverywhere(detectedDraft, { isAutoFromPhoto: true });
@@ -432,6 +485,47 @@ export default function UnifilarCuadroView({
       }
     };
     reader.readAsDataURL(file);
+  };
+
+  const effectiveVisionReport = useMemo<CanariasPanelVisionResult>(() => {
+    if (visionReport) return visionReport;
+    return buildCanariasVisionFromProject({
+      supplyType,
+      igaAmps,
+      hasSurgeProtection: hasCombiSurge,
+      rcdCount,
+      diferencialCalibreAmps: meta.diferencialCalibreAmps || 40,
+      diferencialClase: meta.diferencialClase === "AC" ? "AC" : "A",
+      circuits: calculatedCircuits,
+      meta,
+      brandName: DIN_BRAND_STYLES[dinBrand]
+        ? `${DIN_BRAND_STYLES[dinBrand].shortLabel} ${DIN_BRAND_STYLES[dinBrand].seriesName}`
+        : dinBrand,
+      icuKa,
+    });
+  }, [
+    visionReport,
+    supplyType,
+    igaAmps,
+    hasCombiSurge,
+    rcdCount,
+    meta,
+    calculatedCircuits,
+    dinBrand,
+    icuKa,
+  ]);
+
+  const handleDownloadDxf = () => {
+    const dxfContent = generateUnifilarDxf({
+      vision: effectiveVisionReport,
+      meta,
+      sheetNumber: planNumber,
+    });
+    downloadTextFile(
+      `Unifilar_AutoCAD_${meta.expedienteNum}_${planNumber}.dxf`,
+      dxfContent,
+      "application/dxf;charset=utf-8"
+    );
   };
 
   // Capacidad envolvente & ocupación
@@ -1844,6 +1938,152 @@ export default function UnifilarCuadroView({
               </div>
             </div>
           </div>
+
+          {/* INFORME ESTRUCTURADO REBT / GOBIERNO DE CANARIAS (NRZ103 EDISTRIBUCIÓN) + JSON + MERMAID + DXF */}
+          <div className="lg:col-span-2 rounded-2xl border border-blue-200 bg-white p-5 shadow-xs space-y-3 text-xs">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">
+                  Inventario Técnico Modular (C1-01..), Verificación NRZ103 Canarias y Salida Estructurada
+                </h3>
+                <p className="text-[11px] text-slate-600">
+                  {effectiveVisionReport.contexto_canarias.distribuidora} ·{" "}
+                  <strong>
+                    {effectiveVisionReport.contexto_canarias.sistema_alimentacion}
+                  </strong>{" "}
+                  · Pmáx:{" "}
+                  <strong>
+                    {effectiveVisionReport.contexto_canarias.potencia_maxima_admisible_w.toLocaleString(
+                      "es-ES"
+                    )}{" "}
+                    W
+                  </strong>{" "}
+                  ({effectiveVisionReport.contexto_canarias.grado_electrificacion})
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  onClick={() =>
+                    downloadTextFile(
+                      `Analisis_CGMP_Canarias_${meta.expedienteNum}.json`,
+                      JSON.stringify(effectiveVisionReport, null, 2),
+                      "application/json;charset=utf-8"
+                    )
+                  }
+                  className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 font-semibold text-slate-800 hover:bg-slate-50"
+                >
+                  <Download className="h-3.5 w-3.5 text-[#0f6cbd]" />
+                  JSON Estructurado
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    downloadTextFile(
+                      `Unifilar_Mermaid_${meta.expedienteNum}.mmd`,
+                      effectiveVisionReport.esquema_unifilar_mermaid,
+                      "text/plain;charset=utf-8"
+                    )
+                  }
+                  className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 font-semibold text-slate-800 hover:bg-slate-50"
+                >
+                  <GitBranch className="h-3.5 w-3.5 text-indigo-600" />
+                  Código Mermaid
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDownloadDxf}
+                  className="inline-flex items-center gap-1 rounded-lg bg-slate-900 px-3 py-1.5 font-semibold text-white hover:bg-slate-800"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  AutoCAD (.DXF)
+                </button>
+                {onApplyMemoriaCanarias && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const m =
+                        effectiveVisionReport.memoria_tecnica_gobierno_canarias;
+                      const fullTexto = [
+                        `1. OBJETO DE LA INSTALACIÓN:\n${m.objeto_instalacion}`,
+                        `2. INSTALACIONES DE ENLACE Y DERIVACIÓN INDIVIDUAL (NRZ103):\n${m.caracteristicas_enlace_y_di}`,
+                        `3. PROTECCIÓN CONTRA SOBREINTENSIDADES (ITC-BT-17 / 22):\n${m.proteccion_sobreintensidades}`,
+                        `4. PROTECCIÓN CONTRA CONTACTOS INDIRECTOS Y PUESTA A TIERRA EN TERRENO VOLCÁNICO (ITC-BT-18 / 24):\n${m.proteccion_contactos_indirectos_y_tierra}`,
+                        `5. PROTECCIÓN CONTRA SOBRETENSIONES EN RED INSULAR (ITC-BT-23):\n${m.proteccion_sobretensiones}`,
+                      ].join("\n\n");
+                      onApplyMemoriaCanarias(fullTexto);
+                    }}
+                    className="inline-flex items-center gap-1 rounded-lg bg-[#0f6cbd] px-3 py-1.5 font-semibold text-white hover:bg-[#115ea3]"
+                  >
+                    <BookOpen className="h-3.5 w-3.5" />
+                    Volcar a Memoria M.T.D. Canarias
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {effectiveVisionReport.contexto_canarias.alertas_inspeccion_canarias
+              .length > 0 && (
+              <div className="space-y-1 rounded-xl border border-amber-300 bg-amber-50 p-3 text-[11px] text-amber-950">
+                <div className="font-bold">
+                  ⚠️ Alertas Reglamentarias Canarias (REBT / NRZ103 Edistribución):
+                </div>
+                <ul className="list-disc pl-4 space-y-0.5">
+                  {effectiveVisionReport.contexto_canarias.alertas_inspeccion_canarias.map(
+                    (al, idx) => (
+                      <li key={idx}>{al}</li>
+                    )
+                  )}
+                </ul>
+              </div>
+            )}
+
+            <div className="overflow-x-auto rounded-xl border border-slate-200">
+              <table className="w-full border-collapse text-left text-[11px]">
+                <thead className="bg-slate-100 text-slate-700">
+                  <tr>
+                    <th className="px-2.5 py-1.5 font-bold">ID</th>
+                    <th className="px-2.5 py-1.5 font-bold">Tipo</th>
+                    <th className="px-2.5 py-1.5 font-bold">Marca / Modelo</th>
+                    <th className="px-2.5 py-1.5 font-bold">In / Curva</th>
+                    <th className="px-2.5 py-1.5 font-bold">ID (mA / Clase)</th>
+                    <th className="px-2.5 py-1.5 font-bold">Polos / Icu</th>
+                    <th className="px-2.5 py-1.5 font-bold">Circuito ITC-BT-25</th>
+                    <th className="px-2.5 py-1.5 font-bold">Observaciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {effectiveVisionReport.inventario_componentes.map((comp) => (
+                    <tr key={comp.id} className="hover:bg-slate-50">
+                      <td className="px-2.5 py-1.5 font-mono font-bold text-[#0f6cbd]">
+                        {comp.id}
+                      </td>
+                      <td className="px-2.5 py-1.5 font-bold">{comp.tipo}</td>
+                      <td className="px-2.5 py-1.5">{comp.marca_modelo}</td>
+                      <td className="px-2.5 py-1.5 font-mono">
+                        {comp.calibre_a}A{" "}
+                        {comp.curva !== "N/A" ? `· ${comp.curva}` : ""}
+                      </td>
+                      <td className="px-2.5 py-1.5 font-mono">
+                        {comp.sensibilidad_ma
+                          ? `${comp.sensibilidad_ma}mA · Cl.${comp.clase_id}`
+                          : "—"}
+                      </td>
+                      <td className="px-2.5 py-1.5 font-mono">
+                        {comp.polos} · {comp.poder_corte_ka}kA
+                      </td>
+                      <td className="px-2.5 py-1.5 font-semibold">
+                        {comp.circuito_itc_bt_25}
+                      </td>
+                      <td className="px-2.5 py-1.5 text-slate-600">
+                        {comp.observaciones}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       )}
 
@@ -2765,6 +3005,14 @@ export default function UnifilarCuadroView({
               Simbología normalizada mundial <strong>IEC 60617 / UNE-EN 60617</strong> con tabla de circuitos, notas REBT y cajetín A3 (sin costes internos).
             </div>
             <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={handleDownloadDxf}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-900 bg-slate-900 px-3.5 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+              >
+                <Download className="h-4 w-4" />
+                Descargar AutoCAD (.DXF)
+              </button>
               <button
                 type="button"
                 onClick={() =>

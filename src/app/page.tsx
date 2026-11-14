@@ -4250,6 +4250,18 @@ export default function SistemaCalculoRebtPage() {
                 });
               }}
               onOpenFichaMtd={() => setActiveSection("ficha_mtd")}
+              onApplyMemoriaCanarias={(texto) => {
+                setMtdMeta((prev) => ({
+                  ...prev,
+                  memoriaDescriptivaTexto: texto,
+                }));
+                setTargetMtdPage(5);
+                setActiveSection("ficha_mtd");
+                setStatusBanner({
+                  type: "success",
+                  text: "Memoria Descriptiva formal (Gobierno de Canarias / NRZ103 Edistribución) volcada a la Hoja 5/11 de la Ficha M.T.D.",
+                });
+              }}
               onSaveDiagramRecord={(item) => {
                 updateMonpixWorkspace((prev) => ({
                   ...prev,
