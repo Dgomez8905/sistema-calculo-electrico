@@ -411,12 +411,19 @@ export default function LandingAndAuthView({
 
                     <div className="flex flex-1 flex-col justify-between p-5 sm:p-6 gap-4">
                       <div className="flex items-center justify-between border-b border-slate-100 pb-3.5">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src="/logo-gobierno-canarias.png"
-                          alt="Gobierno de Canarias"
-                          className="h-10 w-auto object-contain"
-                        />
+                        <div className="flex items-center gap-2">
+                          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#e8f0fe] text-[#0f6cbd]">
+                            <ShieldCheck className="h-4 w-4" />
+                          </div>
+                          <div>
+                            <div className="text-xs font-bold text-slate-900 leading-tight">
+                              Reglamento Electrotécnico B.T.
+                            </div>
+                            <div className="text-[10.5px] text-slate-500">
+                              Cálculo y Documentación Técnica Oficial
+                            </div>
+                          </div>
+                        </div>
                         <span className="rounded-md bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-[#0f6cbd]">
                           RD 842/2002
                         </span>
@@ -562,7 +569,7 @@ export default function LandingAndAuthView({
             <span>
               <strong>REBT Cloud Suite</strong> · Sistema de Cálculo B.T. y Memoria Técnica de Diseño (RD 842/2002)
             </span>
-            <span>Gobierno de Canarias · Dirección General de Energía</span>
+            <span>Ingeniería e Instalaciones Eléctricas de Baja Tensión · ITC-BT-01 a ITC-BT-52</span>
           </div>
         </footer>
       </div>
