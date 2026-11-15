@@ -625,8 +625,9 @@ export default function OficinaGastosView({
             {/* Entrada rápida pegando texto de ticket / foto */}
             <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3 space-y-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="font-semibold text-slate-700">
-                  📷 Pega texto o sube foto del ticket/albarán (OCR + IA)
+                <div className="inline-flex items-center gap-1.5 font-semibold text-slate-700">
+                  <Camera className="h-3.5 w-3.5 text-[#0f6cbd]" />
+                  <span>Pega texto o sube foto del ticket/albarán (OCR + IA)</span>
                 </div>
                 <label className="cursor-pointer inline-flex items-center gap-1 rounded-lg bg-[#0f6cbd] px-2.5 py-1 font-semibold text-white hover:bg-[#115ea3]">
                   <Camera className="h-3.5 w-3.5" />
@@ -1204,8 +1205,9 @@ export default function OficinaGastosView({
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4 text-xs">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h3 className="text-sm font-bold text-slate-900">
-                🛒 Pedido Unificado de Material a Almacén
+              <h3 className="inline-flex items-center gap-1.5 text-sm font-bold text-slate-900">
+                <ShoppingCart className="h-4 w-4 text-[#0f6cbd]" />
+                <span>Pedido Unificado de Material a Almacén</span>
               </h3>
               <p className="text-slate-500">
                 Agrupa material procedente del Presupuesto de Vivienda y del Simulador DIN en una sola lista de compra.

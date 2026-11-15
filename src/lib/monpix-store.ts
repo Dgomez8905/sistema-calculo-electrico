@@ -604,7 +604,7 @@ export function useMonpixWorkspace(params: {
 }
 
 // ============================================================================
-// Hook de Dictado por Voz Nativo (🎤 Web Speech API en Español)
+// Hook de Dictado por Voz Nativo (Web Speech API en Español)
 // ============================================================================
 export function useSpeechDictation(onTranscript: (text: string) => void) {
   const [isListening, setIsListening] = useState(false);

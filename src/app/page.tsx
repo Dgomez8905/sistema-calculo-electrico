@@ -43,6 +43,9 @@ import {
   WifiOff,
   RefreshCw,
   ArrowRight,
+  Lightbulb,
+  Cpu,
+  Boxes,
 } from "lucide-react";
 import {
   RebtCircuitInput,
@@ -618,10 +621,10 @@ export default function SistemaCalculoRebtPage() {
   const isNetworkFetchError = (msg?: string) =>
     Boolean(
       msg &&
-        (msg.toLowerCase().includes("failed to fetch") ||
-          msg.toLowerCase().includes("fetch failed") ||
-          msg.toLowerCase().includes("networkerror") ||
-          msg.toLowerCase().includes("load failed"))
+      (msg.toLowerCase().includes("failed to fetch") ||
+        msg.toLowerCase().includes("fetch failed") ||
+        msg.toLowerCase().includes("networkerror") ||
+        msg.toLowerCase().includes("load failed"))
     );
 
   const sanitizeSavedProjectRow = useCallback((row: SavedProjectRow): SavedProjectRow => {
@@ -876,9 +879,8 @@ export default function SistemaCalculoRebtPage() {
           owner_user_id: currentUser.id,
           name:
             prof.mode === "estado_actual"
-              ? `M.T.D. ${prof.expedienteNum} - Estado Actual (${
-                  evaluation.overallCompliant ? "Cumple REBT" : "No Cumple REBT"
-                })`
+              ? `M.T.D. ${prof.expedienteNum} - Estado Actual (${evaluation.overallCompliant ? "Cumple REBT" : "No Cumple REBT"
+              })`
               : `M.T.D. ${prof.expedienteNum} - Instalación Corregida REBT`,
           client_name: profMeta.titularNombre || "Titular sin especificar",
           location: `${profMeta.direccionCalle} ${profMeta.direccionNum}, ${profMeta.terminoMunicipal} (${profMeta.isla})`,
@@ -2018,12 +2020,12 @@ export default function SistemaCalculoRebtPage() {
       is_active: effectiveIsActive,
       ...(roleChanged
         ? {
-            can_create_projects: !isReadOnly,
-            can_edit_calculations: !isReadOnly,
-            can_export_mtd: true,
-            can_delete_projects: isAdminRole,
-            can_manage_users: isAdminRole,
-          }
+          can_create_projects: !isReadOnly,
+          can_edit_calculations: !isReadOnly,
+          can_export_mtd: true,
+          can_delete_projects: isAdminRole,
+          can_manage_users: isAdminRole,
+        }
         : {}),
     };
 
@@ -2216,112 +2218,112 @@ export default function SistemaCalculoRebtPage() {
     keywords?: string;
     icon: React.ReactNode;
   }[] = [
-    {
-      id: "dashboard_tecnico",
-      label: "Inicio / Dashboard",
-      group: "1. Obra y Campo",
-      keywords: "inicio resumen kpi monitor",
-      icon: <LayoutDashboard className="h-4 w-4" />,
-    },
-    {
-      id: "expedientes",
-      label: "Mis Expedientes",
-      group: "1. Obra y Campo",
-      keywords: "obras proyectos historial clientes",
-      icon: <FolderOpen className="h-4 w-4" />,
-    },
-    {
-      id: "calculadoras_obra",
-      label: "Calculadoras de Obra",
-      group: "1. Obra y Campo",
-      keywords: "cable tubo itc-21 fases rst cgp cpm fusibles coche ve itc-52 factura luz",
-      icon: <Calculator className="h-4 w-4" />,
-    },
-    {
-      id: "unifilar_cuadro",
-      label: "Unifilar y Cuadro DIN",
-      group: "1. Obra y Campo",
-      keywords: "esquema unifilar foto voz din a3 svg cad subcuadros",
-      icon: <GitBranch className="h-4 w-4" />,
-    },
-    {
-      id: "titular_ubicacion",
-      label: "1. Titular y Ubicación",
-      group: "2. Expediente y Legalización",
-      keywords: "direccion cliente nif acometida",
-      icon: <MapPin className="h-4 w-4" />,
-    },
-    {
-      id: "circuitos",
-      label: "2. Cuadro de Circuitos",
-      group: "2. Expediente y Legalización",
-      keywords: "pia diferencial seccion caida tension itc-bt-25",
-      icon: <Activity className="h-4 w-4" />,
-    },
-    {
-      id: "edificio_itc10",
-      label: "3. Previsión de Edificio",
-      group: "2. Expediente y Legalización",
-      keywords: "itc-bt-10 lga centralizacion viviendas garaje locales",
-      icon: <Building2 className="h-4 w-4" />,
-    },
-    {
-      id: "tierras_legalizacion",
-      label: "4. Tierra y Legalización",
-      group: "2. Expediente y Legalización",
-      keywords: "picas electrodo itc-bt-18 resistencia ra itc-bt-04",
-      icon: <FileCheck2 className="h-4 w-4" />,
-    },
-    {
-      id: "tramites_oca",
-      label: "5. Trámites, OCA y Catastro",
-      group: "2. Expediente y Legalización",
-      keywords: "19 ccaa industria boletin cie inspeccion oca referencia catastral gps",
-      icon: <ClipboardCheck className="h-4 w-4" />,
-    },
-    {
-      id: "ficha_mtd",
-      label: "6. Ficha Técnica M.T.D.",
-      group: "2. Expediente y Legalización",
-      keywords: "memoria tecnica diseño canarias 11 paginas pdf",
-      icon: <FileSpreadsheet className="h-4 w-4" />,
-    },
-    {
-      id: "presupuestos_plano",
-      label: "Presupuesto y Plano",
-      group: "3. Oficina y Almacén",
-      keywords: "presupuesto vivienda plano simbolos precios pedido almacen simon niessen",
-      icon: <Tag className="h-4 w-4" />,
-    },
-    {
-      id: "oficina_gastos",
-      label: "Oficina, Facturas y Pedido",
-      group: "3. Oficina y Almacén",
-      keywords: "verifactu qr factura ticket gasto rentabilidad gestoria logo pedido",
-      icon: <Briefcase className="h-4 w-4" />,
-    },
-    {
-      id: "tareas_equipo",
-      label: "Tareas, Equipo y Fichaje",
-      group: "3. Oficina y Almacén",
-      keywords: "whatsapp voz operarios fichar jornada partes firma",
-      icon: <CheckSquare className="h-4 w-4" />,
-    },
-    {
-      id: "aprender",
-      label: "Aprender y Simulador",
-      group: "4. Formación y Admin",
-      keywords: "simulador montar cuadro polimetro examen instalador",
-      icon: <GraduationCap className="h-4 w-4" />,
-    },
-    {
-      id: "administracion",
-      label: "Administración (RBAC)",
-      group: "4. Formación y Admin",
-      keywords: "usuarios empresas permisos rbac pin",
-      icon: <ShieldCheck className="h-4 w-4" />,
-    },
-  ];
+      {
+        id: "dashboard_tecnico",
+        label: "Inicio / Dashboard",
+        group: "1. Obra y Campo",
+        keywords: "inicio resumen kpi monitor",
+        icon: <LayoutDashboard className="h-4 w-4" />,
+      },
+      {
+        id: "expedientes",
+        label: "Mis Expedientes",
+        group: "1. Obra y Campo",
+        keywords: "obras proyectos historial clientes",
+        icon: <FolderOpen className="h-4 w-4" />,
+      },
+      {
+        id: "calculadoras_obra",
+        label: "Calculadoras de Obra",
+        group: "1. Obra y Campo",
+        keywords: "cable tubo itc-21 fases rst cgp cpm fusibles coche ve itc-52 factura luz",
+        icon: <Calculator className="h-4 w-4" />,
+      },
+      {
+        id: "unifilar_cuadro",
+        label: "Unifilar y Cuadro DIN",
+        group: "1. Obra y Campo",
+        keywords: "esquema unifilar foto voz din a3 svg cad subcuadros",
+        icon: <GitBranch className="h-4 w-4" />,
+      },
+      {
+        id: "titular_ubicacion",
+        label: "1. Titular y Ubicación",
+        group: "2. Expediente y Legalización",
+        keywords: "direccion cliente nif acometida",
+        icon: <MapPin className="h-4 w-4" />,
+      },
+      {
+        id: "circuitos",
+        label: "2. Cuadro de Circuitos",
+        group: "2. Expediente y Legalización",
+        keywords: "pia diferencial seccion caida tension itc-bt-25",
+        icon: <Activity className="h-4 w-4" />,
+      },
+      {
+        id: "edificio_itc10",
+        label: "3. Previsión de Edificio",
+        group: "2. Expediente y Legalización",
+        keywords: "itc-bt-10 lga centralizacion viviendas garaje locales",
+        icon: <Building2 className="h-4 w-4" />,
+      },
+      {
+        id: "tierras_legalizacion",
+        label: "4. Tierra y Legalización",
+        group: "2. Expediente y Legalización",
+        keywords: "picas electrodo itc-bt-18 resistencia ra itc-bt-04",
+        icon: <FileCheck2 className="h-4 w-4" />,
+      },
+      {
+        id: "tramites_oca",
+        label: "5. Trámites, OCA y Catastro",
+        group: "2. Expediente y Legalización",
+        keywords: "19 ccaa industria boletin cie inspeccion oca referencia catastral gps",
+        icon: <ClipboardCheck className="h-4 w-4" />,
+      },
+      {
+        id: "ficha_mtd",
+        label: "6. Ficha Técnica M.T.D.",
+        group: "2. Expediente y Legalización",
+        keywords: "memoria tecnica diseño canarias 11 paginas pdf",
+        icon: <FileSpreadsheet className="h-4 w-4" />,
+      },
+      {
+        id: "presupuestos_plano",
+        label: "Presupuesto y Plano",
+        group: "3. Oficina y Almacén",
+        keywords: "presupuesto vivienda plano simbolos precios pedido almacen simon niessen",
+        icon: <Tag className="h-4 w-4" />,
+      },
+      {
+        id: "oficina_gastos",
+        label: "Oficina, Facturas y Pedido",
+        group: "3. Oficina y Almacén",
+        keywords: "verifactu qr factura ticket gasto rentabilidad gestoria logo pedido",
+        icon: <Briefcase className="h-4 w-4" />,
+      },
+      {
+        id: "tareas_equipo",
+        label: "Tareas, Equipo y Fichaje",
+        group: "3. Oficina y Almacén",
+        keywords: "whatsapp voz operarios fichar jornada partes firma",
+        icon: <CheckSquare className="h-4 w-4" />,
+      },
+      {
+        id: "aprender",
+        label: "Aprender y Simulador",
+        group: "4. Formación y Admin",
+        keywords: "simulador montar cuadro polimetro examen instalador",
+        icon: <GraduationCap className="h-4 w-4" />,
+      },
+      {
+        id: "administracion",
+        label: "Administración (RBAC)",
+        group: "4. Formación y Admin",
+        keywords: "usuarios empresas permisos rbac pin",
+        icon: <ShieldCheck className="h-4 w-4" />,
+      },
+    ];
 
   const NAV_GROUPS: NavGroup[] = [
     "1. Obra y Campo",
@@ -2427,11 +2429,10 @@ export default function SistemaCalculoRebtPage() {
                             setActiveSection(item.id);
                             setMobileMenuOpen(false);
                           }}
-                          className={`flex w-full items-center gap-3 rounded-xl px-3.5 py-2 text-left text-xs transition ${
-                            isActive
+                          className={`flex w-full items-center gap-3 rounded-xl px-3.5 py-2 text-left text-xs transition ${isActive
                               ? "bg-[#e8f0fe] text-[#0f6cbd] font-semibold"
                               : "font-medium text-slate-700 hover:bg-slate-100"
-                          }`}
+                            }`}
                         >
                           <span
                             className={
@@ -2509,18 +2510,17 @@ export default function SistemaCalculoRebtPage() {
                     item.id === "expedientes"
                       ? isolatedProjects.length
                       : item.id === "circuitos"
-                      ? calculatedCircuits.length
-                      : null;
+                        ? calculatedCircuits.length
+                        : null;
                   return (
                     <button
                       key={item.id}
                       type="button"
                       onClick={() => setActiveSection(item.id)}
-                      className={`group relative flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-xs transition ${
-                        isActive
+                      className={`group relative flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-xs transition ${isActive
                           ? "bg-[#e8f2fc] font-semibold text-[#0f6cbd]"
                           : "font-medium text-slate-600 hover:bg-slate-100/80 hover:text-slate-900"
-                      }`}
+                        }`}
                     >
                       {isActive && (
                         <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-full bg-[#0f6cbd]" />
@@ -2539,11 +2539,10 @@ export default function SistemaCalculoRebtPage() {
                       </span>
                       {badgeCount !== null && (
                         <span
-                          className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold tabular-nums ${
-                            isActive
+                          className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold tabular-nums ${isActive
                               ? "bg-[#0f6cbd] text-white"
                               : "bg-slate-100 text-slate-500"
-                          }`}
+                            }`}
                         >
                           {badgeCount}
                         </span>
@@ -2561,30 +2560,28 @@ export default function SistemaCalculoRebtPage() {
             Isla: <strong className="text-slate-700">{currentTenant?.isla}</strong>
           </span>
           <span
-            className={`inline-flex items-center gap-1 font-semibold ${
-              !isOnline
+            className={`inline-flex items-center gap-1 font-semibold ${!isOnline
                 ? "text-amber-700"
                 : pendingSyncCount > 0
-                ? "text-blue-700"
-                : "text-emerald-700"
-            }`}
+                  ? "text-blue-700"
+                  : "text-emerald-700"
+              }`}
           >
             <span
-              className={`h-1.5 w-1.5 rounded-full ${
-                !isOnline
+              className={`h-1.5 w-1.5 rounded-full ${!isOnline
                   ? "bg-amber-500"
                   : pendingSyncCount > 0
-                  ? "bg-blue-500 animate-pulse"
-                  : "bg-emerald-500"
-              }`}
+                    ? "bg-blue-500 animate-pulse"
+                    : "bg-emerald-500"
+                }`}
             ></span>
             {!isOnline
               ? "Offline"
               : pendingSyncCount > 0
-              ? `Sinc. (${pendingSyncCount})`
-              : isSupabaseConfigured
-              ? "Cloud Sync"
-              : "Local"}
+                ? `Sinc. (${pendingSyncCount})`
+                : isSupabaseConfigured
+                  ? "Cloud Sync"
+                  : "Local"}
           </span>
         </div>
       </aside>
@@ -2766,8 +2763,8 @@ export default function SistemaCalculoRebtPage() {
                   {isSaving
                     ? "Guardando..."
                     : activeProjectId
-                    ? `Guardar (#${activeProjectId})`
-                    : "Registrar"}
+                      ? `Guardar (#${activeProjectId})`
+                      : "Registrar"}
                 </span>
               </button>
             </div>
@@ -2848,11 +2845,10 @@ export default function SistemaCalculoRebtPage() {
                       "stay"
                     )
                   }
-                  className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition ${
-                    dualPhotoState.activeMode === "estado_actual"
+                  className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition ${dualPhotoState.activeMode === "estado_actual"
                       ? "bg-amber-600 text-white shadow-2xs"
                       : "border border-amber-300 bg-white text-amber-900 hover:bg-amber-50"
-                  }`}
+                    }`}
                 >
                   Opción 1: Estado Actual (-ACT)
                 </button>
@@ -2865,11 +2861,10 @@ export default function SistemaCalculoRebtPage() {
                       "stay"
                     )
                   }
-                  className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition ${
-                    dualPhotoState.activeMode === "instalacion_corregida"
+                  className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition ${dualPhotoState.activeMode === "instalacion_corregida"
                       ? "bg-emerald-600 text-white shadow-2xs"
                       : "border border-emerald-300 bg-white text-emerald-900 hover:bg-emerald-50"
-                  }`}
+                    }`}
                 >
                   Opción 2: Cómo Debe Ir (-COR)
                 </button>
@@ -2905,13 +2900,12 @@ export default function SistemaCalculoRebtPage() {
                       <button
                         type="button"
                         onClick={() => setActiveSection(st.id)}
-                        className={`rounded-lg px-2.5 py-1 font-semibold transition ${
-                          isStepActive
+                        className={`rounded-lg px-2.5 py-1 font-semibold transition ${isStepActive
                             ? "bg-[#0f6cbd] text-white"
                             : isPassed
-                            ? "bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
-                            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                        }`}
+                              ? "bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
+                              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                          }`}
                       >
                         {st.stepLabel}
                       </button>
@@ -2942,13 +2936,12 @@ export default function SistemaCalculoRebtPage() {
 
           {statusBanner && (
             <div
-              className={`no-print mb-6 flex items-center justify-between rounded-xl border px-4 py-3 text-xs font-medium shadow-2xs ${
-                statusBanner.type === "success"
+              className={`no-print mb-6 flex items-center justify-between rounded-xl border px-4 py-3 text-xs font-medium shadow-2xs ${statusBanner.type === "success"
                   ? "border-emerald-200 bg-emerald-50 text-emerald-900"
                   : statusBanner.type === "warning"
-                  ? "border-amber-200 bg-amber-50 text-amber-900"
-                  : "border-rose-200 bg-rose-50 text-rose-900"
-              }`}
+                    ? "border-amber-200 bg-amber-50 text-amber-900"
+                    : "border-rose-200 bg-rose-50 text-rose-900"
+                }`}
             >
               <span>{statusBanner.text}</span>
               <button
@@ -3133,8 +3126,9 @@ export default function SistemaCalculoRebtPage() {
                       {homeRebtAnswer.title}
                     </p>
                     <p className="text-slate-700">{homeRebtAnswer.answer}</p>
-                    <p className="text-[11px] text-emerald-800 font-medium">
-                      💡 Consejo de obra: {homeRebtAnswer.practicalTip}
+                    <p className="inline-flex items-center gap-1.5 text-[11px] text-emerald-800 font-medium">
+                      <Lightbulb className="h-3.5 w-3.5 shrink-0 text-emerald-700" />
+                      <span>Consejo de obra: {homeRebtAnswer.practicalTip}</span>
                     </p>
                   </div>
                 )}
@@ -3657,23 +3651,22 @@ export default function SistemaCalculoRebtPage() {
                       Potencia Prevista / Contratada
                     </span>
                     <span
-                      className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${
-                        cgmpSummary.commercialTier === "gran_comercio_mccb"
+                      className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${cgmpSummary.commercialTier === "gran_comercio_mccb"
                           ? "bg-amber-50 text-amber-900 ring-1 ring-amber-500/30"
                           : cgmpSummary.commercialTier === "comercio_estandar_din"
-                          ? "bg-indigo-50 text-indigo-800 ring-1 ring-indigo-500/25"
-                          : cgmpSummary.effectiveElectrificationGrade === "elevada"
-                          ? "bg-blue-50 text-[#0f6cbd] ring-1 ring-[#0f6cbd]/20"
-                          : "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-600/20"
-                      }`}
+                            ? "bg-indigo-50 text-indigo-800 ring-1 ring-indigo-500/25"
+                            : cgmpSummary.effectiveElectrificationGrade === "elevada"
+                              ? "bg-blue-50 text-[#0f6cbd] ring-1 ring-[#0f6cbd]/20"
+                              : "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-600/20"
+                        }`}
                     >
                       {cgmpSummary.commercialTier === "gran_comercio_mccb"
                         ? "> 43 kW · Gran Comercio"
                         : cgmpSummary.commercialTier === "comercio_estandar_din"
-                        ? "≤ 43 kW · Comercio Estándar"
-                        : cgmpSummary.effectiveElectrificationGrade === "elevada"
-                        ? "Elevada ITC-BT-10"
-                        : "Básica ITC-BT-10"}
+                          ? "≤ 43 kW · Comercio Estándar"
+                          : cgmpSummary.effectiveElectrificationGrade === "elevada"
+                            ? "Elevada ITC-BT-10"
+                            : "Básica ITC-BT-10"}
                     </span>
                   </div>
 
@@ -3753,11 +3746,10 @@ export default function SistemaCalculoRebtPage() {
                       Protección General (CGMP) y Tarifa
                     </span>
                     <span
-                      className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${
-                        cgmpSummary.accessTariff === "3.0TD"
+                      className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${cgmpSummary.accessTariff === "3.0TD"
                           ? "bg-indigo-50 text-indigo-800 ring-1 ring-indigo-500/25"
                           : "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-600/25"
-                      }`}
+                        }`}
                       title={cgmpSummary.tariffDetail}
                     >
                       {cgmpSummary.tariffBadgeLabel}
@@ -3851,10 +3843,18 @@ export default function SistemaCalculoRebtPage() {
                     </select>
                   </div>
 
-                  <p className="mt-1.5 text-[10.5px] font-medium text-slate-600">
-                    {cgmpSummary.igaAmps > 63
-                      ? "⚙️ > 63 A: Caja Moldeada + Bobina MX + DPS/POP indep."
-                      : "🧩 ≤ 63 A: Equipo compacto Combi carril DIN (IGA+POP+T2)"}
+                  <p className="mt-1.5 inline-flex items-center gap-1.5 text-[10.5px] font-medium text-slate-600">
+                    {cgmpSummary.igaAmps > 63 ? (
+                      <>
+                        <Cpu className="h-3.5 w-3.5 shrink-0 text-amber-600" />
+                        <span>&gt; 63 A: Caja Moldeada + Bobina MX + DPS/POP indep.</span>
+                      </>
+                    ) : (
+                      <>
+                        <Boxes className="h-3.5 w-3.5 shrink-0 text-[#0f6cbd]" />
+                        <span>≤ 63 A: Equipo compacto Combi carril DIN (IGA+POP+T2)</span>
+                      </>
+                    )}
                   </p>
                 </div>
 
@@ -3892,7 +3892,7 @@ export default function SistemaCalculoRebtPage() {
                   </span>
                   <div className="mt-1 flex items-center gap-2">
                     {cgmpSummary.nonCompliantCircuits === 0 &&
-                    !cgmpSummary.exceedsSinglePhaseLimit ? (
+                      !cgmpSummary.exceedsSinglePhaseLimit ? (
                       <>
                         <CheckCircle2 className="h-6 w-6 text-emerald-600" />
                         <span className="text-lg font-bold text-emerald-700">
@@ -3951,22 +3951,20 @@ export default function SistemaCalculoRebtPage() {
                   <button
                     type="button"
                     onClick={() => loadPresetDwellings("basica")}
-                    className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
-                      cgmpSummary.effectiveElectrificationGrade === "basica"
+                    className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${cgmpSummary.effectiveElectrificationGrade === "basica"
                         ? "border-emerald-300 bg-emerald-50 text-emerald-900"
                         : "border-slate-300 bg-slate-50 text-slate-700 hover:bg-slate-100"
-                    }`}
+                      }`}
                   >
                     Electrificación Básica (5.750 W · IGA 25 A)
                   </button>
                   <button
                     type="button"
                     onClick={() => loadPresetDwellings("elevada_ve")}
-                    className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
-                      cgmpSummary.effectiveElectrificationGrade === "elevada"
+                    className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${cgmpSummary.effectiveElectrificationGrade === "elevada"
                         ? "border-blue-300 bg-blue-50 text-[#0f6cbd]"
                         : "border-slate-300 bg-slate-50 text-slate-700 hover:bg-slate-100"
-                    }`}
+                      }`}
                   >
                     Electrificación Elevada + VE (≥ 9.200 W · IGA 40/50 A)
                   </button>
@@ -4098,11 +4096,10 @@ export default function SistemaCalculoRebtPage() {
                         return (
                           <tr
                             key={index}
-                            className={`group transition ${
-                              isRowOk
+                            className={`group transition ${isRowOk
                                 ? "hover:bg-slate-50/90"
                                 : "bg-rose-50/30 hover:bg-rose-50/50"
-                            }`}
+                              }`}
                           >
                             <td className="sticky left-0 z-10 bg-white px-2.5 py-2 group-hover:bg-slate-50">
                               <input
@@ -4243,11 +4240,10 @@ export default function SistemaCalculoRebtPage() {
                             </td>
                             <td className="bg-slate-50/40 px-2.5 py-2 text-right font-mono tabular-nums whitespace-nowrap">
                               <span
-                                className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-semibold ${
-                                  isRowOk
+                                className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-semibold ${isRowOk
                                     ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20"
                                     : "bg-rose-50 text-rose-700 ring-1 ring-rose-600/25"
-                                }`}
+                                  }`}
                               >
                                 {c.voltageDropPct}%
                               </span>
@@ -4886,20 +4882,20 @@ export default function SistemaCalculoRebtPage() {
               dualPhotoSwitcher={
                 dualPhotoState
                   ? {
-                      activeMode: dualPhotoState.activeMode,
-                      actualExpNum:
-                        dualPhotoState.evaluation.actual.expedienteNum,
-                      corregidoExpNum:
-                        dualPhotoState.evaluation.corregido.expedienteNum,
-                      overallCompliant:
-                        dualPhotoState.evaluation.overallCompliant,
-                      onSwitch: (nextMode) =>
-                        applyDualPhotoSnapshotToActiveWorkspace(
-                          dualPhotoState.evaluation,
-                          nextMode,
-                          "ficha_mtd"
-                        ),
-                    }
+                    activeMode: dualPhotoState.activeMode,
+                    actualExpNum:
+                      dualPhotoState.evaluation.actual.expedienteNum,
+                    corregidoExpNum:
+                      dualPhotoState.evaluation.corregido.expedienteNum,
+                    overallCompliant:
+                      dualPhotoState.evaluation.overallCompliant,
+                    onSwitch: (nextMode) =>
+                      applyDualPhotoSnapshotToActiveWorkspace(
+                        dualPhotoState.evaluation,
+                        nextMode,
+                        "ficha_mtd"
+                      ),
+                  }
                   : null
               }
             />
@@ -4959,11 +4955,11 @@ export default function SistemaCalculoRebtPage() {
                   prev.map((c, idx) =>
                     assignments[idx]
                       ? {
-                          ...c,
-                          phaseAssigned: assignments[idx],
-                          voltage:
-                            assignments[idx] === "L1-L2-L3" ? 400 : 230,
-                        }
+                        ...c,
+                        phaseAssigned: assignments[idx],
+                        voltage:
+                          assignments[idx] === "L1-L2-L3" ? 400 : 230,
+                      }
                       : c
                   )
                 );
@@ -5039,8 +5035,7 @@ export default function SistemaCalculoRebtPage() {
                   const circuitsSummary = nextCircuits
                     .map(
                       (c) =>
-                        `${c.code} (${c.description}, ${c.fixedPiaAmps || 16} A, ${
-                          c.minSectionMm2 || 2.5
+                        `${c.code} (${c.description}, ${c.fixedPiaAmps || 16} A, ${c.minSectionMm2 || 2.5
                         } mm²)`
                     )
                     .join("; ");
@@ -5060,20 +5055,16 @@ export default function SistemaCalculoRebtPage() {
                       nextSupply === "trifasico_400v"
                         ? "4x RZ1-K (AS) 0,6/1kV + TT bajo tubo protector"
                         : "2x RZ1-K (AS) 0,6/1kV + TT bajo tubo protector",
-                    memoriaDescriptivaTexto: `Instalación interior de baja tensión (${
-                      panelMeta.formatLabel ||
+                    memoriaDescriptivaTexto: `Instalación interior de baja tensión (${panelMeta.formatLabel ||
                       (nextSupply === "trifasico_400v"
                         ? "Trifásico 400 V"
                         : "Monofásico 230 V")
-                    }) con CGMP dotado de IGA ${panelMeta.igaAmps ?? 40} A, ${
-                      panelMeta.hasSurgeProtection
+                      }) con CGMP dotado de IGA ${panelMeta.igaAmps ?? 40} A, ${panelMeta.hasSurgeProtection
                         ? "protección combinada contra sobretensiones permanentes y transitorias Tipo 2 (Up ≤ 1,5 kV), "
                         : ""
-                    }${panelMeta.rcdCount ?? 1} interruptor(es) diferencial(es) de ${
-                      panelMeta.diferencialCalibreAmps ?? 40
-                    } A / 30 mA Clase ${
-                      panelMeta.diferencialClase ?? "AC"
-                    } y ${nextCircuits.length} circuitos interiores: ${circuitsSummary}.`,
+                      }${panelMeta.rcdCount ?? 1} interruptor(es) diferencial(es) de ${panelMeta.diferencialCalibreAmps ?? 40
+                      } A / 30 mA Clase ${panelMeta.diferencialClase ?? "AC"
+                      } y ${nextCircuits.length} circuitos interiores: ${circuitsSummary}.`,
                   }));
                 }
                 setStatusBanner({
@@ -5199,12 +5190,10 @@ export default function SistemaCalculoRebtPage() {
                   coordenadasLng: lon || prev.coordenadasLng,
                   coordenadasUtm: utm || prev.coordenadasUtm,
                   memoriaDescriptivaTexto: prev.memoriaDescriptivaTexto
-                    ? `${prev.memoriaDescriptivaTexto}\nRef. Catastral: ${refCatastralNote}${
-                        utm ? ` · UTM: ${utm}` : ""
-                      }`
-                    : `Ref. Catastral: ${refCatastralNote}${
-                        utm ? ` · UTM: ${utm}` : ""
-                      }`,
+                    ? `${prev.memoriaDescriptivaTexto}\nRef. Catastral: ${refCatastralNote}${utm ? ` · UTM: ${utm}` : ""
+                    }`
+                    : `Ref. Catastral: ${refCatastralNote}${utm ? ` · UTM: ${utm}` : ""
+                    }`,
                 }));
                 setStatusBanner({
                   type: "success",
@@ -5273,11 +5262,10 @@ export default function SistemaCalculoRebtPage() {
                 key={item.id}
                 type="button"
                 onClick={() => setActiveSection(item.id)}
-                className={`flex flex-col items-center gap-0.5 rounded-lg px-2.5 py-1 text-[10px] font-semibold transition ${
-                  isActive
+                className={`flex flex-col items-center gap-0.5 rounded-lg px-2.5 py-1 text-[10px] font-semibold transition ${isActive
                     ? "text-[#0f6cbd] bg-blue-50/80"
                     : "text-slate-500 hover:text-slate-900"
-                }`}
+                  }`}
               >
                 {item.icon}
                 <span>{item.label}</span>

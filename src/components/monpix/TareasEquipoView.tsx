@@ -13,6 +13,12 @@ import {
   CheckCircle2,
   Plus,
   History,
+  Calendar,
+  HardHat,
+  Folder,
+  Phone,
+  Package,
+  FileCheck2,
 } from "lucide-react";
 import { parseTaskFromWhatsApp } from "@/lib/monpix-engine";
 import {
@@ -323,11 +329,25 @@ export default function TareasEquipoView({
                     <div>
                       <div className="font-bold text-slate-900">{t.title}</div>
                       <div className="text-[11px] text-slate-600">{t.notes}</div>
-                      <div className="mt-1 flex flex-wrap gap-2 text-[10px] font-semibold text-slate-500">
-                        <span>📅 {t.whenDate}</span>
-                        <span>👷 {t.assignedTo}</span>
-                        <span>📁 {t.projectRef}</span>
-                        {t.phone && <span>📞 {t.phone}</span>}
+                      <div className="mt-1 flex flex-wrap items-center gap-2.5 text-[10px] font-semibold text-slate-500">
+                        <span className="inline-flex items-center gap-1">
+                          <Calendar className="h-3 w-3 text-slate-400" />
+                          {t.whenDate}
+                        </span>
+                        <span className="inline-flex items-center gap-1">
+                          <HardHat className="h-3 w-3 text-slate-400" />
+                          {t.assignedTo}
+                        </span>
+                        <span className="inline-flex items-center gap-1">
+                          <Folder className="h-3 w-3 text-slate-400" />
+                          {t.projectRef}
+                        </span>
+                        {t.phone && (
+                          <span className="inline-flex items-center gap-1">
+                            <Phone className="h-3 w-3 text-slate-400" />
+                            {t.phone}
+                          </span>
+                        )}
                         <span className="uppercase text-[#0f6cbd]">({t.origin})</span>
                       </div>
                     </div>
@@ -374,11 +394,11 @@ export default function TareasEquipoView({
                     }}
                     className="px-2.5 py-1 text-xs"
                   >
-                    <option value="trabajando">🟢 Trabajando</option>
-                    <option value="en_pausa">🟡 En pausa / bocadillo</option>
-                    <option value="terminado">🔵 Ha terminado</option>
-                    <option value="sin_fichar">⚪ Sin fichar</option>
-                    <option value="ausencia">🟣 Ausencia aprobada</option>
+                    <option value="trabajando">Trabajando</option>
+                    <option value="en_pausa">En pausa / bocadillo</option>
+                    <option value="terminado">Ha terminado</option>
+                    <option value="sin_fichar">Sin fichar</option>
+                    <option value="ausencia">Ausencia aprobada</option>
                   </select>
                 </div>
               ))}
@@ -506,8 +526,9 @@ export default function TareasEquipoView({
                     </div>
                     <div className="text-slate-700">{j.instructions}</div>
                     {j.materialsToBring && (
-                      <div className="text-[11px] text-amber-800">
-                        📦 Llevar: {j.materialsToBring}
+                      <div className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-amber-800">
+                        <Package className="h-3 w-3 shrink-0 text-amber-700" />
+                        <span>Llevar: {j.materialsToBring}</span>
                       </div>
                     )}
                   </div>
@@ -717,10 +738,13 @@ export default function TareasEquipoView({
                 {log.correctionHistory.length > 0 && (
                   <div className="rounded-lg bg-slate-50 p-2 text-[11px] text-slate-600 space-y-0.5">
                     {log.correctionHistory.map((c, i) => (
-                      <div key={i}>
-                        📝 Auditado ({new Date(c.correctedAtIso).toLocaleString("es-ES")}) por{" "}
-                        <strong>{c.correctedBy}</strong>: pasó de {c.previousCheckIn}–{c.previousCheckOut} a{" "}
-                        {c.newCheckIn}–{c.newCheckOut} — Motivo: <em>{c.reason}</em>
+                      <div key={i} className="inline-flex items-start gap-1.5">
+                        <FileCheck2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-500" />
+                        <span>
+                          Auditado ({new Date(c.correctedAtIso).toLocaleString("es-ES")}) por{" "}
+                          <strong>{c.correctedBy}</strong>: pasó de {c.previousCheckIn}–{c.previousCheckOut} a{" "}
+                          {c.newCheckIn}–{c.newCheckOut} — Motivo: <em>{c.reason}</em>
+                        </span>
                       </div>
                     ))}
                   </div>

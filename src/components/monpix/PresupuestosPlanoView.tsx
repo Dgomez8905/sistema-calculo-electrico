@@ -13,6 +13,11 @@ import {
   RotateCcw,
   Ruler,
   Undo2,
+  Plug,
+  Lightbulb,
+  ToggleLeft,
+  ArrowLeftRight,
+  Tv,
 } from "lucide-react";
 import { parseDwellingQuoteFromText } from "@/lib/monpix-engine";
 import {
@@ -295,8 +300,9 @@ export default function PresupuestosPlanoView({
             {/* Entrada rápida "Cuéntamelo" */}
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-3 text-xs">
               <div className="flex items-center justify-between">
-                <span className="font-bold text-slate-900">
-                  🎤 Cuéntamelo y te relleno los puntos (con revisión previa)
+                <span className="inline-flex items-center gap-1.5 font-bold text-slate-900">
+                  <Mic className="h-3.5 w-3.5 text-[#0f6cbd]" />
+                  <span>Cuéntamelo y te relleno los puntos (con revisión previa)</span>
                 </span>
                 <button
                   type="button"
@@ -682,7 +688,7 @@ export default function PresupuestosPlanoView({
                     const generated = [...base, ...extraCircuits];
                     onApplyBudgetAndCircuitsToMtd(totals.totalWithTax, generated);
                     setMtdSyncToast(
-                      `✅ ${totals.totalWithTax.toFixed(2)} € y ${generated.length} circuitos aplicados al expediente M.T.D.`
+                      `${totals.totalWithTax.toFixed(2)} € y ${generated.length} circuitos aplicados al expediente M.T.D.`
                     );
                   }}
                   className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-2 font-semibold text-emerald-900 hover:bg-emerald-100"
@@ -692,8 +698,9 @@ export default function PresupuestosPlanoView({
                 </button>
               )}
               {mtdSyncToast && (
-                <p className="rounded-lg bg-emerald-50 px-3 py-2 text-[11px] font-semibold text-emerald-800">
-                  {mtdSyncToast}
+                <p className="inline-flex w-full items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-2 text-[11px] font-semibold text-emerald-800">
+                  <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-700" />
+                  <span>{mtdSyncToast}</span>
                 </p>
               )}
             </div>
@@ -742,12 +749,12 @@ export default function PresupuestosPlanoView({
           <div className="flex flex-wrap items-center gap-2">
             {(
               [
-                { id: "enchufe", label: "🔌 Enchufe", color: "bg-blue-600" },
-                { id: "puntoLuz", label: "💡 Punto Luz", color: "bg-amber-500" },
-                { id: "interruptor", label: "🔘 Interruptor", color: "bg-emerald-600" },
-                { id: "conmutador", label: "⇄ Conmutador", color: "bg-purple-600" },
-                { id: "tvRj45", label: "📺 TV / RJ45", color: "bg-rose-600" },
-                { id: "medir", label: "📏 Medir distancia", color: "bg-slate-800" },
+                { id: "enchufe", label: "Enchufe", icon: <Plug className="h-3.5 w-3.5" />, color: "bg-blue-600" },
+                { id: "puntoLuz", label: "Punto Luz", icon: <Lightbulb className="h-3.5 w-3.5" />, color: "bg-amber-500" },
+                { id: "interruptor", label: "Interruptor", icon: <ToggleLeft className="h-3.5 w-3.5" />, color: "bg-emerald-600" },
+                { id: "conmutador", label: "Conmutador", icon: <ArrowLeftRight className="h-3.5 w-3.5" />, color: "bg-purple-600" },
+                { id: "tvRj45", label: "TV / RJ45", icon: <Tv className="h-3.5 w-3.5" />, color: "bg-rose-600" },
+                { id: "medir", label: "Medir distancia", icon: <Ruler className="h-3.5 w-3.5" />, color: "bg-slate-800" },
               ] as const
             ).map((tool) => (
               <button
@@ -757,13 +764,14 @@ export default function PresupuestosPlanoView({
                   setActiveTool(tool.id);
                   if (tool.id === "medir") setMeasurePts([]);
                 }}
-                className={`rounded-lg px-3 py-1.5 font-semibold ${
+                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-semibold ${
                   activeTool === tool.id
                     ? `${tool.color} text-white`
                     : "border border-slate-200 bg-slate-50 text-slate-700"
                 }`}
               >
-                {tool.label}
+                {tool.icon}
+                <span>{tool.label}</span>
               </button>
             ))}
 
@@ -835,18 +843,20 @@ export default function PresupuestosPlanoView({
               <span
                 key={m.id}
                 style={{ left: `${m.xPct}%`, top: `${m.yPct}%` }}
-                className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full bg-slate-900/90 px-1.5 py-0.5 text-[10px] font-bold text-white shadow"
+                className="absolute -translate-x-1/2 -translate-y-1/2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-900/90 text-white shadow ring-2 ring-white"
                 title={`${m.type} (${m.room})`}
               >
-                {m.type === "enchufe"
-                  ? "🔌"
-                  : m.type === "puntoLuz"
-                  ? "💡"
-                  : m.type === "interruptor"
-                  ? "🔘"
-                  : m.type === "conmutador"
-                  ? "⇄"
-                  : "📺"}
+                {m.type === "enchufe" ? (
+                  <Plug className="h-3.5 w-3.5 text-blue-300" />
+                ) : m.type === "puntoLuz" ? (
+                  <Lightbulb className="h-3.5 w-3.5 text-amber-300" />
+                ) : m.type === "interruptor" ? (
+                  <ToggleLeft className="h-3.5 w-3.5 text-emerald-300" />
+                ) : m.type === "conmutador" ? (
+                  <ArrowLeftRight className="h-3.5 w-3.5 text-purple-300" />
+                ) : (
+                  <Tv className="h-3.5 w-3.5 text-rose-300" />
+                )}
               </span>
             ))}
 
@@ -966,7 +976,7 @@ export default function PresupuestosPlanoView({
                       })
                     );
                     setMtdSyncToast(
-                      `✅ ${materialOrderList.length} líneas de material enviadas al Pedido Unificado de Obra (Oficina).`
+                      `${materialOrderList.length} líneas de material enviadas al Pedido Unificado de Obra (Oficina).`
                     );
                   }}
                   className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 font-semibold text-white hover:bg-emerald-700"

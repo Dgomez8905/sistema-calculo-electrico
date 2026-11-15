@@ -12,6 +12,7 @@ import {
   GripVertical,
   Minimize2,
   RotateCcw,
+  Lightbulb,
 } from "lucide-react";
 import {
   answerRebtQuestion,
@@ -339,7 +340,10 @@ export default function AsistenteMonpixFloating({
           <GripVertical className="h-3.5 w-3.5 text-blue-200 shrink-0" />
           <MessageSquareText className="h-4 w-4 shrink-0" />
           {!compactPill && (
-            <span className="whitespace-nowrap">Pregunta al REBT 🎤</span>
+            <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+              <span>Pregunta al REBT</span>
+              <Mic className="h-3.5 w-3.5 text-blue-200" />
+            </span>
           )}
         </div>
 
@@ -487,9 +491,12 @@ export default function AsistenteMonpixFloating({
                   <p className="text-slate-700 leading-relaxed whitespace-pre-line">
                     {item.response.answer}
                   </p>
-                  <p className="rounded-lg bg-white p-2 text-[11px] text-emerald-900 border border-emerald-100">
-                    💡 <strong>Consejo de obra:</strong>{" "}
-                    {item.response.practicalTip}
+                  <p className="flex items-start gap-1.5 rounded-lg bg-white p-2 text-[11px] text-emerald-900 border border-emerald-100">
+                    <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-700" />
+                    <span>
+                      <strong>Consejo de obra:</strong>{" "}
+                      {item.response.practicalTip}
+                    </span>
                   </p>
                   {item.response.suggestedAction && (
                     <button

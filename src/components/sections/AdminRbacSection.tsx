@@ -18,6 +18,7 @@ import {
   CheckCircle2,
   Ban,
   BarChart3,
+  Info,
 } from "lucide-react";
 import GoogleSelect from "@/components/GoogleSelect";
 import { AdminDashboardSummary } from "@/components/DashboardsView";
@@ -1156,9 +1157,12 @@ export default function AdminRbacSection({
                   </strong>{" "}
                   (<span className="font-mono">{userToDelete.email}</span>).
                 </p>
-                <p className="mt-2 rounded-lg bg-amber-50 border border-amber-200 p-2.5 text-[11px] text-amber-900">
-                  💡 <strong>Nota:</strong> Si solo deseas revocar su acceso temporalmente conservando su ficha técnica, puedes usar el botón{" "}
-                  <strong>Inactivar</strong> en lugar de eliminarlo.
+                <p className="mt-2 flex items-start gap-1.5 rounded-lg bg-amber-50 border border-amber-200 p-2.5 text-[11px] text-amber-900">
+                  <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-700" />
+                  <span>
+                    <strong>Nota:</strong> Si solo deseas revocar su acceso temporalmente conservando su ficha técnica, puedes usar el botón{" "}
+                    <strong>Inactivar</strong> en lugar de eliminarlo.
+                  </span>
                 </p>
               </div>
             </div>

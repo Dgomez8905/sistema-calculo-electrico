@@ -382,10 +382,10 @@ export default function TramitesOcaCatastroView({
                     }}
                     className="px-2.5 py-1 text-xs"
                   >
-                    <option value="ok">✅ Bien (Sin defecto)</option>
-                    <option value="leve">🟡 Defecto Leve</option>
-                    <option value="grave">🟠 Defecto Grave (6 meses)</option>
-                    <option value="muy_grave">🔴 Defecto Muy Grave (Corte)</option>
+                    <option value="ok">Bien (Sin defecto)</option>
+                    <option value="leve">Defecto Leve</option>
+                    <option value="grave">Defecto Grave (6 meses)</option>
+                    <option value="muy_grave">Defecto Muy Grave (Corte)</option>
                   </select>
                 </div>
               ))}
@@ -448,7 +448,7 @@ export default function TramitesOcaCatastroView({
                 className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-1.5 font-semibold text-white hover:bg-emerald-700"
               >
                 <Navigation className="h-3.5 w-3.5" />
-                📍 Estoy aquí
+                Estoy aquí
               </button>
             </div>
 

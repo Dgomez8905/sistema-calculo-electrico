@@ -219,8 +219,8 @@ export default function SectionHistoryRegistry({
             {isSaving
               ? "Registrando..."
               : activeRecordId !== null
-              ? "Guardar como Nuevo"
-              : "Registrar en Historial"}
+                ? "Guardar como Nuevo"
+                : "Registrar en Historial"}
           </button>
         </div>
       </div>
@@ -314,11 +314,10 @@ export default function SectionHistoryRegistry({
                 return (
                   <tr
                     key={rec.id}
-                    className={`transition ${
-                      isEditing
+                    className={`transition ${isEditing
                         ? "bg-amber-50/60 hover:bg-amber-50"
                         : "hover:bg-slate-50"
-                    }`}
+                      }`}
                   >
                     {/* Columna 1 común: ID y Expediente */}
                     <td className="px-4 py-3">
@@ -579,11 +578,10 @@ export default function SectionHistoryRegistry({
                             await onEditRecord(rec.id);
                             window.scrollTo({ top: 0, behavior: "smooth" });
                           }}
-                          className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
-                            isEditing
+                          className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold transition ${isEditing
                               ? "bg-amber-500 text-white shadow-2xs"
                               : "bg-[#e8f0fe] text-[#0f6cbd] hover:bg-blue-100"
-                          }`}
+                            }`}
                           title="Cargar este registro en el formulario superior para editarlo"
                         >
                           <Pencil className="h-3.5 w-3.5" />
@@ -784,7 +782,7 @@ export default function SectionHistoryRegistry({
                   <span className="font-mono font-semibold text-slate-900">
                     {Number(
                       viewingRecord.building_forecast_json?.p1DwellingsWatts ??
-                        82656
+                      82656
                     ).toLocaleString()}{" "}
                     W (
                     {viewingRecord.building_forecast_json?.totalDwellings ?? 16}{" "}
@@ -806,7 +804,7 @@ export default function SectionHistoryRegistry({
                   <span className="font-mono font-semibold text-slate-900">
                     {Number(
                       viewingRecord.building_forecast_json?.p3CommercialWatts ??
-                        14000
+                      14000
                     ).toLocaleString()}{" "}
                     W
                   </span>
@@ -820,7 +818,7 @@ export default function SectionHistoryRegistry({
                     W +{" "}
                     {Number(
                       viewingRecord.building_forecast_json?.p5EffectiveEvWatts ??
-                        7360
+                      7360
                     ).toLocaleString()}{" "}
                     W
                   </span>

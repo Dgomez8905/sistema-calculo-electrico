@@ -23,6 +23,10 @@ import {
   AlertTriangle,
   Wrench,
   BookOpen,
+  XCircle,
+  Search,
+  Plug,
+  Info,
 } from "lucide-react";
 import {
   calculateRebtCircuit,
@@ -311,7 +315,7 @@ export default function UnifilarCuadroView({
     });
     setLastGeneratedDraft(draft);
     setDraftConfirmedMsg(
-      `⚡ Generación automática completada (${draft.formatLabel}): IGA ${draft.igaAmps} A · ${draft.rcdCount} diferencial(es) · ${draft.circuits.length} circuitos actualizados en Simulador DIN, Plano Unifilar IEC 60617 y Ficha Técnica M.T.D.`
+      `Generación automática completada (${draft.formatLabel}): IGA ${draft.igaAmps} A · ${draft.rcdCount} diferencial(es) · ${draft.circuits.length} circuitos actualizados en Simulador DIN, Plano Unifilar IEC 60617 y Ficha Técnica M.T.D.`
     );
     if (opts?.switchToTab) {
       setStepTab(opts.switchToTab);
@@ -484,7 +488,7 @@ export default function UnifilarCuadroView({
         // Por defecto cargamos primero el Estado Actual y habilitamos ambas opciones separadas
         applyDualProfileLocallyAndNotify(dualEval, "estado_actual");
         setPhotoVisionNote(
-          `✅ Foto analizada (${dualEval.sourceLabel}): Se han habilitado 2 opciones separadas con Fichas Técnicas M.T.D. independientes — Ficha #1 (${dualEval.actual.expedienteNum}: ${
+          `Foto analizada (${dualEval.sourceLabel}): Se han habilitado 2 opciones separadas con Fichas Técnicas M.T.D. independientes — Ficha #1 (${dualEval.actual.expedienteNum}: ${
             dualEval.overallCompliant ? "Cumple REBT" : "No cumple REBT"
           }) y Ficha #2 (${dualEval.corregido.expedienteNum}: Correcciones y cómo debe ir).`
         );
@@ -594,14 +598,14 @@ export default function UnifilarCuadroView({
           const faultyMod = prev.find((p) => p.id === earthFaultModuleId);
           if (faultyMod && faultyMod.parentRcdId === target.id && faultyMod.isOn) {
             setSimFeedback(
-              `⚠️ ${target.label} vuelve a saltar al intentar rearmarlo porque persiste la fuga a tierra en ${faultyMod.label}. Baja primero ${faultyMod.label} para aislar la avería.`
+              `Aviso: ${target.label} vuelve a saltar al intentar rearmarlo porque persiste la fuga a tierra en ${faultyMod.label}. Baja primero ${faultyMod.label} para aislar la avería.`
             );
             return prev.map((m) =>
               m.id === id ? { ...m, isOn: false, isTripped: true } : m
             );
           }
         }
-        setSimFeedback(`✅ ${target.label} rearmado correctamente (30 mA en servicio).`);
+        setSimFeedback(`${target.label} rearmado correctamente (30 mA en servicio).`);
         return prev.map((m) =>
           m.id === id ? { ...m, isOn: true, isTripped: false } : m
         );
@@ -616,7 +620,7 @@ export default function UnifilarCuadroView({
         target.neutralSourceRcdId !== target.parentRcdId
       ) {
         setSimFeedback(
-          `⚡ ¡Disparo instantáneo al subir ${target.label}! Su fase y su neutro pertenecen a diferenciales distintos (neutro cruzado).`
+          `Disparo instantáneo al subir ${target.label}: su fase y su neutro pertenecen a diferenciales distintos (neutro cruzado).`
         );
         return prev.map((m) => {
           if (m.id === id) return { ...m, isOn: true };
@@ -635,7 +639,7 @@ export default function UnifilarCuadroView({
         const parent = prev.find((r) => r.id === target.parentRcdId);
         if (parent) {
           setSimFeedback(
-            `⚡ ¡${parent.label} ha saltado al subir ${target.label}! Confirmas que la fuga está en este circuito.`
+            `Disparo: ${parent.label} ha saltado al subir ${target.label}. Confirmas que la fuga está en este circuito.`
           );
           return prev.map((m) => {
             if (m.id === id) return { ...m, isOn: true };
@@ -647,8 +651,8 @@ export default function UnifilarCuadroView({
 
       setSimFeedback(
         nextOn
-          ? `🔵 ${target.label} (${target.sublabel}) encendido (I-ON).`
-          : `⚪ ${target.label} (${target.sublabel}) apagado (0-OFF).`
+          ? `${target.label} (${target.sublabel}) encendido (I-ON).`
+          : `${target.label} (${target.sublabel}) apagado (0-OFF).`
       );
       return prev.map((m) =>
         m.id === id ? { ...m, isOn: nextOn, isTripped: false } : m
@@ -664,7 +668,7 @@ export default function UnifilarCuadroView({
     );
     const rcd = dinModules.find((m) => m.id === rcdId);
     setSimFeedback(
-      `🧪 Pulsado botón TEST en ${rcd?.label || "Diferencial"}: disparo mecánico correcto (< 30 ms). Sube su maneta para rearmar.`
+      `Prueba TEST en ${rcd?.label || "Diferencial"}: disparo mecánico correcto (< 30 ms). Sube su maneta para rearmar.`
     );
   };
 
@@ -677,7 +681,7 @@ export default function UnifilarCuadroView({
       dinModules.find((m) => m.kind === "PIA");
 
     if (!targetPia) {
-      setSimFeedback("⚠️ Añade al menos un PIA de circuito para simular una fuga a tierra.");
+      setSimFeedback("Añade al menos un PIA de circuito para simular una fuga a tierra.");
       return;
     }
 
@@ -691,11 +695,11 @@ export default function UnifilarCuadroView({
         )
       );
       setSimFeedback(
-        `⚡ Fuga de 45 mA provocada en ${targetPia.label} (${targetPia.sublabel}): ${parentRcd.label} ha disparado protegiendo a las personas. Prueba a bajar los PIAs de ese grupo y rearmar ${parentRcd.label}.`
+        `Fuga de 45 mA provocada en ${targetPia.label} (${targetPia.sublabel}): ${parentRcd.label} ha disparado protegiendo a las personas. Prueba a bajar los PIAs de ese grupo y rearmar ${parentRcd.label}.`
       );
     } else {
       setSimFeedback(
-        `🚨 PELIGRO CRÍTICO: Fuga provocada en ${targetPia.label}, pero NO tiene diferencial aguas arriba. ¡La fuga NO ha disparado ningún corte automático!`
+        `PELIGRO CRÍTICO: Fuga provocada en ${targetPia.label}, pero NO tiene diferencial aguas arriba. ¡La fuga NO ha disparado ningún corte automático!`
       );
     }
   };
@@ -754,7 +758,7 @@ export default function UnifilarCuadroView({
     setDinModules(base);
     setEarthFaultModuleId(null);
     setSimFeedback(
-      `🕵️ Modo Avería activo: «${scenario.title}». Revisa los cables, prueba los interruptores y elige el diagnóstico abajo.`
+      `Modo Avería activo: «${scenario.title}». Revisa los cables, prueba los interruptores y elige el diagnóstico abajo.`
     );
   };
 
@@ -772,7 +776,7 @@ export default function UnifilarCuadroView({
     setEarthFaultModuleId(null);
     setActiveChallengeIdx(null);
     setChallengePickedOption(null);
-    setSimFeedback("🔄 Simulador reiniciado con todos los interruptores I-ON y sin averías.");
+    setSimFeedback("Simulador reiniciado con todos los interruptores I-ON y sin averías.");
   };
 
   // ============================================================================
@@ -904,15 +908,15 @@ export default function UnifilarCuadroView({
     setSelectedModId(mod.id);
     setSimFeedback(
       mod.kind === "COMBI"
-        ? `➕ Cabecera actualizada con ${mod.label} (${mod.ratingAmps} A + T2 + POP), sustituyendo al IGA suelto.`
-        : `➕ Añadido ${mod.label} (${mod.sublabel}) al carril DIN.`
+        ? `Cabecera actualizada con ${mod.label} (${mod.ratingAmps} A + T2 + POP), sustituyendo al IGA suelto.`
+        : `Añadido ${mod.label} (${mod.sublabel}) al carril DIN.`
     );
   };
 
   const handleRemoveModule = (id: string) => {
     setDinModules((prev) => prev.filter((m) => m.id !== id));
     if (earthFaultModuleId === id) setEarthFaultModuleId(null);
-    setSimFeedback("🗑️ Componente retirado del cuadro eléctrico.");
+    setSimFeedback("Componente retirado del cuadro eléctrico.");
   };
 
   const handleMoveModule = (id: string, dir: -1 | 1) => {
@@ -940,7 +944,7 @@ export default function UnifilarCuadroView({
       return copy;
     });
     setDraggedModId(null);
-    setSimFeedback("↔️ Módulo recolocado arrastrando sobre el carril DIN.");
+    setSimFeedback("Módulo recolocado arrastrando sobre el carril DIN.");
   };
 
   const handleAutoFixDiagnostic = (
@@ -1169,7 +1173,7 @@ export default function UnifilarCuadroView({
       }
       return prev;
     });
-    setSimFeedback("🔧 Corrección aplicada automáticamente al cuadro eléctrico.");
+    setSimFeedback("Corrección aplicada automáticamente al cuadro eléctrico.");
   };
 
   // Exportar lista de material de cuadro DIN para almacén
@@ -1293,7 +1297,7 @@ export default function UnifilarCuadroView({
     });
     onApplyDraftCircuits(synced, supplyType);
     setDraftConfirmedMsg(
-      "✅ Cuadro DIN sincronizado con los circuitos del expediente activo."
+      "Cuadro DIN sincronizado con los circuitos del expediente activo."
     );
   };
 
@@ -1358,8 +1362,9 @@ export default function UnifilarCuadroView({
       </div>
 
       {draftConfirmedMsg && (
-        <div className="no-print rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-semibold text-emerald-900">
-          {draftConfirmedMsg}
+        <div className="no-print flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-semibold text-emerald-900">
+          <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+          <span>{draftConfirmedMsg}</span>
         </div>
       )}
 
@@ -1369,7 +1374,8 @@ export default function UnifilarCuadroView({
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <span className="inline-flex items-center gap-1.5 rounded-md bg-[#0f6cbd] px-2.5 py-0.5 text-[10.5px] font-bold text-white">
-                📷 Análisis Dual desde Foto del Cuadro · 2 Fichas Técnicas Independientes
+                <Camera className="h-3 w-3 shrink-0" />
+                Análisis Dual desde Foto del Cuadro · 2 Fichas Técnicas Independientes
               </span>
               <p className="mt-1 text-xs text-slate-700">
                 Alterna entre el <strong>Reporte de Estado Actual</strong> (si cumple o no las normativas) y la <strong>Propuesta de Correcciones</strong> (cómo debe ir la instalación).
@@ -1405,15 +1411,27 @@ export default function UnifilarCuadroView({
                 </span>
               </div>
               <p
-                className={`mt-1.5 rounded-lg px-2.5 py-1 text-[11px] font-bold ${
+                className={`mt-1.5 inline-flex w-full items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-bold ${
                   effectiveDualEval.overallCompliant
                     ? "bg-emerald-100 text-emerald-900"
                     : "bg-rose-100 text-rose-900"
                 }`}
               >
-                {effectiveDualEval.overallCompliant
-                  ? `✅ CUMPLE NORMATIVA REBT (${effectiveDualEval.complianceScorePct}%)`
-                  : `❌ NO CUMPLE REBT — ${effectiveDualEval.defectsGraveCount} defecto(s) detectado(s)`}
+                {effectiveDualEval.overallCompliant ? (
+                  <>
+                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-700" />
+                    <span>
+                      CUMPLE NORMATIVA REBT ({effectiveDualEval.complianceScorePct}%)
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="h-3.5 w-3.5 shrink-0 text-rose-700" />
+                    <span>
+                      NO CUMPLE REBT — {effectiveDualEval.defectsGraveCount} defecto(s) detectado(s)
+                    </span>
+                  </>
+                )}
               </p>
               <div className="mt-2.5 flex flex-wrap gap-2">
                 <button
@@ -1461,10 +1479,13 @@ export default function UnifilarCuadroView({
                   Ficha #2: {effectiveDualEval.corregido.expedienteNum}
                 </span>
               </div>
-              <p className="mt-1.5 rounded-lg bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-900">
-                🛠️ ADECUACIÓN 100% REBT: Combi IGA {effectiveDualEval.corregido.igaAmps} A +{" "}
-                {effectiveDualEval.corregido.rcdCount} ID Clase A +{" "}
-                {effectiveDualEval.corregido.circuits.length} circuitos
+              <p className="mt-1.5 inline-flex w-full items-center gap-1.5 rounded-lg bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-900">
+                <Wrench className="h-3.5 w-3.5 shrink-0 text-emerald-700" />
+                <span>
+                  ADECUACIÓN 100% REBT: Combi IGA {effectiveDualEval.corregido.igaAmps} A +{" "}
+                  {effectiveDualEval.corregido.rcdCount} ID Clase A +{" "}
+                  {effectiveDualEval.corregido.circuits.length} circuitos
+                </span>
               </p>
               <div className="mt-2.5 flex flex-wrap gap-2">
                 <button
@@ -1510,8 +1531,9 @@ export default function UnifilarCuadroView({
             <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-xs space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <div className="font-bold text-slate-800">
-                    📷 Desde una foto del cuadro (Detección y Generación Automática)
+                  <div className="inline-flex items-center gap-1.5 font-bold text-slate-800">
+                    <Camera className="h-3.5 w-3.5 text-[#0f6cbd]" />
+                    <span>Desde una foto del cuadro (Detección y Generación Automática)</span>
                   </div>
                   <p className="text-slate-500">
                     Al subir la foto, el sistema detecta el formato del circuito y genera automáticamente el Simulador DIN, el Plano Unifilar IEC 60617 y la Ficha Técnica M.T.D.
@@ -1529,8 +1551,11 @@ export default function UnifilarCuadroView({
               </div>
 
               {isAnalyzingPhoto && (
-                <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-[11px] font-medium text-blue-800">
-                  🔍 Detectando formato de suministro (230V/400V), IGA, diferenciales y PIAs para generar Simulador, Unifilar y Ficha M.T.D....
+                <div className="flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-[11px] font-medium text-blue-800">
+                  <Search className="h-3.5 w-3.5 shrink-0 text-blue-600" />
+                  <span>
+                    Detectando formato de suministro (230V/400V), IGA, diferenciales y PIAs para generar Simulador, Unifilar y Ficha M.T.D....
+                  </span>
                 </div>
               )}
 
@@ -1546,8 +1571,9 @@ export default function UnifilarCuadroView({
                 <div className="flex-1 space-y-2.5 rounded-xl border border-slate-200 bg-white p-3">
                   {(pendingDraft || lastGeneratedDraft) && (
                     <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
-                      <span className="rounded-md bg-blue-50 px-2 py-0.5 font-bold text-[#0f6cbd] border border-blue-200">
-                        ⚡ {(pendingDraft || lastGeneratedDraft)!.formatLabel}
+                      <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 font-bold text-[#0f6cbd] border border-blue-200">
+                        <Zap className="h-3 w-3 shrink-0" />
+                        {(pendingDraft || lastGeneratedDraft)!.formatLabel}
                       </span>
                       <span className="rounded-md bg-slate-100 px-2 py-0.5 font-mono font-bold text-slate-800">
                         IGA {(pendingDraft || lastGeneratedDraft)!.igaAmps} A
@@ -1635,8 +1661,9 @@ export default function UnifilarCuadroView({
               </div>
 
               {photoVisionNote && (
-                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-medium text-emerald-950">
-                  {photoVisionNote}
+                <div className="flex items-start gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-medium text-emerald-950">
+                  <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-700" />
+                  <span>{photoVisionNote}</span>
                 </div>
               )}
 
@@ -1664,8 +1691,9 @@ export default function UnifilarCuadroView({
                     ))}
                   </div>
                   <div className="border-t border-slate-100 pt-2 space-y-1.5">
-                    <div className="text-[11px] font-bold text-emerald-900">
-                      🛠️ Cómo debe ir la instalación (Correcciones Ficha #2):
+                    <div className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-900">
+                      <Wrench className="h-3.5 w-3.5 text-emerald-700" />
+                      <span>Cómo debe ir la instalación (Correcciones Ficha #2):</span>
                     </div>
                     {effectiveDualEval.corrections.map((cor) => (
                       <div
@@ -1685,8 +1713,9 @@ export default function UnifilarCuadroView({
 
             <div className="space-y-2 text-xs">
               <div className="flex items-center justify-between">
-                <label className="font-bold text-slate-800">
-                  🎤 Desde lo que me cuentas (escribe o dicta con el micro)
+                <label className="inline-flex items-center gap-1.5 font-bold text-slate-800">
+                  <Mic className="h-3.5 w-3.5 text-[#0f6cbd]" />
+                  <span>Desde lo que me cuentas (escribe o dicta con el micro)</span>
                 </label>
                 <button
                   type="button"
@@ -1736,8 +1765,9 @@ export default function UnifilarCuadroView({
             {pendingDraft && (
               <div className="rounded-xl border border-emerald-300 bg-emerald-50/50 p-4 space-y-3 text-xs">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="font-bold text-emerald-950">
-                    ✅ Formato de Circuito Detectado (Ajuste fino opcional en tiempo real)
+                  <span className="inline-flex items-center gap-1.5 font-bold text-emerald-950">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-700" />
+                    <span>Formato de Circuito Detectado (Ajuste fino opcional en tiempo real)</span>
                   </span>
                   <span className="rounded bg-white px-2 py-0.5 font-mono text-[11px] font-bold text-emerald-800 border border-emerald-200">
                     {pendingDraft.circuits.length} PIAs · {pendingDraft.formatLabel}
@@ -2211,8 +2241,9 @@ export default function UnifilarCuadroView({
             {effectiveVisionReport.contexto_canarias.alertas_inspeccion_canarias
               .length > 0 && (
               <div className="space-y-1 rounded-xl border border-amber-300 bg-amber-50 p-3 text-[11px] text-amber-950">
-                <div className="font-bold">
-                  ⚠️ Alertas Reglamentarias Canarias (REBT / NRZ103 Edistribución):
+                <div className="inline-flex items-center gap-1.5 font-bold">
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-700" />
+                  <span>Alertas Reglamentarias Canarias (REBT / NRZ103 Edistribución):</span>
                 </div>
                 <ul className="list-disc pl-4 space-y-0.5">
                   {effectiveVisionReport.contexto_canarias.alertas_inspeccion_canarias.map(
@@ -2343,7 +2374,16 @@ export default function UnifilarCuadroView({
                   : "border-blue-200 bg-blue-50/70 text-slate-800"
               }`}
             >
-              <span>{simFeedback}</span>
+              <span className="inline-flex items-center gap-1.5">
+                {earthFaultModuleId ? (
+                  <Zap className="h-3.5 w-3.5 shrink-0 text-rose-600" />
+                ) : errorDiagnostics.length > 0 ? (
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-600" />
+                ) : (
+                  <Info className="h-3.5 w-3.5 shrink-0 text-[#0f6cbd]" />
+                )}
+                <span>{simFeedback}</span>
+              </span>
               <span className="font-mono text-[11px] text-slate-600">
                 Haz clic en cualquier maneta I-ON / 0-OFF para probar corte
               </span>
@@ -2378,7 +2418,10 @@ export default function UnifilarCuadroView({
                 {showCables && (
                   <div className="mb-3 rounded-lg border border-slate-300 bg-white/90 p-2.5 text-[11px]">
                     <div className="flex flex-wrap items-center justify-between gap-2 font-bold text-slate-800">
-                      <span>🔌 Esquema de cableado vivo del cuadro:</span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <Plug className="h-3.5 w-3.5 text-[#0f6cbd]" />
+                        <span>Esquema de cableado vivo del cuadro:</span>
+                      </span>
                       <div className="flex flex-wrap items-center gap-3 text-[10px]">
                         <span className="inline-flex items-center gap-1">
                           <span className="h-2.5 w-4 rounded-xs bg-amber-800" /> Fase (L)
@@ -2423,13 +2466,29 @@ export default function UnifilarCuadroView({
                               <span>
                                 <strong>{p.label}</strong> ({p.cableSectionMm2 ?? 2.5} mm²)
                               </span>
-                              <span className="text-[10px]">
-                                {noRcd
-                                  ? "⚠️ Directo sin DIF"
-                                  : neutralCrossed
-                                  ? `⚠️ Neutro en otro DIF`
-                                  : `← ${rcdParent.label}`}{" "}
-                                · {noEarth ? "❌ Sin PE" : "⏚ PE OK"}
+                              <span className="inline-flex items-center gap-1 text-[10px]">
+                                {noRcd ? (
+                                  <>
+                                    <AlertTriangle className="h-3 w-3 shrink-0 text-rose-600" />
+                                    <span>Directo sin DIF</span>
+                                  </>
+                                ) : neutralCrossed ? (
+                                  <>
+                                    <AlertTriangle className="h-3 w-3 shrink-0 text-amber-600" />
+                                    <span>Neutro en otro DIF</span>
+                                  </>
+                                ) : (
+                                  <span>← {rcdParent.label}</span>
+                                )}
+                                <span>·</span>
+                                {noEarth ? (
+                                  <span className="inline-flex items-center gap-0.5 text-rose-700">
+                                    <XCircle className="h-3 w-3 shrink-0" />
+                                    <span>Sin PE</span>
+                                  </span>
+                                ) : (
+                                  <span>⏚ PE OK</span>
+                                )}
                               </span>
                             </div>
                           );
@@ -2675,8 +2734,9 @@ export default function UnifilarCuadroView({
               <div className="no-print grid grid-cols-1 gap-4 rounded-2xl border border-blue-200 bg-blue-50/40 p-4 lg:grid-cols-2">
                 {/* 1. Añadir componente al carril */}
                 <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 text-xs">
-                  <h4 className="font-bold text-slate-900">
-                    ➕ Agregar componente al cuadro eléctrico
+                  <h4 className="inline-flex items-center gap-1.5 font-bold text-slate-900">
+                    <Plus className="h-3.5 w-3.5 text-[#0f6cbd]" />
+                    <span>Agregar componente al cuadro eléctrico</span>
                   </h4>
                   <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
                     <div>
@@ -2773,10 +2833,13 @@ export default function UnifilarCuadroView({
                 {/* 2. Inspector del componente seleccionado (para probar conexiones buenas o malas) */}
                 <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 text-xs">
                   <div className="flex items-center justify-between">
-                    <h4 className="font-bold text-slate-900">
-                      🔧 Inspector del módulo seleccionado:{" "}
-                      <span className="text-[#0f6cbd]">
-                        {selectedModule?.label || "Ninguno"}
+                    <h4 className="inline-flex items-center gap-1.5 font-bold text-slate-900">
+                      <Wrench className="h-3.5 w-3.5 text-slate-600" />
+                      <span>
+                        Inspector del módulo seleccionado:{" "}
+                        <span className="text-[#0f6cbd]">
+                          {selectedModule?.label || "Ninguno"}
+                        </span>
                       </span>
                     </h4>
                     {selectedModule && (
@@ -2901,7 +2964,7 @@ export default function UnifilarCuadroView({
                               className="mt-1 w-full px-2.5 py-1.5 text-xs"
                             >
                               <option value="">
-                                ⚠️ Sin diferencial (probar fallo)
+                                Sin diferencial (probar fallo)
                               </option>
                               {availableRcds.map((r) => (
                                 <option key={r.id} value={r.id}>
@@ -2977,8 +3040,11 @@ export default function UnifilarCuadroView({
             {showMaterialModal && (
               <div className="no-print rounded-2xl border border-indigo-200 bg-indigo-50/40 p-4 text-xs space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h4 className="font-bold text-indigo-950">
-                    📋 Lista de Material del Cuadro para Almacén ({panelMaterialBom.length} líneas)
+                  <h4 className="inline-flex items-center gap-1.5 font-bold text-indigo-950">
+                    <ClipboardList className="h-4 w-4 text-indigo-700" />
+                    <span>
+                      Lista de Material del Cuadro para Almacén ({panelMaterialBom.length} líneas)
+                    </span>
                   </h4>
                   <div className="flex flex-wrap gap-2">
                     {onAddToUnifiedOrder && (
@@ -2997,7 +3063,7 @@ export default function UnifilarCuadroView({
                             }))
                           );
                           setDraftConfirmedMsg(
-                            `✅ ${panelMaterialBom.length} líneas del cuadro DIN añadidas al Pedido Unificado de Obra.`
+                            `${panelMaterialBom.length} líneas del cuadro DIN añadidas al Pedido Unificado de Obra.`
                           );
                         }}
                         className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 font-semibold text-white hover:bg-emerald-700"
@@ -3050,8 +3116,9 @@ export default function UnifilarCuadroView({
             {activeChallenge && (
               <div className="no-print rounded-2xl border-2 border-purple-300 bg-purple-50/60 p-4 text-xs space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="font-bold text-purple-950 text-sm">
-                    🕵️ {activeChallenge.title}
+                  <div className="inline-flex items-center gap-1.5 font-bold text-purple-950 text-sm">
+                    <SearchCode className="h-4 w-4 text-purple-700" />
+                    <span>{activeChallenge.title}</span>
                   </div>
                   <button
                     type="button"
@@ -3086,7 +3153,7 @@ export default function UnifilarCuadroView({
                 </div>
                 {challengePickedOption !== null && (
                   <div
-                    className={`rounded-xl p-3 font-medium ${
+                    className={`flex items-start gap-2 rounded-xl p-3 font-medium ${
                       challengePickedOption ===
                       activeChallenge.correctOptionIndex
                         ? "bg-emerald-100 text-emerald-950"
@@ -3094,10 +3161,20 @@ export default function UnifilarCuadroView({
                     }`}
                   >
                     {challengePickedOption ===
-                    activeChallenge.correctOptionIndex
-                      ? "✅ ¡Diagnóstico exacto! "
-                      : "❌ No es esa la causa. "}
-                    {activeChallenge.explanation}
+                    activeChallenge.correctOptionIndex ? (
+                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700" />
+                    ) : (
+                      <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-700" />
+                    )}
+                    <span>
+                      <strong>
+                        {challengePickedOption ===
+                        activeChallenge.correctOptionIndex
+                          ? "¡Diagnóstico exacto! "
+                          : "No es esa la causa. "}
+                      </strong>
+                      {activeChallenge.explanation}
+                    </span>
                   </div>
                 )}
               </div>
@@ -3143,13 +3220,15 @@ export default function UnifilarCuadroView({
                   }`}
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="font-bold">
-                      {diag.severity === "error"
-                        ? "❌ "
-                        : diag.severity === "warning"
-                        ? "⚠️ "
-                        : "✅ "}
-                      {diag.title}
+                    <div className="inline-flex items-center gap-1.5 font-bold">
+                      {diag.severity === "error" ? (
+                        <XCircle className="h-3.5 w-3.5 shrink-0 text-rose-600" />
+                      ) : diag.severity === "warning" ? (
+                        <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-600" />
+                      ) : (
+                        <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+                      )}
+                      <span>{diag.title}</span>
                     </div>
                     <span className="rounded bg-white/80 px-2 py-0.5 font-mono text-[10px] font-bold">
                       {diag.itc}

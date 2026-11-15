@@ -634,7 +634,7 @@ export function computePanelLiveState(
         reason: isFaultTarget
           ? parentRcd
             ? "Fuga detectada → DIF disparado"
-            : "⚠️ FUGA SIN DIFERENCIAL"
+            : "ALERTA: FUGA SIN DIFERENCIAL"
           : !rcdLive
           ? parentRcd?.isTripped
             ? `Cortado por disparo de ${parentRcd.label}`

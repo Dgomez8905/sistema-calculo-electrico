@@ -19,6 +19,8 @@ import {
   Wrench,
   X,
   ArrowLeft,
+  Search,
+  XCircle,
 } from "lucide-react";
 import type {
   MtdFormMetadata,
@@ -476,8 +478,9 @@ export default function NewExpedienteWizardModal({
 
               {isAnalyzing && (
                 <div className="rounded-xl border border-blue-200 bg-blue-50 p-6 text-center space-y-2">
-                  <p className="text-sm font-bold text-[#0f6cbd]">
-                    🔍 Escaneando aparamenta DIN, protecciones y circuitos del cuadro eléctrico...
+                  <p className="inline-flex items-center justify-center gap-2 text-sm font-bold text-[#0f6cbd]">
+                    <Search className="h-4 w-4 animate-pulse" />
+                    <span>Escaneando aparamenta DIN, protecciones y circuitos del cuadro eléctrico...</span>
                   </p>
                   <p className="text-xs text-slate-600">
                     Generando en paralelo el Diagnóstico de Estado Actual (-ACT) y la Propuesta de Correcciones REBT (-COR).
@@ -636,10 +639,18 @@ export default function NewExpedienteWizardModal({
                         }`}
                       >
                         <div className="flex items-center justify-between gap-2">
-                          <span className="text-xs font-extrabold uppercase">
-                            {dualResult.overallCompliant
-                              ? "✅ SÍ CUMPLE NORMATIVA REBT"
-                              : "❌ NO CUMPLE NORMATIVA REBT"}
+                          <span className="inline-flex items-center gap-1.5 text-xs font-extrabold uppercase">
+                            {dualResult.overallCompliant ? (
+                              <>
+                                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+                                <span>SÍ CUMPLE NORMATIVA REBT</span>
+                              </>
+                            ) : (
+                              <>
+                                <XCircle className="h-4 w-4 shrink-0 text-rose-600" />
+                                <span>NO CUMPLE NORMATIVA REBT</span>
+                              </>
+                            )}
                           </span>
                           <span className="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-bold">
                             Índice: {dualResult.complianceScorePct}%

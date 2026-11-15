@@ -263,7 +263,7 @@ export function buildUnifilarIec60617Svg(input: UnifilarSvgInput): string {
       <text x="580" y="65" font-family="Arial" font-size="8.5" fill="#475569">Puesta a tierra y conductor protección</text>
       <text x="455" y="88" font-family="Arial" font-size="9" font-weight="bold" fill="#0f172a">[///] Conductores:</text>
       <text x="580" y="88" font-family="Arial" font-size="8.5" fill="#475569">Trazos oblicuos = Nº conductores (F+N+PE / 3F+N+PE)</text>
-      <text x="12" y="110" font-family="Arial" font-size="8" font-style="italic" fill="#92400e">⚠️ ${escapeXml(disclaimer)}</text>
+      <text x="12" y="110" font-family="Arial" font-size="8" font-style="italic" fill="#92400e">AVISO: ${escapeXml(disclaimer)}</text>
     </g>
   </g>
 

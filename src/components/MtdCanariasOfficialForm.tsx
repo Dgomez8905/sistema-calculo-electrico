@@ -32,6 +32,8 @@ import {
   RotateCcw,
   Type,
   Move,
+  CheckCircle2,
+  AlertTriangle,
 } from "lucide-react";
 
 const MTD_SHEETS_CATALOG: {
@@ -286,16 +288,16 @@ export default function MtdCanariasOfficialForm({
           coordenadasUtm: utm,
         }));
         setGeoFeedback(
-          `✅ Coordenadas localizadas: ${latFixed}, ${lonFixed} (${utm}). Ya puedes abrir Google Street View o subir/pegar la foto de la fachada.`
+          `Coordenadas localizadas: ${latFixed}, ${lonFixed} (${utm}). Ya puedes abrir Google Street View o subir/pegar la foto de la fachada.`
         );
       } else {
         setGeoFeedback(
-          "⚠️ No se encontró la calle exacta automáticamente. Puedes escribir Latitud/Longitud o pulsar «Usar mi GPS»."
+          "Aviso: No se encontró la calle exacta automáticamente. Puedes escribir Latitud/Longitud o pulsar «Usar mi GPS»."
         );
       }
     } catch {
       setGeoFeedback(
-        "⚠️ Sin respuesta del geocodificador externo. Introduce las coordenadas manualmente o usa el GPS del dispositivo."
+        "Aviso: Sin respuesta del geocodificador externo. Introduce las coordenadas manualmente o usa el GPS del dispositivo."
       );
     } finally {
       setIsGeocoding(false);
@@ -304,7 +306,7 @@ export default function MtdCanariasOfficialForm({
 
   const handleUseDeviceGps = () => {
     if (typeof navigator === "undefined" || !navigator.geolocation) {
-      setGeoFeedback("⚠️ Tu navegador no dispone de sensor GPS.");
+      setGeoFeedback("Aviso: Tu navegador no dispone de sensor GPS.");
       return;
     }
     setGeoFeedback("Capturando posición GPS actual en obra...");
@@ -323,11 +325,11 @@ export default function MtdCanariasOfficialForm({
           coordenadasUtm: utm,
         }));
         setGeoFeedback(
-          `✅ GPS en obra fijado: ${latFixed}, ${lonFixed} · UTM ${utm}.`
+          `GPS en obra fijado: ${latFixed}, ${lonFixed} · UTM ${utm}.`
         );
       },
       () => {
-        setGeoFeedback("⚠️ Permiso de ubicación denegado o sin cobertura GPS.");
+        setGeoFeedback("Aviso: Permiso de ubicación denegado o sin cobertura GPS.");
       },
       { enableHighAccuracy: true, timeout: 10000 }
     );
@@ -353,7 +355,7 @@ export default function MtdCanariasOfficialForm({
           updateField("fachadaFotoDataUrl", rawUrl);
         }
         setGeoFeedback(
-          "✅ Fotografía de fachada cargada en la Hoja 9/11. Haz clic en cualquier punto de la foto para situar el indicador de CGP y coordenadas."
+          "Fotografía de fachada cargada en la Hoja 9/11. Haz clic en cualquier punto de la foto para situar el indicador de CGP y coordenadas."
         );
       };
       img.onerror = () => {
@@ -505,7 +507,7 @@ export default function MtdCanariasOfficialForm({
           updateField("croquisImagenDataUrl", rawUrl);
         }
         setGeoFeedback(
-          "✅ Imagen base del Croquis 1B cargada. Puedes situar encima la CGP, la red B.T., textos o trazos manuales."
+          "Imagen base del Croquis 1B cargada. Puedes situar encima la CGP, la red B.T., textos o trazos manuales."
         );
       };
       img.onerror = () => updateField("croquisImagenDataUrl", rawUrl);
@@ -723,8 +725,9 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
         {dualPhotoSwitcher && (
           <div className="rounded-xl border-2 border-blue-200 bg-gradient-to-b from-blue-50/80 to-white p-3.5 shadow-xs space-y-2.5">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-[10.5px] font-extrabold uppercase tracking-wide text-[#0f6cbd]">
-                📷 2 Fichas Técnicas Separadas (Foto)
+              <span className="inline-flex items-center gap-1.5 text-[10.5px] font-extrabold uppercase tracking-wide text-[#0f6cbd]">
+                <Camera className="h-3.5 w-3.5 shrink-0" />
+                <span>2 Fichas Técnicas Separadas (Foto)</span>
               </span>
               <span
                 className={`rounded-full px-2 py-0.5 text-[9.5px] font-bold ${
@@ -3439,7 +3442,7 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
                   type="button"
                   onClick={() => {
                     updateField("fachadaFotoDataUrl", "");
-                    setGeoFeedback("🗑️ Fotografía de fachada retirada de la Hoja 9/11.");
+                    setGeoFeedback("Fotografía de fachada retirada de la Hoja 9/11.");
                   }}
                   className="inline-flex items-center gap-1 rounded-xl border border-rose-300 bg-white px-3 py-2 font-semibold text-rose-700 hover:bg-rose-50"
                 >
@@ -3537,7 +3540,7 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
                       const trimmed = streetViewUrlInput.trim();
                       if (!trimmed) return;
                       updateField("fachadaFotoDataUrl", trimmed);
-                      setGeoFeedback("✅ Imagen de fachada cargada desde URL de Google.");
+                      setGeoFeedback("Imagen de fachada cargada desde URL de Google.");
                     }}
                     className="rounded bg-slate-800 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-slate-900"
                   >
@@ -3548,8 +3551,19 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
             </div>
 
             {geoFeedback && (
-              <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-semibold text-emerald-950">
-                {geoFeedback}
+              <div
+                className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[11px] font-semibold ${
+                  geoFeedback.startsWith("Aviso:")
+                    ? "border-amber-200 bg-amber-50 text-amber-950"
+                    : "border-emerald-200 bg-emerald-50 text-emerald-950"
+                }`}
+              >
+                {geoFeedback.startsWith("Aviso:") ? (
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-700" />
+                ) : (
+                  <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-700" />
+                )}
+                <span>{geoFeedback}</span>
               </div>
             )}
           </div>
@@ -3865,7 +3879,7 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
                                     meta.fachadaFotoDataUrl || ""
                                   );
                                   setGeoFeedback(
-                                    "✅ Fotografía sincronizada desde el Apartado 2 al Apartado 1B."
+                                    "Fotografía sincronizada desde el Apartado 2 al Apartado 1B."
                                   );
                                 }}
                                 className="rounded border border-slate-300 bg-white px-1.5 py-0.5 font-semibold text-slate-700 hover:bg-slate-100"
@@ -3880,7 +3894,7 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
                               onClick={() => {
                                 updateField("croquisImagenDataUrl", "");
                                 setGeoFeedback(
-                                  "🗑️ Fotografía retirada del Apartado 1B."
+                                  "Fotografía retirada del Apartado 1B."
                                 );
                               }}
                               className="inline-flex items-center gap-0.5 rounded border border-rose-300 bg-white px-1.5 py-0.5 font-semibold text-rose-700 hover:bg-rose-50"
@@ -3907,7 +3921,7 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
                               if (!trimmed) return;
                               updateField("croquisImagenDataUrl", trimmed);
                               setGeoFeedback(
-                                "✅ Imagen de fachada importada desde URL de Google en el Apartado 1B."
+                                "Imagen de fachada importada desde URL de Google en el Apartado 1B."
                               );
                             }}
                             className="rounded bg-slate-800 px-2 py-0.5 text-[9px] font-semibold text-white hover:bg-slate-900"
@@ -3974,19 +3988,24 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
                               <div className="flex h-5 w-5 items-center justify-center rounded-full border-2 border-rose-800 bg-rose-600 text-white shadow">
                                 <Crosshair className="h-3 w-3 stroke-[2.5]" />
                               </div>
-                              <div className="mt-0.5 max-w-[190px] truncate rounded border border-black bg-amber-300 px-1.5 py-0.5 text-[8px] font-extrabold text-black shadow">
-                                ⚡{" "}
-                                {meta.fachadaNotaPuntoSuministro ||
-                                  "CGP / Punto Suministro"}
+                              <div className="mt-0.5 inline-flex max-w-[190px] items-center gap-0.5 truncate rounded border border-black bg-amber-300 px-1.5 py-0.5 text-[8px] font-extrabold text-black shadow">
+                                <Zap className="h-2.5 w-2.5 shrink-0 fill-current" />
+                                <span className="truncate">
+                                  {meta.fachadaNotaPuntoSuministro ||
+                                    "CGP / Punto Suministro"}
+                                </span>
                               </div>
                             </div>
                           </div>
 
                           {/* Leyenda georreferenciada inferior nítida en pantalla e impresión */}
                           <div className="flex shrink-0 items-center justify-between gap-1 border-t border-black bg-slate-100 px-1.5 py-0.5 text-[7.5px] font-mono font-bold text-black">
-                            <span className="truncate">
-                              📍 1B: C/ {meta.direccionCalle}{" "}
-                              {meta.direccionNum} ({meta.terminoMunicipal})
+                            <span className="inline-flex items-center gap-0.5 truncate">
+                              <MapPin className="h-2.5 w-2.5 shrink-0" />
+                              <span className="truncate">
+                                1B: C/ {meta.direccionCalle}{" "}
+                                {meta.direccionNum} ({meta.terminoMunicipal})
+                              </span>
                             </span>
                             <span className="truncate shrink-0">
                               {meta.coordenadasLat && meta.coordenadasLng
@@ -4401,14 +4420,18 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
                                   >
                                     {parcelSubText}
                                   </text>
+                                  <polygon
+                                    points={`${parcelaX + 14},${parcelaY + 46} ${parcelaX + 10},${parcelaY + 51} ${parcelaX + 13},${parcelaY + 51} ${parcelaX + 11},${parcelaY + 56} ${parcelaX + 16},${parcelaY + 50} ${parcelaX + 13},${parcelaY + 50}`}
+                                    fill="#b91c1c"
+                                  />
                                   <text
-                                    x={parcelaX + 10}
+                                    x={parcelaX + 19}
                                     y={parcelaY + 54}
                                     fontSize="8.8"
                                     fontWeight="bold"
                                     fill="#b91c1c"
                                   >
-                                    ⚡ {notaLine1}
+                                    {notaLine1}
                                   </text>
                                   {notaLine2 && (
                                     <text
@@ -4569,16 +4592,22 @@ La presente Memoria Técnica de Diseño (M.T.D. B.T.) tiene por objeto definir y
                             <div className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-rose-800 bg-rose-600 text-white shadow">
                               <Crosshair className="h-3.5 w-3.5 stroke-[2.5]" />
                             </div>
-                            <div className="mt-0.5 max-w-[320px] truncate rounded border border-black bg-amber-300 px-2 py-0.5 text-[8.5px] font-extrabold text-black shadow">
-                              ⚡ {meta.fachadaNotaPuntoSuministro || "CGP / Punto Suministro"}
+                            <div className="mt-0.5 inline-flex max-w-[320px] items-center gap-0.5 truncate rounded border border-black bg-amber-300 px-2 py-0.5 text-[8.5px] font-extrabold text-black shadow">
+                              <Zap className="h-2.5 w-2.5 shrink-0 fill-current" />
+                              <span className="truncate">
+                                {meta.fachadaNotaPuntoSuministro || "CGP / Punto Suministro"}
+                              </span>
                             </div>
                           </div>
                         </div>
 
                         {/* Leyenda georreferenciada impresa al pie de la foto (sin tapar la imagen y nítida en impresión) */}
                         <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-black bg-slate-100 px-2 py-0.5 text-[8px] font-mono font-bold text-black">
-                          <span className="truncate">
-                            📍 FACHADA: C/ {meta.direccionCalle} {meta.direccionNum} ({meta.terminoMunicipal})
+                          <span className="inline-flex items-center gap-0.5 truncate">
+                            <MapPin className="h-2.5 w-2.5 shrink-0" />
+                            <span className="truncate">
+                              FACHADA: C/ {meta.direccionCalle} {meta.direccionNum} ({meta.terminoMunicipal})
+                            </span>
                           </span>
                           <span className="truncate shrink-0">
                             {meta.coordenadasLat && meta.coordenadasLng
