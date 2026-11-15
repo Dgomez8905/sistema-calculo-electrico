@@ -1,18 +1,50 @@
 @import "tailwindcss" source("..");
 
 :root {
-  --background: #f8fafc;
+  --background: #f4f6f9;
   --foreground: #0f172a;
-  --google-blue: #1a73e8;
-  --google-blue-soft: #e8f0fe;
-  --google-border: #dadce0;
-  --google-border-hover: #bdc1c6;
+  --brand-primary: #0f6cbd;
+  --brand-primary-hover: #0c5aa6;
+  --google-blue: #0f6cbd;
+  --google-blue-soft: #e8f2fc;
+  --google-border: #cbd5e1;
+  --google-border-hover: #94a3b8;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: "Inter", "Google Sans", "Segoe UI", Roboto, system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ============================================================================
+   SISTEMA VISUAL SAAS CORPORATIVO (CONTROLES, FOCUS Y TABULAR NUMS)
+   Excluye estrictamente hojas de impresión (.mtd-print-page y .print-a3-sheet)
+   ============================================================================ */
+@media screen {
+  .font-mono,
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+
+  main input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),
+  main textarea {
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+  }
+
+  main input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]):focus,
+  main textarea:focus {
+    outline: none;
+    border-color: var(--brand-primary);
+    box-shadow: 0 0 0 3px rgba(15, 108, 189, 0.14);
+  }
+
+  .mtd-print-page input:focus,
+  .mtd-print-page textarea:focus {
+    box-shadow: none !important;
+  }
 }
 
 /* ============================================================================
@@ -243,7 +275,8 @@ select:not(.mtd-raw-select):focus {
   }
 
   html.monpix-dark body,
-  html.monpix-dark .bg-\[\#f8fafc\] {
+  html.monpix-dark .bg-\[\#f8fafc\],
+  html.monpix-dark .bg-\[\#f4f6f9\] {
     background-color: #0b1120 !important;
     color: var(--monpix-text) !important;
   }

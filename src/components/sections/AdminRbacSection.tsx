@@ -17,6 +17,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Ban,
+  BarChart3,
 } from "lucide-react";
 import GoogleSelect from "@/components/GoogleSelect";
 import { AdminDashboardSummary } from "@/components/DashboardsView";
@@ -81,6 +82,25 @@ interface AdminRbacSectionProps {
   setNewTenantIsla: (v: string) => void;
 }
 
+const ROLE_LABELS: Record<UserRole, { label: string; style: string }> = {
+  super_admin: {
+    label: "Super Admin",
+    style: "bg-indigo-50 text-indigo-800 ring-1 ring-indigo-600/20",
+  },
+  admin_empresa: {
+    label: "Admin Empresa",
+    style: "bg-blue-50 text-[#0f6cbd] ring-1 ring-[#0f6cbd]/20",
+  },
+  ingeniero_instalador: {
+    label: "Instalador / Ing.",
+    style: "bg-slate-100 text-slate-700",
+  },
+  visor_auditor: {
+    label: "Visor / OCA",
+    style: "bg-purple-50 text-purple-700 ring-1 ring-purple-600/20",
+  },
+};
+
 export default function AdminRbacSection({
   tenants,
   users,
@@ -119,7 +139,12 @@ export default function AdminRbacSection({
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">(
     "all"
   );
+  const [tenantFilter, setTenantFilter] = useState<number | "all">("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const [activeCreatePanel, setActiveCreatePanel] = useState<
+    "none" | "user" | "tenant"
+  >("none");
+  const [showAnalyticsCharts, setShowAnalyticsCharts] = useState(false);
 
   // Estado del Modal de Edición de Usuario
   const [editingUser, setEditingUser] = useState<AppUser | null>(null);
@@ -153,6 +178,7 @@ export default function AdminRbacSection({
     return users.filter((u) => {
       if (statusFilter === "active" && !u.is_active) return false;
       if (statusFilter === "inactive" && u.is_active) return false;
+      if (tenantFilter !== "all" && u.tenant_id !== tenantFilter) return false;
       if (!q) return true;
       return (
         u.full_name.toLowerCase().includes(q) ||
@@ -161,7 +187,7 @@ export default function AdminRbacSection({
         (u.cci_or_colegiado || "").toLowerCase().includes(q)
       );
     });
-  }, [users, statusFilter, searchTerm]);
+  }, [users, statusFilter, tenantFilter, searchTerm]);
 
   const openEditModal = (u: AppUser) => {
     setEditingUser(u);
@@ -189,44 +215,117 @@ export default function AdminRbacSection({
     }
   };
 
+  const handleCreateUserSubmit = (e: React.FormEvent) => {
+    onCreateUser(e);
+    setActiveCreatePanel("none");
+  };
+
+  const handleCreateTenantSubmit = (e: React.FormEvent) => {
+    onCreateTenant(e);
+    setActiveCreatePanel("none");
+  };
+
   return (
-    <div className="space-y-6">
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs">
-        <span className="inline-flex items-center gap-1.5 rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-[#0f6cbd]">
-          <ShieldCheck className="h-3.5 w-3.5" />
-          Dashboard Administrativo Multi-Tenant y RBAC
-        </span>
-        <h2 className="mt-2 text-lg font-bold text-slate-900">
-          Métricas Globales, Empresas (Tenants), Gestión de Usuarios y Matriz de Permisología
-        </h2>
-        <p className="mt-0.5 text-xs text-slate-500">
-          Supervisa las métricas de actividad por empresa, crea, edita, inactiva o elimina técnicos y configura permisos RBAC con aislamiento estricto.
-        </p>
+    <div className="space-y-5">
+      {/* Cabecera Ejecutiva con Acciones Bajo Demanda */}
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200/90 bg-white p-5 shadow-2xs">
+        <div className="min-w-0">
+          <span className="inline-flex items-center gap-1.5 rounded-md bg-blue-50 px-2.5 py-0.5 text-[11px] font-semibold text-[#0f6cbd] ring-1 ring-[#0f6cbd]/20">
+            <ShieldCheck className="h-3 w-3" />
+            Administración Corporativa y RBAC
+          </span>
+          <h2 className="mt-1.5 text-lg font-bold tracking-tight text-slate-900">
+            Directorio de Usuarios, Multitenencia y Permisología
+          </h2>
+          <p className="mt-0.5 text-xs text-slate-500">
+            Gestiona técnicos habilitados, empresas instaladoras y privilegios granulares con segregación estricta de expedientes.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowAnalyticsCharts((v) => !v)}
+            className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold transition ${
+              showAnalyticsCharts
+                ? "border-blue-200 bg-blue-50 text-[#0f6cbd]"
+                : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+            }`}
+          >
+            <BarChart3 className="h-3.5 w-3.5" />
+            {showAnalyticsCharts ? "Ocultar Analítica" : "Analítica por Empresa"}
+          </button>
+
+          <button
+            type="button"
+            disabled={!canManage}
+            onClick={() =>
+              setActiveCreatePanel((p) => (p === "tenant" ? "none" : "tenant"))
+            }
+            className={`inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-semibold transition disabled:opacity-50 ${
+              activeCreatePanel === "tenant"
+                ? "border-slate-900 bg-slate-900 text-white"
+                : "border-slate-300 bg-white text-slate-800 hover:bg-slate-50"
+            }`}
+          >
+            <Building className="h-3.5 w-3.5" />
+            Nueva Empresa
+          </button>
+
+          <button
+            type="button"
+            disabled={!canManage}
+            onClick={() =>
+              setActiveCreatePanel((p) => (p === "user" ? "none" : "user"))
+            }
+            className="inline-flex items-center gap-1.5 rounded-xl bg-[#0f6cbd] px-4 py-2 text-xs font-semibold text-white shadow-2xs transition hover:bg-[#0c5aa6] disabled:opacity-50"
+          >
+            <Plus className="h-4 w-4" />
+            Nuevo Usuario
+          </button>
+        </div>
       </div>
 
-      {/* Dashboard Ejecutivo de Administración */}
+      {/* KPIs Ejecutivos + Gráficos Opcionales */}
       <AdminDashboardSummary
         tenants={tenants}
         users={users}
         allProjects={allProjects}
         currentUser={currentUser}
         onSwitchUser={onSwitchUser}
+        showCharts={showAnalyticsCharts}
       />
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Formulario 1: Crear Nuevo Usuario */}
+      {/* Panel Desplegable Bajo Demanda: Crear Nuevo Usuario */}
+      {activeCreatePanel === "user" && (
         <form
-          onSubmit={onCreateUser}
-          className="rounded-xl border border-slate-200 bg-white p-6 shadow-xs space-y-4"
+          onSubmit={handleCreateUserSubmit}
+          className="rounded-xl border-2 border-blue-200 bg-white p-5 shadow-sm space-y-4"
         >
-          <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-            <Users className="h-5 w-5 text-[#0f6cbd]" />
-            <h3 className="text-sm font-bold text-slate-900">
-              Registrar Nuevo Usuario
-            </h3>
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-[#0f6cbd]">
+                <Users className="h-4 w-4" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">
+                  Registrar Nuevo Usuario con Espacio Aislado
+                </h3>
+                <p className="text-[11px] text-slate-500">
+                  El técnico recibirá acceso inmediato bajo la empresa instaladora seleccionada.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveCreatePanel("none")}
+              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div className="sm:col-span-2">
               <label className="block text-xs font-semibold text-slate-700">
                 Nombre Completo y Cargo
@@ -303,9 +402,7 @@ export default function AdminRbacSection({
                 <option value="visor_auditor">
                   Visor / Auditor OCA (Solo lectura)
                 </option>
-                <option value="super_admin">
-                  Super Administrador Global
-                </option>
+                <option value="super_admin">Super Administrador Global</option>
               </GoogleSelect>
             </div>
 
@@ -336,28 +433,55 @@ export default function AdminRbacSection({
             </div>
           </div>
 
-          <button
-            type="submit"
-            className="inline-flex items-center gap-2 rounded-lg bg-[#0f6cbd] px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-[#115ea3]"
-          >
-            <Plus className="h-4 w-4" />
-            Crear Usuario con Espacio Aislado
-          </button>
+          <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-3">
+            <button
+              type="button"
+              onClick={() => setActiveCreatePanel("none")}
+              className="rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[#0f6cbd] px-4 py-2 text-xs font-semibold text-white shadow-2xs hover:bg-[#0c5aa6]"
+            >
+              <Plus className="h-4 w-4" />
+              Crear Usuario
+            </button>
+          </div>
         </form>
+      )}
 
-        {/* Formulario 2: Crear Nueva Empresa / Tenant */}
+      {/* Panel Desplegable Bajo Demanda: Crear Nueva Empresa / Tenant */}
+      {activeCreatePanel === "tenant" && (
         <form
-          onSubmit={onCreateTenant}
-          className="rounded-xl border border-slate-200 bg-white p-6 shadow-xs space-y-4"
+          onSubmit={handleCreateTenantSubmit}
+          className="rounded-xl border-2 border-slate-300 bg-white p-5 shadow-sm space-y-4"
         >
-          <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-            <Building className="h-5 w-5 text-[#0f6cbd]" />
-            <h3 className="text-sm font-bold text-slate-900">
-              Registrar Nueva Empresa Instaladora / Tenant
-            </h3>
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-800">
+                <Building className="h-4 w-4" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">
+                  Registrar Nueva Empresa Instaladora / Tenant
+                </h3>
+                <p className="text-[11px] text-slate-500">
+                  Crea un entorno multitenant independiente para otra razón social o delegación insular.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveCreatePanel("none")}
+              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div className="sm:col-span-2">
               <label className="block text-xs font-semibold text-slate-700">
                 Razón Social de la Empresa / Estudio
@@ -387,7 +511,7 @@ export default function AdminRbacSection({
 
             <div>
               <label className="block text-xs font-semibold text-slate-700">
-                Nº Empresa Instaladora Habilitada
+                Nº Empresa Instaladora
               </label>
               <input
                 type="text"
@@ -418,29 +542,38 @@ export default function AdminRbacSection({
             </div>
           </div>
 
-          <button
-            type="submit"
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-slate-800"
-          >
-            <Plus className="h-4 w-4" />
-            Registrar Empresa (Tenant)
-          </button>
+          <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-3">
+            <button
+              type="button"
+              onClick={() => setActiveCreatePanel("none")}
+              className="rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-2xs hover:bg-slate-800"
+            >
+              <Plus className="h-4 w-4" />
+              Registrar Empresa (Tenant)
+            </button>
+          </div>
         </form>
-      </div>
+      )}
 
-      {/* Matriz de Permisología y Gestión de Usuarios (RBAC) */}
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
-        <div className="border-b border-slate-200 px-6 py-4 flex flex-wrap items-center justify-between gap-3">
+      {/* Matriz Principal de Permisología y Gestión de Usuarios (RBAC) */}
+      <div className="overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-2xs">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
           <div>
             <h3 className="text-sm font-bold text-slate-900">
-              Matriz de Usuarios, Multitenencia y Permisología (RBAC)
+              Matriz de Usuarios y Permisología (RBAC)
             </h3>
             <p className="text-xs text-slate-500">
-              Edita datos profesionales, activa/inactiva cuentas, elimina usuarios o ajusta permisos granulares con un clic.
+              Activa o revoca permisos con un clic, edita fichas profesionales, bloquea accesos o cambia de sesión activa.
             </p>
           </div>
 
-          {/* Filtros de Estado y Buscador */}
+          {/* Filtros: Estado + Empresa + Buscador */}
           <div className="flex flex-wrap items-center gap-2">
             <div className="inline-flex rounded-lg bg-slate-100 p-0.5 text-[11px] font-semibold">
               <button
@@ -478,24 +611,53 @@ export default function AdminRbacSection({
               </button>
             </div>
 
+            {tenants.length > 1 && (
+              <div className="w-48">
+                <GoogleSelect
+                  value={tenantFilter}
+                  onChange={(e) =>
+                    setTenantFilter(
+                      e.target.value === "all" ? "all" : Number(e.target.value)
+                    )
+                  }
+                >
+                  <option value="all">Todas las empresas</option>
+                  {tenants.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </GoogleSelect>
+              </div>
+            )}
+
             <div className="relative">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Buscar usuario o correo..."
-                className="w-48 sm:w-56 rounded-lg border border-slate-300 bg-white pl-8 pr-2.5 py-1.5 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
+                placeholder="Buscar usuario, NIF o correo..."
+                className="w-48 sm:w-56 rounded-lg border border-slate-300 bg-white py-1.5 pl-8 pr-7 text-xs text-slate-900"
               />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
             </div>
           </div>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold uppercase text-slate-500">
+            <thead className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
               <tr>
-                <th className="px-4 py-3">Usuario / Correo</th>
+                <th className="px-4 py-3">Usuario / Credenciales</th>
                 <th className="px-4 py-3">Empresa (Tenant)</th>
                 <th className="px-3 py-3">Rol / Estado</th>
                 <th className="px-2.5 py-3 text-center">Reportes</th>
@@ -508,7 +670,7 @@ export default function AdminRbacSection({
                 <th className="px-4 py-3 text-right">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200">
+            <tbody className="divide-y divide-slate-200/80">
               {filteredUsers.length === 0 ? (
                 <tr>
                   <td
@@ -525,49 +687,75 @@ export default function AdminRbacSection({
                     (p) => p.owner_user_id === u.id
                   ).length;
                   const isCurrent = u.id === currentUser?.id;
+                  const initials = u.full_name
+                    .split(" ")
+                    .slice(0, 2)
+                    .map((w) => w.charAt(0).toUpperCase())
+                    .join("");
+                  const roleBadge = ROLE_LABELS[u.role] || {
+                    label: u.role,
+                    style: "bg-slate-100 text-slate-700",
+                  };
 
                   return (
                     <tr
                       key={u.id}
-                      className={
+                      className={`transition ${
                         isCurrent
                           ? "bg-blue-50/40"
                           : !u.is_active
                           ? "bg-slate-50/80 opacity-75"
-                          : "hover:bg-slate-50"
-                      }
+                          : "hover:bg-slate-50/90"
+                      }`}
                     >
-                      <td className="px-4 py-3">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span
-                            className={`font-bold ${
-                              u.is_active
-                                ? "text-slate-900"
-                                : "text-slate-500 line-through"
+                      <td className="px-4 py-3.5">
+                        <div className="flex items-start gap-2.5">
+                          <div
+                            className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
+                              !u.is_active
+                                ? "bg-slate-200 text-slate-500"
+                                : isCurrent
+                                ? "bg-[#0f6cbd] text-white"
+                                : "bg-blue-50 text-[#0f6cbd] ring-1 ring-blue-200"
                             }`}
                           >
-                            {u.full_name}
-                          </span>
-                          {!u.is_active && (
-                            <span className="inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">
-                              <Ban className="h-2.5 w-2.5" />
-                              Inactivo
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-[11px] text-slate-500">
-                          {u.email} · PIN: <code className="font-mono">••••</code>
-                        </div>
-                        {(u.doi_nif || u.cci_or_colegiado) && (
-                          <div className="mt-0.5 text-[10px] text-slate-400">
-                            {u.doi_nif ? `NIF: ${u.doi_nif}` : ""}
-                            {u.doi_nif && u.cci_or_colegiado ? " · " : ""}
-                            {u.cci_or_colegiado ? `CCI: ${u.cci_or_colegiado}` : ""}
+                            {initials}
                           </div>
-                        )}
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span
+                                className={`font-bold ${
+                                  u.is_active
+                                    ? "text-slate-900"
+                                    : "text-slate-500 line-through"
+                                }`}
+                              >
+                                {u.full_name}
+                              </span>
+                              {!u.is_active && (
+                                <span className="inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">
+                                  <Ban className="h-2.5 w-2.5" />
+                                  Inactivo
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[11px] text-slate-500">
+                              {u.email} · PIN: <code className="font-mono">••••</code>
+                            </div>
+                            {(u.doi_nif || u.cci_or_colegiado) && (
+                              <div className="mt-0.5 text-[10px] text-slate-400">
+                                {u.doi_nif ? `NIF: ${u.doi_nif}` : ""}
+                                {u.doi_nif && u.cci_or_colegiado ? " · " : ""}
+                                {u.cci_or_colegiado
+                                  ? `CCI: ${u.cci_or_colegiado}`
+                                  : ""}
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </td>
 
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3.5">
                         <span className="font-medium text-slate-800">
                           {t?.name || "—"}
                         </span>
@@ -576,10 +764,12 @@ export default function AdminRbacSection({
                         </div>
                       </td>
 
-                      <td className="px-3 py-3">
+                      <td className="px-3 py-3.5">
                         <div className="flex flex-col items-start gap-1">
-                          <span className="inline-flex rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
-                            {u.role}
+                          <span
+                            className={`inline-flex rounded-md px-2 py-0.5 text-[10.5px] font-bold ${roleBadge.style}`}
+                          >
+                            {roleBadge.label}
                           </span>
                           <span
                             className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
@@ -603,7 +793,7 @@ export default function AdminRbacSection({
                         </div>
                       </td>
 
-                      <td className="px-2.5 py-3 text-center font-mono font-bold text-[#0f6cbd]">
+                      <td className="px-2.5 py-3.5 text-center font-mono font-bold text-[#0f6cbd] tabular-nums">
                         {userProjectsCount}
                       </td>
 
@@ -616,18 +806,18 @@ export default function AdminRbacSection({
                           "can_manage_users",
                         ] as const
                       ).map((perm) => (
-                        <td key={perm} className="px-2.5 py-3 text-center">
+                        <td key={perm} className="px-2.5 py-3.5 text-center">
                           <input
                             type="checkbox"
                             checked={u[perm]}
                             disabled={!canManage}
                             onChange={() => onTogglePermission(u, perm)}
-                            className="h-4 w-4 rounded border-slate-300 text-[#0f6cbd] focus:ring-[#0f6cbd] disabled:opacity-50"
+                            className="h-4 w-4 cursor-pointer rounded border-slate-300 accent-[#0f6cbd] focus:ring-[#0f6cbd] disabled:cursor-not-allowed disabled:opacity-50"
                           />
                         </td>
                       ))}
 
-                      <td className="px-3 py-3 text-center">
+                      <td className="px-3 py-3.5 text-center">
                         {isCurrent ? (
                           <span className="inline-flex items-center gap-1 rounded-md bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-800 whitespace-nowrap">
                             <UserCheck className="h-3.5 w-3.5" />
@@ -641,14 +831,14 @@ export default function AdminRbacSection({
                           <button
                             type="button"
                             onClick={() => onSwitchUser(u)}
-                            className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-100 whitespace-nowrap"
+                            className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-[#0f6cbd] whitespace-nowrap"
                           >
                             Entrar como usuario
                           </button>
                         )}
                       </td>
 
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-4 py-3.5 text-right">
                         <div className="inline-flex items-center justify-end gap-1.5">
                           <button
                             type="button"
@@ -934,7 +1124,7 @@ export default function AdminRbacSection({
                 <button
                   type="submit"
                   disabled={isSavingEdit}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#0f6cbd] px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#115ea3] disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#0f6cbd] px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#0c5aa6] disabled:opacity-50"
                 >
                   <CheckCircle2 className="h-4 w-4" />
                   {isSavingEdit ? "Guardando..." : "Guardar Cambios"}

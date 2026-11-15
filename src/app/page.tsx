@@ -2468,29 +2468,34 @@ export default function SistemaCalculoRebtPage() {
       {/* =====================================================================
           MENÚ LATERAL IZQUIERDO SIMPLIFICADO (ESCRITORIO)
          ===================================================================== */}
-      <aside className="no-print sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-slate-200 bg-white lg:flex">
+      <aside className="no-print sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-slate-200/90 bg-white lg:flex">
         {/* Marca / Cabecera Lateral */}
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#0f6cbd] text-white shadow-xs">
+        <div className="flex h-14 items-center justify-between border-b border-slate-200/80 px-4">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#0f6cbd] text-white shadow-2xs">
               <Zap className="h-4 w-4" />
             </div>
-            <span className="text-sm font-bold tracking-tight text-slate-900">
-              REBT Cloud Suite
-            </span>
+            <div>
+              <span className="block text-xs font-extrabold tracking-tight text-slate-900">
+                REBT Cloud Suite
+              </span>
+              <span className="block text-[10px] font-medium text-slate-400">
+                Ingeniería B.T. · RD 842/2002
+              </span>
+            </div>
           </div>
           <button
             type="button"
             onClick={() => setViewMode("landing")}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-            title="Ir a la Landing Page"
+            className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+            title="Ir a la Página Principal"
           >
             <Home className="h-4 w-4" />
           </button>
         </div>
 
-        {/* Navegación Agrupada por Flujo de Trabajo */}
-        <nav className="flex-1 space-y-3 overflow-y-auto px-3 py-4">
+        {/* Navegación Agrupada por Flujo de Trabajo con Contadores en Vivo */}
+        <nav className="flex-1 space-y-3.5 overflow-y-auto px-2.5 py-3.5">
           {NAV_GROUPS.map((group) => (
             <div key={group} className="space-y-0.5">
               <div className="px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
@@ -2500,25 +2505,49 @@ export default function SistemaCalculoRebtPage() {
                 .filter((item) => item.group === group)
                 .map((item) => {
                   const isActive = activeSection === item.id;
+                  const badgeCount =
+                    item.id === "expedientes"
+                      ? isolatedProjects.length
+                      : item.id === "circuitos"
+                      ? calculatedCircuits.length
+                      : null;
                   return (
                     <button
                       key={item.id}
                       type="button"
                       onClick={() => setActiveSection(item.id)}
-                      className={`flex w-full items-center gap-3 rounded-xl px-3.5 py-2 text-left text-xs transition ${
+                      className={`group relative flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-xs transition ${
                         isActive
-                          ? "bg-[#e8f0fe] text-[#0f6cbd] font-semibold"
-                          : "font-medium text-slate-700 hover:bg-slate-100"
+                          ? "bg-[#e8f2fc] font-semibold text-[#0f6cbd]"
+                          : "font-medium text-slate-600 hover:bg-slate-100/80 hover:text-slate-900"
                       }`}
                     >
-                      <span
-                        className={
-                          isActive ? "text-[#0f6cbd]" : "text-slate-500"
-                        }
-                      >
-                        {item.icon}
+                      {isActive && (
+                        <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-full bg-[#0f6cbd]" />
+                      )}
+                      <span className="flex min-w-0 items-center gap-2.5">
+                        <span
+                          className={
+                            isActive
+                              ? "text-[#0f6cbd]"
+                              : "text-slate-400 group-hover:text-slate-600"
+                          }
+                        >
+                          {item.icon}
+                        </span>
+                        <span className="truncate">{item.label}</span>
                       </span>
-                      <span className="truncate">{item.label}</span>
+                      {badgeCount !== null && (
+                        <span
+                          className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold tabular-nums ${
+                            isActive
+                              ? "bg-[#0f6cbd] text-white"
+                              : "bg-slate-100 text-slate-500"
+                          }`}
+                        >
+                          {badgeCount}
+                        </span>
+                      )}
                     </button>
                   );
                 })}
@@ -2527,8 +2556,10 @@ export default function SistemaCalculoRebtPage() {
         </nav>
 
         {/* Estado compacto al pie */}
-        <div className="border-t border-slate-200 px-4 py-3 text-[11px] text-slate-500 flex items-center justify-between">
-          <span>REBT RD 842/2002</span>
+        <div className="border-t border-slate-200/80 bg-slate-50/50 px-4 py-2.5 text-[11px] text-slate-500 flex items-center justify-between">
+          <span className="truncate max-w-[115px]" title={currentTenant?.isla}>
+            Isla: <strong className="text-slate-700">{currentTenant?.isla}</strong>
+          </span>
           <span
             className={`inline-flex items-center gap-1 font-semibold ${
               !isOnline
@@ -2552,7 +2583,7 @@ export default function SistemaCalculoRebtPage() {
               : pendingSyncCount > 0
               ? `Sinc. (${pendingSyncCount})`
               : isSupabaseConfigured
-              ? "Online"
+              ? "Cloud Sync"
               : "Local"}
           </span>
         </div>
@@ -2562,8 +2593,8 @@ export default function SistemaCalculoRebtPage() {
           ÁREA DE CONTENIDO PRINCIPAL
          ===================================================================== */}
       <div className="flex flex-1 flex-col min-w-0">
-        {/* Barra Superior con Acciones y Perfil de Sesión Organizado Arriba a la Derecha */}
-        <header className="no-print sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white/95 px-3 py-2.5 sm:px-6 sm:py-3 backdrop-blur">
+        {/* Barra Superior Compacta SaaS (Sin saltos en portátiles 1280px) */}
+        <header className="no-print sticky top-0 z-20 flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/90 bg-white/95 px-3 py-2 sm:px-5 lg:h-14 lg:flex-nowrap backdrop-blur">
           <div className="flex items-center gap-2 min-w-0">
             <button
               type="button"
@@ -2573,31 +2604,55 @@ export default function SistemaCalculoRebtPage() {
             >
               <Menu className="h-4 w-4" />
             </button>
-            <span className="rounded-md bg-blue-50 px-2 py-1 text-[11px] sm:text-xs font-bold text-[#0f6cbd] shrink-0">
+            <span className="rounded-md bg-[#e8f2fc] px-2 py-0.5 font-mono text-[11px] font-bold text-[#0f6cbd] shrink-0">
               {mtdMeta.expedienteNum}
             </span>
-            <ChevronRight className="hidden sm:block h-3.5 w-3.5 shrink-0 text-slate-400" />
-            <span className="truncate text-xs sm:text-sm font-bold text-slate-900 max-w-[140px] sm:max-w-xs">
+            <ChevronRight className="hidden sm:block h-3.5 w-3.5 shrink-0 text-slate-300" />
+            <span className="truncate text-xs sm:text-sm font-semibold text-slate-900 max-w-[130px] sm:max-w-[200px] xl:max-w-xs">
               {mtdMeta.titularNombre || "Nuevo Expediente REBT"}
             </span>
             {activeProjectId && (
-              <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 ring-1 ring-emerald-600/20">
+              <span className="hidden md:inline-flex rounded-md bg-emerald-50 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-emerald-700 ring-1 ring-emerald-600/20">
                 #{activeProjectId}
               </span>
             )}
+            {!isOnline ? (
+              <span
+                className="hidden 2xl:inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800 ring-1 ring-amber-300/60"
+                title="Trabajando sin conexión: tus cambios quedan en cola local"
+              >
+                <WifiOff className="h-3 w-3" />
+                Offline{pendingSyncCount > 0 ? ` (${pendingSyncCount})` : ""}
+              </span>
+            ) : pendingSyncCount > 0 ? (
+              <span className="hidden 2xl:inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-[#0f6cbd]">
+                <RefreshCw className="h-3 w-3 animate-spin" />
+                Sinc. ({pendingSyncCount})
+              </span>
+            ) : (
+              lastAutoSavedAt && (
+                <span
+                  className="hidden 2xl:inline-flex items-center gap-1 rounded-md bg-emerald-50/80 px-2 py-0.5 text-[10px] font-medium text-emerald-700"
+                  title="Autoguardado activo"
+                >
+                  <CheckCircle2 className="h-3 w-3" />
+                  {lastAutoSavedAt}
+                </span>
+              )
+            )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {/* Buscador Global de Obra, Herramienta o ITC */}
             <div className="relative">
-              <div className="flex items-center rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5">
-                <Search className="h-3.5 w-3.5 text-slate-400" />
+              <div className="flex items-center rounded-lg border border-slate-200 bg-slate-50/90 px-2.5 py-1.5 transition focus-within:border-[#0f6cbd] focus-within:bg-white">
+                <Search className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                 <input
                   type="text"
                   value={globalSearch}
                   onChange={(e) => setGlobalSearch(e.target.value)}
-                  placeholder="Buscar obra, herramienta, ITC…"
-                  className="ml-1.5 w-36 sm:w-48 bg-transparent text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none"
+                  placeholder="Buscar módulo o expediente…"
+                  className="ml-1.5 w-28 sm:w-40 xl:w-52 bg-transparent text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none"
                 />
                 {globalSearch && (
                   <button
@@ -2665,31 +2720,6 @@ export default function SistemaCalculoRebtPage() {
               )}
             </div>
 
-            {!isOnline ? (
-              <span
-                className="hidden xl:inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-800 ring-1 ring-amber-300/60"
-                title="Trabajando sin conexión: tus cambios quedan en cola local y se sincronizarán al volver internet"
-              >
-                <WifiOff className="h-3 w-3" />
-                Offline{pendingSyncCount > 0 ? ` · ${pendingSyncCount} pend.` : ""}
-              </span>
-            ) : pendingSyncCount > 0 ? (
-              <span className="hidden xl:inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-1 text-[10px] font-semibold text-[#0f6cbd]">
-                <RefreshCw className="h-3 w-3 animate-spin" />
-                Sincronizando ({pendingSyncCount})
-              </span>
-            ) : (
-              lastAutoSavedAt && (
-                <span
-                  className="hidden xl:inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700"
-                  title="Tus datos de oficina, presupuestos y tareas se guardan solos al instante"
-                >
-                  <CheckCircle2 className="h-3 w-3" />
-                  Guardado {lastAutoSavedAt}
-                </span>
-              )
-            )}
-
             <button
               type="button"
               onClick={() => setDarkMode((d) => !d)}
@@ -2704,13 +2734,13 @@ export default function SistemaCalculoRebtPage() {
               )}
             </button>
 
-            {/* Botones de Acción del Expediente */}
-            <div className="flex items-center gap-1.5 sm:gap-2">
+            {/* Acciones Jerarquizadas del Expediente */}
+            <div className="flex items-center gap-1.5">
               <button
                 type="button"
                 onClick={() => setShowNewWizardModal(true)}
                 title="Abrir Asistente Guiado: Nuevo Expediente o Análisis Dual por Foto de Cuadro"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-blue-300 bg-white px-2.5 sm:px-3 py-1.5 text-xs font-bold text-[#0f6cbd] shadow-2xs transition hover:bg-blue-50"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs transition hover:border-blue-300 hover:bg-blue-50/50 hover:text-[#0f6cbd]"
               >
                 <FilePlus2 className="h-3.5 w-3.5 text-[#0f6cbd]" />
                 <span className="hidden sm:inline">Nuevo</span>
@@ -2719,17 +2749,17 @@ export default function SistemaCalculoRebtPage() {
               <button
                 type="button"
                 onClick={() => setActiveSection("ficha_mtd")}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50/70 px-2.5 sm:px-3 py-1.5 text-xs font-semibold text-[#0f6cbd] transition hover:bg-blue-100/70"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-[#e8f2fc]/70 px-2.5 py-1.5 text-xs font-semibold text-[#0f6cbd] transition hover:bg-[#e8f2fc]"
               >
                 <Printer className="h-3.5 w-3.5" />
-                <span>Ficha M.T.D.</span>
+                <span className="hidden md:inline">Ficha M.T.D.</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => handleSaveToSupabase("auto")}
                 disabled={isSaving || !currentUser?.can_create_projects}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-[#0f6cbd] px-2.5 sm:px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:bg-[#115ea3] disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[#0f6cbd] px-2.5 sm:px-3 py-1.5 text-xs font-semibold text-white shadow-2xs transition hover:bg-[#0c5aa6] disabled:opacity-50"
               >
                 <Save className="h-3.5 w-3.5" />
                 <span>
@@ -2742,14 +2772,14 @@ export default function SistemaCalculoRebtPage() {
               </button>
             </div>
 
-            <div className="hidden sm:block h-6 w-px bg-slate-200" />
+            <div className="hidden sm:block h-5 w-px bg-slate-200" />
 
-            {/* Perfil de Sesión Organizado en la Esquina Superior Derecha */}
-            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/90 px-2.5 py-1 sm:px-3 sm:py-1.5 shadow-2xs">
-              <div className="flex h-6 w-6 sm:h-7 sm:w-7 shrink-0 items-center justify-center rounded-full bg-[#0f6cbd] text-xs font-bold text-white">
+            {/* Selector Compacto de Perfil Multi-Tenant */}
+            <div className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50/90 px-2 py-1">
+              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#0f6cbd] text-[11px] font-bold text-white">
                 {currentUser?.full_name.charAt(0).toUpperCase()}
               </div>
-              <div className="min-w-0">
+              <div className="hidden sm:block min-w-0">
                 <GoogleSelect
                   variant="ghost"
                   value={currentUser?.id || 1}
@@ -2759,7 +2789,7 @@ export default function SistemaCalculoRebtPage() {
                     );
                     if (target) switchActiveUser(target);
                   }}
-                  className="max-w-[140px] sm:max-w-[220px]"
+                  className="max-w-[140px] xl:max-w-[175px]"
                   title="Cambiar cuenta activa (Multitenant)"
                 >
                   {users
@@ -2770,18 +2800,12 @@ export default function SistemaCalculoRebtPage() {
                       </option>
                     ))}
                 </GoogleSelect>
-                <div className="hidden sm:flex items-center gap-1 text-[10px] text-slate-500">
-                  <Building className="h-2.5 w-2.5 text-[#0f6cbd]" />
-                  <span className="truncate max-w-[180px]">
-                    {currentTenant?.name}
-                  </span>
-                </div>
               </div>
               <button
                 type="button"
                 onClick={() => setViewMode("login")}
-                className="ml-0.5 rounded-lg border border-slate-200 bg-white p-1.5 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
-                title="Cambiar sesión / Recuperar contraseña"
+                className="rounded-md p-1 text-slate-500 transition hover:bg-white hover:text-slate-900"
+                title="Cambiar sesión / Salir"
               >
                 <LogOut className="h-3.5 w-3.5" />
               </button>
@@ -2789,8 +2813,8 @@ export default function SistemaCalculoRebtPage() {
           </div>
         </header>
 
-        {/* Contenedor de Secciones */}
-        <main className="flex-1 p-3 sm:p-6 lg:p-8 pb-20 lg:pb-8">
+        {/* Contenedor de Secciones con holgura inferior para evitar colisión con botón flotante */}
+        <main className="flex-1 p-3 sm:p-5 lg:p-6 pb-24">
           {/* Barra global de conmutación rápida cuando hay 2 Fichas Técnicas separadas desde Foto (-ACT vs -COR) */}
           {dualPhotoState && (
             <div className="no-print mb-4 flex flex-wrap items-center justify-between gap-2.5 rounded-xl border-2 border-blue-200 bg-gradient-to-r from-blue-50/90 via-white to-emerald-50/70 px-4 py-2.5 shadow-xs">
@@ -2941,30 +2965,43 @@ export default function SistemaCalculoRebtPage() {
               DASHBOARD OPERATIVO DEL TÉCNICO (KPIs Y MONITOR REBT + ACCESOS MONPIX)
              ================================================================= */}
           {activeSection === "dashboard_tecnico" && (
-            <div className="space-y-6">
-              {/* Cabecera rápida de obra a oficina + Pregunta al REBT */}
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-xs space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="space-y-5">
+              {/* Hero Operativo Unificado del Técnico (Sin cabeceras ni botones duplicados) */}
+              <div className="rounded-xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-2xs space-y-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <h2 className="text-base sm:text-lg font-bold text-slate-900">
-                      Hola, {currentUser?.full_name.split(" ")[0]} ·{" "}
-                      <span className="font-medium text-slate-500 text-xs sm:text-sm">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center gap-1 rounded-md bg-[#e8f2fc] px-2 py-0.5 text-[11px] font-semibold text-[#0f6cbd]">
+                        Panel Operativo de Ingeniería REBT
+                      </span>
+                      <span className="text-[11px] text-slate-400">·</span>
+                      <span className="text-xs font-medium text-slate-500 capitalize">
                         {new Date().toLocaleDateString("es-ES", {
                           weekday: "long",
                           day: "numeric",
                           month: "long",
                         })}
                       </span>
+                    </div>
+                    <h2 className="mt-1 text-base sm:text-lg font-bold tracking-tight text-slate-900">
+                      Hola, {currentUser?.full_name.split(" ")[0]} —{" "}
+                      <span className="font-semibold text-slate-600">
+                        {currentTenant?.name}
+                      </span>
                     </h2>
-                    <p className="mt-0.5 text-[11px] text-amber-700 font-medium">
-                      ⚠️ {ORIENTATIVE_DISCLAIMER}
+                    <p className="mt-0.5 text-[11px] text-slate-500">
+                      Registro: <strong>{currentTenant?.empresa_instaladora_num}</strong> (
+                      {currentTenant?.isla}) · CCI/Colegiado:{" "}
+                      <strong>{currentUser?.cci_or_colegiado || "—"}</strong> ·{" "}
+                      <span className="text-amber-700">{ORIENTATIVE_DISCLAIMER}</span>
                     </p>
                   </div>
+
                   <div className="flex flex-wrap items-center gap-2 text-xs">
                     <button
                       type="button"
                       onClick={() => setActiveSection("tareas_equipo")}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 font-semibold text-amber-900 hover:bg-amber-100"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50/80 px-2.5 py-1.5 font-semibold text-amber-900 transition hover:bg-amber-100 tabular-nums"
                     >
                       <CheckSquare className="h-3.5 w-3.5" />
                       {
@@ -2975,7 +3012,7 @@ export default function SistemaCalculoRebtPage() {
                     <button
                       type="button"
                       onClick={() => setActiveSection("tareas_equipo")}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 font-semibold text-emerald-800 hover:bg-emerald-100"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50/80 px-2.5 py-1.5 font-semibold text-emerald-800 transition hover:bg-emerald-100 tabular-nums"
                     >
                       <Users className="h-3.5 w-3.5" />
                       {
@@ -2988,7 +3025,7 @@ export default function SistemaCalculoRebtPage() {
                   </div>
                 </div>
 
-                {/* Accesos directos de un toque (de la obra a la oficina) */}
+                {/* Lanzador rápido de herramientas (Obra ↔ Oficina) */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
                   {[
                     {
@@ -3038,9 +3075,9 @@ export default function SistemaCalculoRebtPage() {
                       key={card.id}
                       type="button"
                       onClick={() => setActiveSection(card.id)}
-                      className="flex flex-col items-start gap-1 rounded-xl border border-slate-200 bg-slate-50/70 p-2.5 text-left transition hover:border-[#0f6cbd] hover:bg-blue-50/40"
+                      className="group flex flex-col items-start gap-1 rounded-xl border border-slate-200/90 bg-slate-50/60 p-2.5 text-left transition hover:border-blue-300 hover:bg-white hover:shadow-2xs"
                     >
-                      <div className="flex items-center gap-1.5 font-bold text-xs text-slate-900">
+                      <div className="flex items-center gap-1.5 font-bold text-xs text-slate-900 group-hover:text-[#0f6cbd]">
                         {card.icon}
                         <span className="truncate">{card.title}</span>
                       </div>
@@ -3051,28 +3088,28 @@ export default function SistemaCalculoRebtPage() {
                   ))}
                 </div>
 
-                {/* Pregunta rápida al reglamento REBT desde inicio */}
+                {/* Consulta rápida al Reglamento REBT */}
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
                     if (!homeRebtQuery.trim()) return;
                     setHomeRebtAnswer(answerRebtQuestion(homeRebtQuery));
                   }}
-                  className="flex flex-col sm:flex-row gap-2 pt-1"
+                  className="flex flex-col sm:flex-row gap-2"
                 >
                   <div className="relative flex-1">
-                    <MessageSquareText className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-[#0f6cbd]" />
+                    <MessageSquareText className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#0f6cbd]" />
                     <input
                       type="text"
                       value={homeRebtQuery}
                       onChange={(e) => setHomeRebtQuery(e.target.value)}
-                      placeholder="Pregunta rápida al REBT: ej. ¿Qué sección pongo para un horno de 3,5 kW? o ¿Cómo mido la tierra?"
-                      className="w-full rounded-xl border border-slate-300 bg-white pl-9 pr-3 py-2 text-xs text-slate-900 focus:border-[#0f6cbd] focus:outline-none"
+                      placeholder="Consulta normativa REBT: ej. ¿Qué sección pongo para un horno de 3,5 kW? o ¿Cómo mido la tierra?"
+                      className="w-full rounded-xl border border-slate-300 bg-slate-50/50 pl-9 pr-3 py-2 text-xs text-slate-900 focus:bg-white"
                     />
                   </div>
                   <button
                     type="submit"
-                    className="rounded-xl bg-[#0f6cbd] px-4 py-2 text-xs font-semibold text-white hover:bg-[#115ea3] shrink-0"
+                    className="rounded-xl bg-[#0f6cbd] px-4 py-2 text-xs font-semibold text-white shadow-2xs transition hover:bg-[#0c5aa6] shrink-0"
                   >
                     Consultar ITC
                   </button>
@@ -3996,197 +4033,244 @@ export default function SistemaCalculoRebtPage() {
                 </div>
               </div>
 
-              {/* Tabla de Circuitos */}
-              <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
+              {/* Tabla de Circuitos con Doble Zona Visual (Parámetros Editables vs Resultados REBT) */}
+              <section className="overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-2xs">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
-                    <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold uppercase text-slate-500">
-                      <tr>
-                        <th className="px-2.5 py-3">Cód.</th>
-                        <th className="px-2.5 py-3">Descripción del Circuito</th>
-                        <th className="px-2.5 py-3">Uso / ITC</th>
-                        <th className="px-2.5 py-3">Tensión</th>
-                        <th className="px-2.5 py-3">Potencia (W)</th>
-                        <th className="px-2.5 py-3">Long. (m)</th>
-                        <th className="px-2.5 py-3">Aisl. / Mét.</th>
-                        <th className="px-2.5 py-3 text-right">Ib (A)</th>
-                        <th className="px-2.5 py-3 text-right">PIA (A)</th>
-                        <th className="px-2.5 py-3 text-right">Iz (A)</th>
-                        <th className="px-2.5 py-3">Sección (mm²)</th>
-                        <th className="px-2.5 py-3 text-right">ΔU (%)</th>
-                        <th className="px-2.5 py-3 text-right">Icc (A)</th>
-                        <th className="px-2.5 py-3 text-right">Tubo Ø</th>
-                        <th className="px-2.5 py-3 text-center">Acción</th>
+                    <thead>
+                      {/* Nivel 1: Agrupación Semántica Entrada vs Salida Calculada */}
+                      <tr className="border-b border-slate-200 text-[10px] font-bold uppercase tracking-wider">
+                        <th
+                          colSpan={7}
+                          className="bg-slate-50/70 px-3 py-1.5 text-slate-500 border-r border-slate-200"
+                        >
+                          Parámetros de Diseño del Circuito (Editables)
+                        </th>
+                        <th
+                          colSpan={8}
+                          className="bg-[#e8f2fc]/60 px-3 py-1.5 text-[#0f6cbd]"
+                        >
+                          Dimensionado Reglamentario REBT Calculado (Ib ≤ In ≤ Iz · ΔU% · Icc)
+                        </th>
+                      </tr>
+                      {/* Nivel 2: Columnas */}
+                      <tr className="border-b border-slate-200 bg-slate-50/90 text-[11px] font-semibold uppercase text-slate-500">
+                        <th className="sticky left-0 z-10 bg-slate-50 px-2.5 py-2.5">
+                          Cód.
+                        </th>
+                        <th className="px-2.5 py-2.5">Descripción del Circuito</th>
+                        <th className="px-2.5 py-2.5">Uso / ITC</th>
+                        <th className="px-2.5 py-2.5">Tensión</th>
+                        <th className="px-2.5 py-2.5 text-right">Potencia (W)</th>
+                        <th className="px-2.5 py-2.5 text-right">Long. (m)</th>
+                        <th className="border-r border-slate-200 px-2.5 py-2.5">
+                          Aisl. / Mét.
+                        </th>
+                        <th className="bg-blue-50/30 px-2.5 py-2.5 text-right">
+                          Ib (A)
+                        </th>
+                        <th className="bg-blue-50/30 px-2.5 py-2.5 text-right">
+                          PIA (A)
+                        </th>
+                        <th className="bg-blue-50/30 px-2.5 py-2.5 text-right">
+                          Iz (A)
+                        </th>
+                        <th className="bg-blue-50/30 px-2.5 py-2.5">
+                          Sección (mm²)
+                        </th>
+                        <th className="bg-blue-50/30 px-2.5 py-2.5 text-right">
+                          ΔU (%)
+                        </th>
+                        <th className="bg-blue-50/30 px-2.5 py-2.5 text-right">
+                          Icc (A)
+                        </th>
+                        <th className="bg-blue-50/30 px-2.5 py-2.5 text-right">
+                          Tubo Ø
+                        </th>
+                        <th className="bg-blue-50/30 px-2.5 py-2.5 text-center">
+                          Acción
+                        </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-200">
-                      {calculatedCircuits.map((c, index) => (
-                        <tr key={index} className="hover:bg-slate-50/80">
-                          <td className="px-2.5 py-2">
-                            <input
-                              type="text"
-                              value={c.code}
-                              onChange={(e) =>
-                                updateCircuit(index, "code", e.target.value)
-                              }
-                              className="w-12 rounded border border-slate-300 bg-white px-1.5 py-1 font-bold text-[#0f6cbd]"
-                            />
-                          </td>
-                          <td className="px-2.5 py-2">
-                            <input
-                              type="text"
-                              value={c.description}
-                              onChange={(e) =>
-                                updateCircuit(
-                                  index,
-                                  "description",
-                                  e.target.value
-                                )
-                              }
-                              className="w-48 rounded border border-slate-300 bg-white px-2 py-1 text-slate-900"
-                            />
-                          </td>
-                          <td className="px-2.5 py-2 min-w-[140px]">
-                            <GoogleSelect
-                              value={c.usageType}
-                              onChange={(e) =>
-                                updateCircuit(
-                                  index,
-                                  "usageType",
-                                  e.target.value as CircuitUsageType
-                                )
-                              }
-                            >
-                              <option value="vivienda_interior">
-                                Vivienda (3%)
-                              </option>
-                              <option value="alumbrado">Alumbrado (3%)</option>
-                              <option value="alumbrado_descarga">
-                                Descarga x1,8 (3%)
-                              </option>
-                              <option value="fuerza_otros">
-                                Fuerza / Otros (5%)
-                              </option>
-                              <option value="motor">Motor x1,25 (5%)</option>
-                              <option value="recarga_ve">Recarga VE (5%)</option>
-                            </GoogleSelect>
-                          </td>
-                          <td className="px-2.5 py-2 min-w-[100px]">
-                            <GoogleSelect
-                              value={c.phaseSystem}
-                              onChange={(e) =>
-                                updateCircuit(
-                                  index,
-                                  "phaseSystem",
-                                  e.target.value as "monofasico" | "trifasico"
-                                )
-                              }
-                            >
-                              <option value="monofasico">230V 1F</option>
-                              <option value="trifasico">400V 3F</option>
-                            </GoogleSelect>
-                          </td>
-                          <td className="px-2.5 py-2">
-                            <input
-                              type="number"
-                              min={0}
-                              step={100}
-                              value={c.powerWatts}
-                              onChange={(e) =>
-                                updateCircuit(
-                                  index,
-                                  "powerWatts",
-                                  Number(e.target.value) || 0
-                                )
-                              }
-                              className="w-20 rounded border border-slate-300 bg-white px-2 py-1 text-right text-slate-900"
-                            />
-                          </td>
-                          <td className="px-2.5 py-2">
-                            <input
-                              type="number"
-                              min={1}
-                              value={c.lengthMeters}
-                              onChange={(e) =>
-                                updateCircuit(
-                                  index,
-                                  "lengthMeters",
-                                  Number(e.target.value) || 1
-                                )
-                              }
-                              className="w-14 rounded border border-slate-300 bg-white px-1.5 py-1 text-right text-slate-900"
-                            />
-                          </td>
-                          <td className="px-2.5 py-2 min-w-[165px]">
-                            <div className="flex items-center gap-1">
-                              <GoogleSelect
-                                value={c.insulationType}
+                    <tbody className="divide-y divide-slate-200/80">
+                      {calculatedCircuits.map((c, index) => {
+                        const isRowOk = c.voltageDropPct <= c.maxAllowedDropPct;
+                        return (
+                          <tr
+                            key={index}
+                            className={`group transition ${
+                              isRowOk
+                                ? "hover:bg-slate-50/90"
+                                : "bg-rose-50/30 hover:bg-rose-50/50"
+                            }`}
+                          >
+                            <td className="sticky left-0 z-10 bg-white px-2.5 py-2 group-hover:bg-slate-50">
+                              <input
+                                type="text"
+                                value={c.code}
+                                onChange={(e) =>
+                                  updateCircuit(index, "code", e.target.value)
+                                }
+                                className="h-8 w-12 rounded-md border border-slate-300 bg-white px-1.5 text-center font-mono font-bold text-[#0f6cbd]"
+                              />
+                            </td>
+                            <td className="px-2.5 py-2">
+                              <input
+                                type="text"
+                                value={c.description}
                                 onChange={(e) =>
                                   updateCircuit(
                                     index,
-                                    "insulationType",
-                                    e.target.value as InsulationType
+                                    "description",
+                                    e.target.value
                                   )
                                 }
-                              >
-                                <option value="PVC_70">PVC 70°C</option>
-                                <option value="XLPE_90">XLPE 90°C</option>
-                              </GoogleSelect>
+                                className="h-8 w-52 rounded-md border border-slate-300 bg-white px-2 text-slate-900"
+                              />
+                            </td>
+                            <td className="px-2.5 py-2 min-w-[140px]">
                               <GoogleSelect
-                                value={c.installationMethod}
+                                value={c.usageType}
                                 onChange={(e) =>
                                   updateCircuit(
                                     index,
-                                    "installationMethod",
-                                    e.target.value as InstallationMethod
+                                    "usageType",
+                                    e.target.value as CircuitUsageType
                                   )
                                 }
                               >
-                                <option value="B1">B1</option>
-                                <option value="E">E/F</option>
+                                <option value="vivienda_interior">
+                                  Vivienda (3%)
+                                </option>
+                                <option value="alumbrado">Alumbrado (3%)</option>
+                                <option value="alumbrado_descarga">
+                                  Descarga x1,8 (3%)
+                                </option>
+                                <option value="fuerza_otros">
+                                  Fuerza / Otros (5%)
+                                </option>
+                                <option value="motor">Motor x1,25 (5%)</option>
+                                <option value="recarga_ve">Recarga VE (5%)</option>
                               </GoogleSelect>
-                            </div>
-                          </td>
-                          <td className="px-2.5 py-2 text-right font-mono text-slate-700">
-                            {c.currentIbAmps} A
-                          </td>
-                          <td className="px-2.5 py-2 text-right font-mono font-bold text-[#0f6cbd]">
-                            {c.piaAmps} A
-                          </td>
-                          <td className="px-2.5 py-2 text-right font-mono text-slate-600">
-                            {c.ampacityIzAmps} A
-                          </td>
-                          <td className="px-2.5 py-2 font-mono font-semibold text-slate-900">
-                            {c.conductorsSummary} + PE {c.peSectionMm2} mm²
-                          </td>
-                          <td className="px-2.5 py-2 text-right font-mono">
-                            <span
-                              className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-semibold ${
-                                c.voltageDropPct <= c.maxAllowedDropPct
-                                  ? "bg-emerald-50 text-emerald-700"
-                                  : "bg-rose-50 text-rose-700"
-                              }`}
-                            >
-                              {c.voltageDropPct}%
-                            </span>
-                          </td>
-                          <td className="px-2.5 py-2 text-right font-mono text-slate-600">
-                            {c.shortCircuitCurrentAmps} A
-                          </td>
-                          <td className="px-2.5 py-2 text-right font-mono text-slate-700">
-                            Ø {c.tubeDiameterMm} mm
-                          </td>
-                          <td className="px-2.5 py-2 text-center">
-                            <button
-                              type="button"
-                              onClick={() => removeCircuit(index)}
-                              className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
+                            </td>
+                            <td className="px-2.5 py-2 min-w-[100px]">
+                              <GoogleSelect
+                                value={c.phaseSystem}
+                                onChange={(e) =>
+                                  updateCircuit(
+                                    index,
+                                    "phaseSystem",
+                                    e.target.value as "monofasico" | "trifasico"
+                                  )
+                                }
+                              >
+                                <option value="monofasico">230V 1F</option>
+                                <option value="trifasico">400V 3F</option>
+                              </GoogleSelect>
+                            </td>
+                            <td className="px-2.5 py-2 text-right">
+                              <input
+                                type="number"
+                                min={0}
+                                step={100}
+                                value={c.powerWatts}
+                                onChange={(e) =>
+                                  updateCircuit(
+                                    index,
+                                    "powerWatts",
+                                    Number(e.target.value) || 0
+                                  )
+                                }
+                                className="h-8 w-20 rounded-md border border-slate-300 bg-white px-2 text-right font-mono tabular-nums text-slate-900"
+                              />
+                            </td>
+                            <td className="px-2.5 py-2 text-right">
+                              <input
+                                type="number"
+                                min={1}
+                                value={c.lengthMeters}
+                                onChange={(e) =>
+                                  updateCircuit(
+                                    index,
+                                    "lengthMeters",
+                                    Number(e.target.value) || 1
+                                  )
+                                }
+                                className="h-8 w-14 rounded-md border border-slate-300 bg-white px-1.5 text-right font-mono tabular-nums text-slate-900"
+                              />
+                            </td>
+                            <td className="border-r border-slate-200/80 px-2.5 py-2 min-w-[165px]">
+                              <div className="flex items-center gap-1">
+                                <GoogleSelect
+                                  value={c.insulationType}
+                                  onChange={(e) =>
+                                    updateCircuit(
+                                      index,
+                                      "insulationType",
+                                      e.target.value as InsulationType
+                                    )
+                                  }
+                                >
+                                  <option value="PVC_70">PVC 70°C</option>
+                                  <option value="XLPE_90">XLPE 90°C</option>
+                                </GoogleSelect>
+                                <GoogleSelect
+                                  value={c.installationMethod}
+                                  onChange={(e) =>
+                                    updateCircuit(
+                                      index,
+                                      "installationMethod",
+                                      e.target.value as InstallationMethod
+                                    )
+                                  }
+                                >
+                                  <option value="B1">B1</option>
+                                  <option value="E">E/F</option>
+                                </GoogleSelect>
+                              </div>
+                            </td>
+                            <td className="bg-slate-50/40 px-2.5 py-2 text-right font-mono tabular-nums text-slate-700 whitespace-nowrap">
+                              {c.currentIbAmps} A
+                            </td>
+                            <td className="bg-slate-50/40 px-2.5 py-2 text-right font-mono font-bold tabular-nums text-[#0f6cbd] whitespace-nowrap">
+                              {c.piaAmps} A
+                            </td>
+                            <td className="bg-slate-50/40 px-2.5 py-2 text-right font-mono tabular-nums text-slate-600 whitespace-nowrap">
+                              {c.ampacityIzAmps} A
+                            </td>
+                            <td className="bg-slate-50/40 px-2.5 py-2 font-mono font-semibold tabular-nums text-slate-900 whitespace-nowrap">
+                              {c.conductorsSummary} + PE {c.peSectionMm2} mm²
+                            </td>
+                            <td className="bg-slate-50/40 px-2.5 py-2 text-right font-mono tabular-nums whitespace-nowrap">
+                              <span
+                                className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-semibold ${
+                                  isRowOk
+                                    ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20"
+                                    : "bg-rose-50 text-rose-700 ring-1 ring-rose-600/25"
+                                }`}
+                              >
+                                {c.voltageDropPct}%
+                              </span>
+                            </td>
+                            <td className="bg-slate-50/40 px-2.5 py-2 text-right font-mono tabular-nums text-slate-600 whitespace-nowrap">
+                              {c.shortCircuitCurrentAmps} A
+                            </td>
+                            <td className="bg-slate-50/40 px-2.5 py-2 text-right font-mono tabular-nums text-slate-700 whitespace-nowrap">
+                              Ø {c.tubeDiameterMm} mm
+                            </td>
+                            <td className="bg-slate-50/40 px-2.5 py-2 text-center">
+                              <button
+                                type="button"
+                                onClick={() => removeCircuit(index)}
+                                title="Eliminar circuito"
+                                className="rounded-md p-1.5 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

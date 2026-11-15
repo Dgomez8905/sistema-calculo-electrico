@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   Eye,
   Pencil,
@@ -12,6 +12,7 @@ import {
   FileSpreadsheet,
   X,
   RotateCcw,
+  Search,
 } from "lucide-react";
 import {
   MtdFormMetadata,
@@ -109,6 +110,7 @@ export default function SectionHistoryRegistry({
   const [viewingRecord, setViewingRecord] =
     useState<SavedHistoryRecord | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+  const [historySearch, setHistorySearch] = useState("");
 
   const info = SECTION_TITLES[section];
 
@@ -117,23 +119,40 @@ export default function SectionHistoryRegistry({
     ...(r.mtd_metadata_json || {}),
   });
 
+  const filteredRecords = useMemo(() => {
+    const q = historySearch.trim().toLowerCase();
+    if (!q) return records;
+    return records.filter((rec) => {
+      const meta = rec.mtd_metadata_json;
+      return (
+        String(rec.id).includes(q) ||
+        rec.name.toLowerCase().includes(q) ||
+        rec.client_name.toLowerCase().includes(q) ||
+        rec.location.toLowerCase().includes(q) ||
+        (meta?.expedienteNum || "").toLowerCase().includes(q) ||
+        (meta?.titularNombre || "").toLowerCase().includes(q) ||
+        (meta?.terminoMunicipal || "").toLowerCase().includes(q)
+      );
+    });
+  }, [records, historySearch]);
+
   return (
-    <div className="mt-6 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
+    <div className="mt-6 overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-2xs">
       {/* Cabecera del Historial con Botones de Registro / Actualización */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 bg-slate-50/70 px-6 py-4">
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 bg-slate-50/60 px-5 py-4">
         <div className="flex items-start gap-3">
-          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-[#0f6cbd] ring-1 ring-blue-200">
+          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-[#0f6cbd] ring-1 ring-blue-200/80">
             <History className="h-4 w-4" />
           </div>
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-sm font-bold text-slate-900">{info.title}</h3>
-              <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-[11px] font-bold text-[#0f6cbd]">
+              <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-[11px] font-bold text-[#0f6cbd] tabular-nums">
                 {records.length} {records.length === 1 ? "registro" : "registros"}
               </span>
               {activeRecordId && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-bold text-amber-800">
-                  Editando Registro #{activeRecordId}
+                  Editando #{activeRecordId}
                 </span>
               )}
             </div>
@@ -141,8 +160,30 @@ export default function SectionHistoryRegistry({
           </div>
         </div>
 
-        {/* Barra de Botones para Registrar o Actualizar en el Historial */}
+        {/* Barra de Buscador + Botones para Registrar o Actualizar en el Historial */}
         <div className="flex flex-wrap items-center gap-2">
+          {records.length >= 2 && (
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={historySearch}
+                onChange={(e) => setHistorySearch(e.target.value)}
+                placeholder="Filtrar historial..."
+                className="w-44 rounded-lg border border-slate-300 bg-white py-1.5 pl-8 pr-6 text-xs text-slate-900 placeholder:text-slate-400"
+              />
+              {historySearch && (
+                <button
+                  type="button"
+                  onClick={() => setHistorySearch("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+          )}
+
           {activeRecordId !== null && (
             <>
               <button
@@ -172,13 +213,13 @@ export default function SectionHistoryRegistry({
             type="button"
             disabled={isSaving || !canEdit}
             onClick={onSaveNew}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-[#0f6cbd] px-3.5 py-1.5 text-xs font-semibold text-white shadow-2xs transition hover:bg-[#115ea3] disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-[#0f6cbd] px-3.5 py-1.5 text-xs font-semibold text-white shadow-2xs transition hover:bg-[#0c5aa6] disabled:opacity-50"
           >
             <Plus className="h-3.5 w-3.5" />
             {isSaving
               ? "Registrando..."
               : activeRecordId !== null
-              ? "Guardar como Nuevo Registro"
+              ? "Guardar como Nuevo"
               : "Registrar en Historial"}
           </button>
         </div>
@@ -195,6 +236,17 @@ export default function SectionHistoryRegistry({
             <strong className="text-[#0f6cbd]">&ldquo;Registrar en Historial&rdquo;</strong>{" "}
             para añadir el primer registro editable.
           </p>
+        </div>
+      ) : filteredRecords.length === 0 ? (
+        <div className="p-6 text-center text-xs text-slate-500">
+          No hay registros que coincidan con &ldquo;{historySearch}&rdquo;.{" "}
+          <button
+            type="button"
+            onClick={() => setHistorySearch("")}
+            className="font-semibold text-[#0f6cbd] hover:underline"
+          >
+            Ver todos
+          </button>
         </div>
       ) : (
         <div className="overflow-x-auto">
@@ -251,7 +303,7 @@ export default function SectionHistoryRegistry({
             </thead>
 
             <tbody className="divide-y divide-slate-200">
-              {records.map((rec) => {
+              {filteredRecords.map((rec) => {
                 const isEditing = activeRecordId === rec.id;
                 const meta = getMeta(rec);
                 const bf = rec.building_forecast_json || {};
